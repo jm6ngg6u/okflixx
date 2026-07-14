@@ -214,26 +214,11 @@ function AdminLayout() {
   );
 }
 
-function EmberBackdrop() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[#ff2a3a]/10 blur-[120px]" />
-      <div className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full bg-[#b0060f]/10 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-[#ff2a3a]/5 blur-[100px]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,42,58,0.08),transparent_50%)]" />
-      <div className="absolute inset-0" style={{
-        backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
-        backgroundSize: "48px 48px",
-      }} />
-    </div>
-  );
-}
-
 function FullScreen({ label }: { label: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
-      <EmberBackdrop />
-      <div className="relative flex flex-col items-center gap-4">
+      <LiveBackground />
+      <div className="relative z-10 flex flex-col items-center gap-4">
         <div className="w-10 h-10 rounded-full border-2 border-[#ff2a3a]/30 border-t-[#ff2a3a] animate-spin" />
         <div className="text-sm text-white/60 font-mono uppercase tracking-widest">{label}</div>
       </div>
