@@ -30,11 +30,18 @@ const WINDOWS: { label: string; hours: number }[] = [
 function DashboardPage() {
   const [hours, setHours] = useState(24);
   const fetchStats = useServerFn(getDashboardStats);
+  const fetchSettings = useServerFn(listSettings);
+  const doToggle = useServerFn(toggleProxyMode);
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-stats", hours],
     queryFn: () => fetchStats({ data: { windowHours: hours } }),
     refetchInterval: 30_000,
   });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
+  const proxyOn = settingsQ.data?.settings?.proxy_mode === "1";
+  const maintOn = settingsQ.data?.settings?.maintenance_enabled === "1";
+
 
   const kpi = data?.kpi ?? { total: 0, success: 0, rate_limited: 0, bot_detected: 0, invalid_code: 0, other: 0 };
   const successRate = kpi.total ? Math.round((kpi.success / kpi.total) * 1000) / 10 : 0;
