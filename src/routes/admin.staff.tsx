@@ -3,13 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { listStaff, inviteStaff, revokeRole } from "@/lib/staff.functions";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, UserPlus, Trash2 } from "lucide-react";
+import { Users, UserPlus, Trash2, Mail, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/staff")({
@@ -26,106 +24,125 @@ function StaffPage() {
   const q = useQuery({ queryKey: ["staff"], queryFn: () => fetchStaff() });
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "moderator">("moderator");
+  const [busy, setBusy] = useState(false);
+
+  const staff = q.data?.staff ?? [];
+  const invites = q.data?.invites ?? [];
+
+  async function invite() {
+    if (!email.trim()) return;
+    setBusy(true);
+    try {
+      await doInvite({ data: { email: email.trim(), role } });
+      toast.success(`Invite sent · promoted on first sign-in`);
+      setEmail("");
+      qc.invalidateQueries({ queryKey: ["staff"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally { setBusy(false); }
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2"><Users className="w-6 h-6" /> Staff & roles</h1>
-        <p className="text-sm text-muted-foreground">Invite by email — role is granted automatically when they first sign in.</p>
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#ff2a3a]/20 to-[#b0060f]/10 border border-[#ff2a3a]/20 flex items-center justify-center">
+          <Users className="w-5 h-5 text-[#ff2a3a]" />
+        </div>
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#ff2a3a] mb-1">// Access</div>
+          <h1 className="font-display text-3xl md:text-4xl leading-none">Staff & roles</h1>
+          <p className="text-sm text-white/50 mt-2">Invite by email. Role is granted automatically on the invitee's first sign-in.</p>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2"><UserPlus className="w-4 h-4" /> Invite staff</CardTitle>
-          <CardDescription>Send an invite for an email address. On first sign-in the user is auto-promoted to the chosen role.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid sm:grid-cols-[1fr_180px_auto] gap-2">
-          <div>
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="person@example.com" />
+      <div className="glass p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <UserPlus className="w-4 h-4 text-[#ff2a3a]" />
+          <div className="font-display text-lg">Invite staff</div>
+        </div>
+        <div className="grid sm:grid-cols-[1fr_180px_auto] gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Email</label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="person@example.com" className="bg-white/5 border-white/10" />
           </div>
-          <div>
-            <Label>Role</Label>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Role</label>
             <Select value={role} onValueChange={(v: any) => setRole(v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="moderator">Moderator</SelectItem>
+                <SelectItem value="admin">Admin — full access</SelectItem>
+                <SelectItem value="moderator">Moderator — read + attempts</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="self-end">
-            <Button
-              onClick={async () => {
-                if (!email) return;
-                try {
-                  await doInvite({ data: { email, role } });
-                  toast.success("Invite created");
-                  setEmail("");
-                  qc.invalidateQueries({ queryKey: ["staff"] });
-                } catch (e: any) {
-                  toast.error(e?.message ?? "Failed");
-                }
-              }}
-            >
+            <Button onClick={invite} disabled={!email.trim() || busy} className="btn-red w-full sm:w-auto">
+              {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
               Invite
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Current staff</CardTitle></CardHeader>
-        <CardContent>
-          {q.isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> : (
-            <div className="space-y-2">
-              {(q.data?.staff ?? []).map((s: any) => (
-                <div key={s.user_id + s.role} className="flex items-center justify-between rounded-md border p-3">
-                  <div>
-                    <div className="text-sm font-medium">{s.display_name ?? s.email ?? s.user_id.slice(0, 8)}</div>
-                    <div className="text-xs text-muted-foreground">{s.email ?? "—"}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={s.role === "admin" ? "default" : "secondary"}>{s.role}</Badge>
-                    <Button size="sm" variant="ghost" onClick={async () => {
-                      if (!confirm("Revoke role?")) return;
-                      try {
-                        await doRevoke({ data: { user_id: s.user_id } });
-                        qc.invalidateQueries({ queryKey: ["staff"] });
-                      } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-                    }}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {(q.data?.staff ?? []).length === 0 && (
-                <div className="text-sm text-muted-foreground">No staff yet.</div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Pending invites</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {(q.data?.invites ?? []).map((i: any) => (
-              <div key={i.id} className="flex items-center justify-between rounded-md border p-3">
-                <div className="text-sm">{i.email}</div>
-                <div className="flex gap-2">
-                  <Badge>{i.role}</Badge>
-                  <Badge variant={i.used_at ? "secondary" : "outline"}>{i.used_at ? "used" : "pending"}</Badge>
-                </div>
+      <div className="glass overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-[#ff2a3a]" />
+          <div className="font-display text-lg">Current staff <span className="text-white/40 text-sm">({staff.length})</span></div>
+        </div>
+        <div className="divide-y divide-white/5">
+          {q.isLoading ? (
+            <div className="p-8 text-center text-white/40 text-sm">Loading…</div>
+          ) : staff.length === 0 ? (
+            <div className="p-8 text-center text-white/40 text-sm">No staff yet.</div>
+          ) : staff.map((s: any) => (
+            <div key={s.user_id + s.role} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition">
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{s.display_name ?? s.email ?? s.user_id.slice(0, 8)}</div>
+                <div className="text-xs text-white/50 font-mono truncate">{s.email ?? s.user_id.slice(0, 12)}</div>
               </div>
-            ))}
-            {(q.data?.invites ?? []).length === 0 && (
-              <div className="text-sm text-muted-foreground">No invites.</div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge variant="outline" className={s.role === "admin" ? "bg-[#ff2a3a]/15 text-[#ff8a90] border-[#ff2a3a]/30" : "bg-white/10 text-white/70 border-white/15"}>
+                  {s.role}
+                </Badge>
+                <Button size="sm" variant="ghost" onClick={async () => {
+                  if (!confirm(`Revoke ${s.role} from ${s.email ?? s.user_id.slice(0, 8)}?`)) return;
+                  try {
+                    await doRevoke({ data: { user_id: s.user_id } });
+                    toast.success("Role revoked");
+                    qc.invalidateQueries({ queryKey: ["staff"] });
+                  } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+                }} className="hover:bg-red-500/10">
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="glass overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
+          <Mail className="w-4 h-4 text-[#ff2a3a]" />
+          <div className="font-display text-lg">Pending invites <span className="text-white/40 text-sm">({invites.filter((i: any) => !i.used_at).length})</span></div>
+        </div>
+        <div className="divide-y divide-white/5">
+          {invites.length === 0 ? (
+            <div className="p-8 text-center text-white/40 text-sm">No invites.</div>
+          ) : invites.map((i: any) => (
+            <div key={i.id} className="flex items-center justify-between px-5 py-3">
+              <div className="text-sm font-mono">{i.email}</div>
+              <div className="flex gap-2">
+                <Badge variant="outline" className="bg-white/10 text-white/70 border-white/15">{i.role}</Badge>
+                <Badge variant="outline" className={i.used_at
+                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                  : "bg-amber-500/15 text-amber-300 border-amber-500/30"}>
+                  {i.used_at ? "used" : "pending"}
+                </Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
