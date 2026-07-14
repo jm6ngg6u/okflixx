@@ -179,23 +179,23 @@ export const submitActivation = createServerFn({ method: "POST" })
       if (isCookieDead(outcome.status)) {
         await supabaseAdmin.rpc("mark_cookie_invalid", {
           _id: cookie.id,
-          _reason: (outcome as any).error ?? outcome.status,
+          _reason: ((outcome as any).error ?? outcome.status) as string,
         });
       } else {
         await supabaseAdmin.rpc("release_cookie", {
           _id: cookie.id,
           _success: success,
-          _outcome: success ? null : outcome.status,
+          _outcome: success ? undefined : outcome.status,
         });
       }
       if (proxyRow) {
         await supabaseAdmin.rpc("release_proxy", {
           _id: proxyRow.id,
           _success: outcome.status !== "worker_error",
-          _latency_ms: null,
-          _err: outcome.status === "worker_error" ? (outcome as any).error : null,
+          _err: outcome.status === "worker_error" ? ((outcome as any).error as string) : undefined,
         });
       }
+
 
       // 5f. Terminal decisions.
       if (success) {
