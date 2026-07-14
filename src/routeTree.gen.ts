@@ -9,38 +9,229 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BgPreviewIndexRouteImport } from './routes/bg-preview.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as BgPreviewParticlesRouteImport } from './routes/bg-preview.particles'
+import { Route as BgPreviewNebulaRouteImport } from './routes/bg-preview.nebula'
+import { Route as BgPreviewAuroraRouteImport } from './routes/bg-preview.aurora'
+import { Route as AdminStaffRouteImport } from './routes/admin.staff'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminSecurityRouteImport } from './routes/admin.security'
+import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
+import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
+import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
+import { Route as ApiPublicHooksPoolCheckRouteImport } from './routes/api/public/hooks/pool-check'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BgPreviewIndexRoute = BgPreviewIndexRouteImport.update({
+  id: '/bg-preview/',
+  path: '/bg-preview/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const BgPreviewParticlesRoute = BgPreviewParticlesRouteImport.update({
+  id: '/bg-preview/particles',
+  path: '/bg-preview/particles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BgPreviewNebulaRoute = BgPreviewNebulaRouteImport.update({
+  id: '/bg-preview/nebula',
+  path: '/bg-preview/nebula',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BgPreviewAuroraRoute = BgPreviewAuroraRouteImport.update({
+  id: '/bg-preview/aurora',
+  path: '/bg-preview/aurora',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminStaffRoute = AdminStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSecurityRoute = AdminSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProxiesRoute = AdminProxiesRouteImport.update({
+  id: '/proxies',
+  path: '/proxies',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCookiesRoute = AdminCookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
+  id: '/attempts',
+  path: '/attempts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const ApiPublicHooksPoolCheckRoute = ApiPublicHooksPoolCheckRouteImport.update({
+  id: '/api/public/hooks/pool-check',
+  path: '/api/public/hooks/pool-check',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/admin/attempts': typeof AdminAttemptsRoute
+  '/admin/cookies': typeof AdminCookiesRoute
+  '/admin/proxies': typeof AdminProxiesRoute
+  '/admin/security': typeof AdminSecurityRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/bg-preview/aurora': typeof BgPreviewAuroraRoute
+  '/bg-preview/nebula': typeof BgPreviewNebulaRoute
+  '/bg-preview/particles': typeof BgPreviewParticlesRoute
+  '/admin/': typeof AdminIndexRoute
+  '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/admin/attempts': typeof AdminAttemptsRoute
+  '/admin/cookies': typeof AdminCookiesRoute
+  '/admin/proxies': typeof AdminProxiesRoute
+  '/admin/security': typeof AdminSecurityRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/bg-preview/aurora': typeof BgPreviewAuroraRoute
+  '/bg-preview/nebula': typeof BgPreviewNebulaRoute
+  '/bg-preview/particles': typeof BgPreviewParticlesRoute
+  '/admin': typeof AdminIndexRoute
+  '/bg-preview': typeof BgPreviewIndexRoute
+  '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/admin/attempts': typeof AdminAttemptsRoute
+  '/admin/cookies': typeof AdminCookiesRoute
+  '/admin/proxies': typeof AdminProxiesRoute
+  '/admin/security': typeof AdminSecurityRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/bg-preview/aurora': typeof BgPreviewAuroraRoute
+  '/bg-preview/nebula': typeof BgPreviewNebulaRoute
+  '/bg-preview/particles': typeof BgPreviewParticlesRoute
+  '/admin/': typeof AdminIndexRoute
+  '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/admin/attempts'
+    | '/admin/cookies'
+    | '/admin/proxies'
+    | '/admin/security'
+    | '/admin/settings'
+    | '/admin/staff'
+    | '/bg-preview/aurora'
+    | '/bg-preview/nebula'
+    | '/bg-preview/particles'
+    | '/admin/'
+    | '/bg-preview/'
+    | '/api/public/hooks/pool-check'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/admin/attempts'
+    | '/admin/cookies'
+    | '/admin/proxies'
+    | '/admin/security'
+    | '/admin/settings'
+    | '/admin/staff'
+    | '/bg-preview/aurora'
+    | '/bg-preview/nebula'
+    | '/bg-preview/particles'
+    | '/admin'
+    | '/bg-preview'
+    | '/api/public/hooks/pool-check'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/admin/attempts'
+    | '/admin/cookies'
+    | '/admin/proxies'
+    | '/admin/security'
+    | '/admin/settings'
+    | '/admin/staff'
+    | '/bg-preview/aurora'
+    | '/bg-preview/nebula'
+    | '/bg-preview/particles'
+    | '/admin/'
+    | '/bg-preview/'
+    | '/api/public/hooks/pool-check'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  BgPreviewAuroraRoute: typeof BgPreviewAuroraRoute
+  BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
+  BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
+  BgPreviewIndexRoute: typeof BgPreviewIndexRoute
+  ApiPublicHooksPoolCheckRoute: typeof ApiPublicHooksPoolCheckRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +239,124 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bg-preview/': {
+      id: '/bg-preview/'
+      path: '/bg-preview'
+      fullPath: '/bg-preview/'
+      preLoaderRoute: typeof BgPreviewIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/bg-preview/particles': {
+      id: '/bg-preview/particles'
+      path: '/bg-preview/particles'
+      fullPath: '/bg-preview/particles'
+      preLoaderRoute: typeof BgPreviewParticlesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bg-preview/nebula': {
+      id: '/bg-preview/nebula'
+      path: '/bg-preview/nebula'
+      fullPath: '/bg-preview/nebula'
+      preLoaderRoute: typeof BgPreviewNebulaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bg-preview/aurora': {
+      id: '/bg-preview/aurora'
+      path: '/bg-preview/aurora'
+      fullPath: '/bg-preview/aurora'
+      preLoaderRoute: typeof BgPreviewAuroraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/staff': {
+      id: '/admin/staff'
+      path: '/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AdminStaffRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/security': {
+      id: '/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AdminSecurityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/proxies': {
+      id: '/admin/proxies'
+      path: '/proxies'
+      fullPath: '/admin/proxies'
+      preLoaderRoute: typeof AdminProxiesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/cookies': {
+      id: '/admin/cookies'
+      path: '/cookies'
+      fullPath: '/admin/cookies'
+      preLoaderRoute: typeof AdminCookiesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/attempts': {
+      id: '/admin/attempts'
+      path: '/attempts'
+      fullPath: '/admin/attempts'
+      preLoaderRoute: typeof AdminAttemptsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/api/public/hooks/pool-check': {
+      id: '/api/public/hooks/pool-check'
+      path: '/api/public/hooks/pool-check'
+      fullPath: '/api/public/hooks/pool-check'
+      preLoaderRoute: typeof ApiPublicHooksPoolCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminAttemptsRoute: typeof AdminAttemptsRoute
+  AdminCookiesRoute: typeof AdminCookiesRoute
+  AdminProxiesRoute: typeof AdminProxiesRoute
+  AdminSecurityRoute: typeof AdminSecurityRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminStaffRoute: typeof AdminStaffRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAttemptsRoute: AdminAttemptsRoute,
+  AdminCookiesRoute: AdminCookiesRoute,
+  AdminProxiesRoute: AdminProxiesRoute,
+  AdminSecurityRoute: AdminSecurityRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminStaffRoute: AdminStaffRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AuthRoute: AuthRoute,
+  BgPreviewAuroraRoute: BgPreviewAuroraRoute,
+  BgPreviewNebulaRoute: BgPreviewNebulaRoute,
+  BgPreviewParticlesRoute: BgPreviewParticlesRoute,
+  BgPreviewIndexRoute: BgPreviewIndexRoute,
+  ApiPublicHooksPoolCheckRoute: ApiPublicHooksPoolCheckRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
