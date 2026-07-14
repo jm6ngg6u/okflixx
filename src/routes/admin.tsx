@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
-  Shield, ShieldAlert, KeyRound,
+  Shield, ShieldAlert, KeyRound, Menu, X,
 } from "lucide-react";
-import { toast } from "sonner";
+import logo from "@/assets/brand-logo.png";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -22,6 +22,7 @@ function AdminLayout() {
   const [authed, setAuthed] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const auditedAccessRef = useRef<string | null>(null);
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -53,6 +54,8 @@ function AdminLayout() {
     });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, [navigate, qc]);
+
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const role = useQuery({
     queryKey: ["staff-role", userId],
@@ -91,9 +94,7 @@ function AdminLayout() {
     const allowed = !role.error && !!role.data?.isStaff;
     supabase
       .rpc("log_admin_access_attempt", { _allowed: allowed, _path: pathname })
-      .then(({ error }) => {
-        if (error) console.warn("Unable to record admin access audit", error.message);
-      });
+      .then(({ error }) => { if (error) console.warn("audit failed", error.message); });
   }, [authed, pathname, role.data?.isStaff, role.error, role.isFetching, role.isLoading, userId]);
 
   async function signOut() {
@@ -103,22 +104,21 @@ function AdminLayout() {
     navigate({ to: "/auth", replace: true });
   }
 
-  if (!authReady) return <FullScreenLoading label="Loading session…" />;
+  if (!authReady) return <FullScreen label="Loading session…" />;
   if (!authed) return null;
-  if (role.isLoading) return <FullScreenLoading label="Checking permissions…" />;
+  if (role.isLoading) return <FullScreen label="Checking permissions…" />;
   if (role.error || !role.data?.isStaff) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <div className="max-w-md text-center space-y-4">
-          <ShieldAlert className="w-12 h-12 mx-auto text-destructive" />
-          <h1 className="text-2xl font-bold">Access denied</h1>
-          <p className="text-muted-foreground">
-            You are signed in but not a staff member. Ask an existing admin to grant your account a role.
-          </p>
-          {userEmail && <p className="text-xs text-muted-foreground">Current account: {userEmail}</p>}
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-black text-white">
+        <EmberBackdrop />
+        <div className="relative max-w-md text-center space-y-5 glass p-8">
+          <ShieldAlert className="w-12 h-12 mx-auto text-[#ff2a3a]" />
+          <h1 className="font-display text-3xl">Access denied</h1>
+          <p className="text-white/60 text-sm">You are signed in but not a staff member. Ask an existing admin to grant your account a role.</p>
+          {userEmail && <p className="text-xs text-white/40 font-mono">{userEmail}</p>}
           <div className="flex gap-2 justify-center">
             <Button variant="outline" onClick={signOut}>Sign out</Button>
-            <Button asChild><Link to="/">Home</Link></Button>
+            <Button asChild className="btn-red"><Link to="/">Home</Link></Button>
           </div>
         </div>
       </div>
@@ -134,52 +134,106 @@ function AdminLayout() {
     { to: "/admin/security", label: "Security (TOTP)", icon: KeyRound },
     { to: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
   ];
+  const visibleNav = nav.filter((n) => !n.adminOnly || role.data?.isAdmin);
 
   return (
-    <div className="min-h-screen bg-background text-foreground grid grid-cols-1 md:grid-cols-[240px_1fr]">
-      <aside className="border-r border-border/50 bg-card/40 backdrop-blur p-4 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
-        <div className="flex items-center gap-2 mb-6 px-2">
-          <Shield className="w-5 h-5 text-primary" />
-          <div className="font-bold">Emberlord Admin</div>
-        </div>
-        <div className="text-xs text-muted-foreground px-2 mb-1">Signed in as</div>
-        <div className="px-2 mb-4">
-          <div className="text-sm font-medium">{role.data?.profile?.display_name ?? role.data?.profile?.username ?? "Staff"}</div>
-          <Badge variant={role.data?.isAdmin ? "default" : "secondary"} className="mt-1 text-[10px]">
-            {role.data?.isAdmin ? "ADMIN" : "MODERATOR"}
-          </Badge>
-        </div>
-        <nav className="space-y-1">
-          {nav.filter((n) => !n.adminOnly || role.data?.isAdmin).map((n) => {
-            const active = pathname === n.to;
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition ${
-                  active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                }`}
-              >
-                <n.icon className="w-4 h-4" /> {n.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <Button variant="ghost" className="w-full justify-start mt-6 text-muted-foreground" onClick={signOut}>
-          <LogOut className="w-4 h-4 mr-2" /> Sign out
-        </Button>
-      </aside>
-      <main className="p-4 md:p-8 max-w-[1400px] w-full">
-        <Outlet />
-      </main>
+    <div className="min-h-screen relative bg-black text-white">
+      <EmberBackdrop />
+
+      {/* Top bar (mobile) */}
+      <div className="md:hidden relative z-30 flex items-center justify-between px-4 py-3 border-b border-white/10 backdrop-blur bg-black/40">
+        <Link to="/admin" className="flex items-center gap-2">
+          <img src={logo} alt="" className="h-7 w-7" />
+          <span className="font-display text-sm">EMBER<span className="text-[#ff2a3a]">LORD</span> · Admin</span>
+        </Link>
+        <button onClick={() => setMobileOpen((v) => !v)} className="p-2 rounded-md border border-white/10">
+          {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+        </button>
+      </div>
+
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-[260px_1fr]">
+        <aside className={`${mobileOpen ? "block" : "hidden"} md:block border-r border-white/5 bg-black/40 backdrop-blur-xl p-5 md:sticky md:top-0 md:h-screen md:overflow-y-auto`}>
+          <Link to="/admin" className="hidden md:flex items-center gap-3 mb-8 group">
+            <img src={logo} alt="" className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
+            <div>
+              <div className="font-display text-base leading-none">EMBER<span className="text-[#ff2a3a]">LORD</span></div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-white/40 mt-1">Control room</div>
+            </div>
+          </Link>
+
+          <div className="glass p-3 mb-5">
+            <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Signed in</div>
+            <div className="text-sm font-medium truncate">
+              {role.data?.profile?.display_name ?? role.data?.profile?.username ?? "Staff"}
+            </div>
+            <div className="text-[11px] text-white/50 font-mono truncate">{userEmail}</div>
+            <Badge variant="outline" className={`mt-2 text-[10px] border-none ${role.data?.isAdmin ? "bg-[#ff2a3a]/20 text-[#ff8a90]" : "bg-white/10 text-white/70"}`}>
+              {role.data?.isAdmin ? "ADMIN" : "MODERATOR"}
+            </Badge>
+          </div>
+
+          <div className="text-[10px] uppercase tracking-widest text-white/30 px-2 mb-2">Navigation</div>
+          <nav className="space-y-1">
+            {visibleNav.map((n) => {
+              const active = pathname === n.to;
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition relative overflow-hidden ${
+                    active
+                      ? "bg-gradient-to-r from-[#ff2a3a]/20 to-transparent text-white border border-[#ff2a3a]/30"
+                      : "text-white/60 hover:text-white hover:bg-white/5 border border-transparent"
+                  }`}
+                >
+                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-[#ff2a3a] rounded-r" />}
+                  <n.icon className="w-4 h-4" /> {n.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="mt-8 space-y-2">
+            <Button variant="outline" asChild className="w-full justify-start border-white/10 bg-white/[0.02] hover:bg-white/10">
+              <Link to="/"><Shield className="w-4 h-4 mr-2" /> View public site</Link>
+            </Button>
+            <Button variant="ghost" className="w-full justify-start text-white/60 hover:text-white" onClick={signOut}>
+              <LogOut className="w-4 h-4 mr-2" /> Sign out
+            </Button>
+          </div>
+        </aside>
+
+        <main className="p-4 md:p-8 max-w-[1400px] w-full">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
 
-function FullScreenLoading({ label }: { label: string }) {
+function EmberBackdrop() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-sm text-muted-foreground animate-pulse">{label}</div>
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[#ff2a3a]/10 blur-[120px]" />
+      <div className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full bg-[#b0060f]/10 blur-[120px]" />
+      <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-[#ff2a3a]/5 blur-[100px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,42,58,0.08),transparent_50%)]" />
+      <div className="absolute inset-0" style={{
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
+        backgroundSize: "48px 48px",
+      }} />
+    </div>
+  );
+}
+
+function FullScreen({ label }: { label: string }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
+      <EmberBackdrop />
+      <div className="relative flex flex-col items-center gap-4">
+        <div className="w-10 h-10 rounded-full border-2 border-[#ff2a3a]/30 border-t-[#ff2a3a] animate-spin" />
+        <div className="text-sm text-white/60 font-mono uppercase tracking-widest">{label}</div>
+      </div>
     </div>
   );
 }
