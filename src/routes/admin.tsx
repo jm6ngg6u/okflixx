@@ -112,8 +112,8 @@ function AdminLayout() {
   if (role.error || !role.data?.isStaff) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-black text-white">
-        <EmberBackdrop />
-        <div className="relative max-w-md text-center space-y-5 glass p-8">
+        <LiveBackground />
+        <div className="relative z-10 max-w-md text-center space-y-5 glass p-8">
           <ShieldAlert className="w-12 h-12 mx-auto text-[#ff2a3a]" />
           <h1 className="font-display text-3xl">Access denied</h1>
           <p className="text-white/60 text-sm">You are signed in but not a staff member. Ask an existing admin to grant your account a role.</p>
