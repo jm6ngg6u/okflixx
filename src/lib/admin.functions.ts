@@ -150,3 +150,45 @@ export const getPoolSummary = createServerFn({ method: "GET" })
     }
     return { cookies: c, proxies: p };
   });
+
+/** Live worker health probe. */
+export const getWorkerHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const url = (process.env.NETFLIX_WORKER_URL ?? "").replace(/\/+$/, "");
+    if (!url) return { ok: false, latency_ms: null as number | null, error: "NETFLIX_WORKER_URL not set" };
+    const t0 = Date.now();
+    try {
+      const c = new AbortController();
+      const to = setTimeout(() => c.abort(), 6000);
+      const r = await fetch(`${url}/health`, { signal: c.signal, headers: { "X-Worker-Token": process.env.NETFLIX_WORKER_TOKEN ?? "" } });
+      clearTimeout(to);
+      return { ok: r.ok, latency_ms: Date.now() - t0, error: r.ok ? null : `HTTP ${r.status}` };
+    } catch (e: any) {
+      return { ok: false, latency_ms: Date.now() - t0, error: String(e?.message ?? e) };
+    }
+  });
+
+/** Recent admin activity feed. */
+export const getRecentActivity = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data } = await supabase
+      .from("admin_activity_log")
+      .select("id, action, details, created_at, admin_id")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    return { rows: data ?? [] };
+  });
