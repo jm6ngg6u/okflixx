@@ -24,6 +24,7 @@ import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
 import { Route as ApiPublicHooksPoolCheckRouteImport } from './routes/api/public/hooks/pool-check'
+import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -100,6 +101,12 @@ const ApiPublicHooksPoolCheckRoute = ApiPublicHooksPoolCheckRouteImport.update({
   path: '/api/public/hooks/pool-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksCookiesAutocheckRoute =
+  ApiPublicHooksCookiesAutocheckRouteImport.update({
+    id: '/api/public/hooks/cookies-autocheck',
+    path: '/api/public/hooks/cookies-autocheck',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
 }
 export interface FileRoutesByTo {
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin': typeof AdminIndexRoute
   '/bg-preview': typeof BgPreviewIndexRoute
+  '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
 }
 export interface FileRoutesById {
@@ -150,6 +159,7 @@ export interface FileRoutesById {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
 }
 export interface FileRouteTypes {
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin/'
     | '/bg-preview/'
+    | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin'
     | '/bg-preview'
+    | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
   id:
     | '__root__'
@@ -202,6 +214,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin/'
     | '/bg-preview/'
+    | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
   fileRoutesById: FileRoutesById
 }
@@ -213,6 +226,7 @@ export interface RootRouteChildren {
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
   BgPreviewIndexRoute: typeof BgPreviewIndexRoute
+  ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
   ApiPublicHooksPoolCheckRoute: typeof ApiPublicHooksPoolCheckRoute
 }
 
@@ -323,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPoolCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/cookies-autocheck': {
+      id: '/api/public/hooks/cookies-autocheck'
+      path: '/api/public/hooks/cookies-autocheck'
+      fullPath: '/api/public/hooks/cookies-autocheck'
+      preLoaderRoute: typeof ApiPublicHooksCookiesAutocheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -356,6 +377,7 @@ const rootRouteChildren: RootRouteChildren = {
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
   BgPreviewIndexRoute: BgPreviewIndexRoute,
+  ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
   ApiPublicHooksPoolCheckRoute: ApiPublicHooksPoolCheckRoute,
 }
 export const routeTree = rootRouteImport
