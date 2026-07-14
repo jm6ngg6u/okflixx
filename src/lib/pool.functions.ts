@@ -1,63 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { createHash } from "crypto";
+import { fingerprintOf, hasNetflixAuthCookie, parseCookieBlob, type CookiePair } from "@/lib/cookie-parser";
 
 // -------------------- Cookie parsing --------------------
-
-type CookiePair = { name: string; value: string; domain?: string };
-
-function parseCookieBlob(raw: string): CookiePair[] {
-  raw = raw.trim();
-  if (!raw) return [];
-  // JSON array (EditThisCookie / Cookie-Editor export)
-  if (raw.startsWith("[") || raw.startsWith("{")) {
-    try {
-      const j = JSON.parse(raw);
-      const arr = Array.isArray(j) ? j : Array.isArray(j.cookies) ? j.cookies : [];
-      return arr
-        .map((c: any) => ({ name: String(c.name ?? ""), value: String(c.value ?? ""), domain: c.domain }))
-        .filter((c: CookiePair) => c.name && c.value);
-    } catch { /* fall through */ }
-  }
-  const out: CookiePair[] = [];
-  const lines = raw.split(/\r?\n/);
-  // Netscape: domain \t flag \t path \t secure \t expiry \t name \t value
-  if (lines.some((l) => l.split("\t").length >= 7)) {
-    for (const line of lines) {
-      if (!line || line.startsWith("#")) continue;
-      const parts = line.split("\t");
-      if (parts.length < 7) continue;
-      out.push({ domain: parts[0], name: parts[5], value: parts.slice(6).join("\t") });
-    }
-    return out.filter((c) => c.name && c.value);
-  }
-  // Header style: "a=1; b=2; c=3"
-  const flat = raw.replace(/\n/g, "; ");
-  for (const seg of flat.split(";")) {
-    const eq = seg.indexOf("=");
-    if (eq < 1) continue;
-    const name = seg.slice(0, eq).trim();
-    const value = seg.slice(eq + 1).trim();
-    if (name && value) out.push({ name, value });
-  }
-  return out;
-}
-
-function cookieHeader(pairs: CookiePair[]): string {
-  return pairs.map((c) => `${c.name}=${c.value}`).join("; ");
-}
-
-function fingerprintOf(pairs: CookiePair[]): string {
-  const key = pairs.find((c) => c.name === "NetflixId")?.value ?? pairs.map((c) => `${c.name}=${c.value}`).sort().join("|");
-  return createHash("sha256").update(key).digest("hex").slice(0, 32);
-}
 
 // -------------------- Netflix cookie check (via worker) --------------------
 
 type CheckOutcome = {
-  status: "active" | "on_hold" | "free" | "invalid";
+  status: "active" | "on_hold" | "free" | "invalid" | "unknown";
   is_valid: boolean;
+  transient?: boolean;
+  proxy_mode: boolean;
+  proxy_used: boolean;
   email?: string | null;
   country?: string | null;
   plan_name?: string | null;
@@ -82,18 +37,29 @@ async function checkNetflixCookie(pairs: CookiePair[], supabaseAdmin: any): Prom
   const { checkCookieViaWorker } = await import("@/lib/worker.server");
   const proxyMode = await readProxyMode(supabaseAdmin);
   let proxyPayload: any = null;
+  let proxyId: string | null = null;
   if (proxyMode) {
     const { data: pr } = await supabaseAdmin.rpc("pick_next_proxy");
     const p = Array.isArray(pr) ? pr[0] : pr;
     if (p) {
       proxyPayload = { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password };
-      await supabaseAdmin.rpc("release_proxy", { _id: p.id, _success: true });
+      proxyId = p.id;
     }
   }
   const out = await checkCookieViaWorker({ cookies: pairs, proxy: proxyPayload });
+  if (proxyId) {
+    await supabaseAdmin.rpc("release_proxy", {
+      _id: proxyId,
+      _success: !out.transient,
+      _err: out.transient ? out.error ?? "Proxy or Netflix check failed" : undefined,
+    });
+  }
   return {
     status: out.status,
     is_valid: out.is_valid,
+    transient: out.transient ?? false,
+    proxy_mode: proxyMode,
+    proxy_used: Boolean(proxyPayload),
     email: out.email ?? null,
     country: out.country ?? null,
     plan_name: out.plan_name ?? null,
@@ -125,7 +91,7 @@ export const uploadCookies = createServerFn({ method: "POST" })
     let inserted = 0, duplicates = 0, invalid = 0;
     for (const blob of data.blobs) {
       const pairs = parseCookieBlob(blob);
-      if (pairs.length === 0) { invalid++; continue; }
+      if (pairs.length === 0 || !hasNetflixAuthCookie(pairs)) { invalid++; continue; }
       const fp = fingerprintOf(pairs);
       const { data: dup } = await supabaseAdmin.from("cookie_pool").select("id").eq("fingerprint", fp).maybeSingle();
       if (dup) { duplicates++; continue; }
@@ -164,7 +130,7 @@ export const listCookies = createServerFn({ method: "POST" })
     if (!isAdmin && !isMod) throw new Error("Forbidden");
     let q = supabase
       .from("cookie_pool")
-      .select("id,label,email,country,plan_name,video_quality,name,payment_method,status,is_valid,total_uses,success_count,fail_count,last_used_at,last_checked_at,created_at", { count: "exact" })
+      .select("id,label,email,country,plan_name,video_quality,name,member_since,max_streams,payment_method,status,is_valid,total_uses,success_count,fail_count,last_used_at,last_checked_at,last_checked_mode,last_error,created_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
     if (data.status) q = q.eq("status", data.status);
@@ -208,8 +174,12 @@ export const checkCookieNow = createServerFn({ method: "POST" })
       plan_name: outcome.plan_name ?? null,
       video_quality: outcome.video_quality ?? null,
       name: outcome.name ?? null,
+      member_since: outcome.member_since ?? null,
+      max_streams: outcome.max_streams ?? null,
       payment_method: outcome.payment_method ?? null,
       last_checked_at: new Date().toISOString(),
+      last_checked_mode: outcome.proxy_used ? "proxy" : "direct",
+      last_error: outcome.last_error ?? null,
     }).eq("id", data.id);
     return outcome;
   });
@@ -222,21 +192,27 @@ export const checkAllCookies = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin.from("cookie_pool").select("id, cookies_json").limit(500);
-    let checked = 0, active = 0, invalid = 0;
+    let checked = 0, active = 0, invalid = 0, free = 0, on_hold = 0, unknown = 0;
     for (const r of rows ?? []) {
       const o = await checkNetflixCookie(r.cookies_json as CookiePair[], supabaseAdmin);
       await supabaseAdmin.from("cookie_pool").update({
         status: o.status, is_valid: o.is_valid,
         email: o.email ?? null, country: o.country ?? null, plan_name: o.plan_name ?? null,
-        video_quality: o.video_quality ?? null, name: o.name ?? null, payment_method: o.payment_method ?? null,
-        last_checked_at: new Date().toISOString(),
+        video_quality: o.video_quality ?? null, name: o.name ?? null,
+        member_since: o.member_since ?? null, max_streams: o.max_streams ?? null,
+        payment_method: o.payment_method ?? null,
+        last_checked_at: new Date().toISOString(), last_checked_mode: o.proxy_used ? "proxy" : "direct",
+        last_error: o.last_error ?? null,
       }).eq("id", r.id);
       checked++;
       if (o.status === "active") active++;
       if (o.status === "invalid") invalid++;
+      if (o.status === "free") free++;
+      if (o.status === "on_hold") on_hold++;
+      if (o.status === "unknown") unknown++;
     }
-    await supabaseAdmin.from("admin_activity_log").insert({ admin_id: userId, action: "cookie.check_all", details: { checked, active, invalid } });
-    return { checked, active, invalid };
+    await supabaseAdmin.from("admin_activity_log").insert({ admin_id: userId, action: "cookie.check_all", details: { checked, active, invalid, free, on_hold, unknown } });
+    return { checked, active, invalid, free, on_hold, unknown };
   });
 
 // -------------------- Proxy parsing --------------------
@@ -325,24 +301,20 @@ export const checkAllProxies = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows } = await supabaseAdmin.from("proxy_pool").select("id, scheme, ip, port").limit(500);
+    const { checkProxyViaWorker } = await import("@/lib/worker.server");
+    const { data: rows } = await supabaseAdmin.from("proxy_pool").select("id, scheme, ip, port, username, password").limit(500);
     let valid = 0, invalid = 0;
-    // NOTE: Worker runtime cannot tunnel through arbitrary HTTP/SOCKS proxies for outbound fetches.
-    // We only sanity-check reachability of the proxy host:port from the edge and log the result.
     for (const p of rows ?? []) {
-      let ok = false, err: string | null = null;
-      try {
-        const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 5000);
-        // Attempt a lightweight TCP-ish reach via HTTP — best-effort.
-        await fetch(`http://${p.ip}:${p.port}`, { signal: c.signal }).catch((e) => { err = String(e?.message || e); });
-        clearTimeout(t);
-        ok = !err;
-      } catch (e: any) { err = String(e?.message || e); }
+      const out = await checkProxyViaWorker({
+        proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
+      });
       await supabaseAdmin.from("proxy_pool").update({
-        is_valid: ok, last_error: err, last_checked_at: new Date().toISOString(),
+        is_valid: out.ok,
+        last_latency_ms: out.latency_ms ?? null,
+        last_error: out.error ?? null,
+        last_checked_at: new Date().toISOString(),
       }).eq("id", p.id);
-      if (ok) valid++; else invalid++;
+      if (out.ok) valid++; else invalid++;
     }
     return { valid, invalid };
   });
