@@ -107,7 +107,7 @@ function HomePage() {
           <a href="#devices" className="hover:text-white transition">Devices</a>
           <a href="#reviews" className="hover:text-white transition">Reviews</a>
         </div>
-        <a href="#activate" className="btn-ghost text-sm">Sign In</a>
+        <a href="#activate" className="btn-red text-sm">Activate →</a>
       </nav>
 
       {/* HERO — CENTERED */}
