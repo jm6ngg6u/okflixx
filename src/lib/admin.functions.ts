@@ -161,7 +161,9 @@ export const getWorkerHealth = createServerFn({ method: "GET" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
-    const url = (process.env.NETFLIX_WORKER_URL ?? "").replace(/\/+$/, "");
+    let url = (process.env.NETFLIX_WORKER_URL ?? "").trim();
+    if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
+    url = url.replace(/\/+$/, "");
     if (!url) return { ok: false, latency_ms: null as number | null, error: "NETFLIX_WORKER_URL not set" };
     const t0 = Date.now();
     try {
