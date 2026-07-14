@@ -1,15 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDashboardStats } from "@/lib/admin.functions";
+import { listSettings, toggleProxyMode } from "@/lib/settings.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
-  Activity, CheckCircle2, ShieldOff, Bot, XCircle, TrendingUp, MapPin,
+  Activity, CheckCircle2, ShieldOff, Bot, XCircle, TrendingUp, MapPin, Zap,
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Dashboard — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
@@ -26,11 +30,18 @@ const WINDOWS: { label: string; hours: number }[] = [
 function DashboardPage() {
   const [hours, setHours] = useState(24);
   const fetchStats = useServerFn(getDashboardStats);
+  const fetchSettings = useServerFn(listSettings);
+  const doToggle = useServerFn(toggleProxyMode);
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-stats", hours],
     queryFn: () => fetchStats({ data: { windowHours: hours } }),
     refetchInterval: 30_000,
   });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
+  const proxyOn = settingsQ.data?.settings?.proxy_mode === "1";
+  const maintOn = settingsQ.data?.settings?.maintenance_enabled === "1";
+
 
   const kpi = data?.kpi ?? { total: 0, success: 0, rate_limited: 0, bot_detected: 0, invalid_code: 0, other: 0 };
   const successRate = kpi.total ? Math.round((kpi.success / kpi.total) * 1000) / 10 : 0;
@@ -55,6 +66,39 @@ function DashboardPage() {
           </TabsList>
         </Tabs>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card/50 p-4">
+        <Zap className={`w-5 h-5 ${proxyOn ? "text-primary" : "text-muted-foreground"}`} />
+        <div className="flex-1 min-w-[220px]">
+          <div className="text-sm font-medium">
+            Proxy mode: <span className={proxyOn ? "text-primary" : "text-muted-foreground"}>{proxyOn ? "ON (proxied)" : "OFF (proxyless)"}</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {proxyOn
+              ? "Cookie checks and TV activations are routed through your proxy pool."
+              : "Cookie checks and TV activations run direct from the server."}
+          </div>
+        </div>
+        <Switch
+          checked={proxyOn}
+          onCheckedChange={async () => {
+            try {
+              const r = await doToggle();
+              toast.success(`Proxy mode is now ${r.proxy_mode ? "ON" : "OFF"}`);
+              qc.invalidateQueries({ queryKey: ["admin-settings"] });
+            } catch (e: any) {
+              toast.error(e?.message ?? "Toggle failed");
+            }
+          }}
+        />
+        {maintOn && (
+          <Badge variant="destructive" className="ml-2">
+            Maintenance mode ON — visitors are blocked
+          </Badge>
+        )}
+        <Link to="/admin/settings" className="text-xs text-muted-foreground underline underline-offset-2">More…</Link>
+      </div>
+
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Kpi icon={Activity} label="Total" value={kpi.total} tone="primary" />

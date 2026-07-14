@@ -65,7 +65,7 @@ function fingerprintOf(pairs: CookiePair[]): string {
   return createHash("sha256").update(key).digest("hex").slice(0, 32);
 }
 
-// -------------------- Netflix cookie check --------------------
+// -------------------- Netflix cookie check (via worker) --------------------
 
 type CheckOutcome = {
   status: "active" | "on_hold" | "free" | "invalid";
@@ -75,51 +75,49 @@ type CheckOutcome = {
   plan_name?: string | null;
   video_quality?: string | null;
   name?: string | null;
+  member_since?: string | null;
+  max_streams?: number | null;
   payment_method?: string | null;
+  last_error?: string | null;
 };
 
-async function checkNetflixCookie(pairs: CookiePair[]): Promise<CheckOutcome> {
-  try {
-    const res = await fetch("https://www.netflix.com/YourAccount", {
-      headers: {
-        cookie: cookieHeader(pairs),
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-        "accept": "text/html,application/xhtml+xml",
-        "accept-language": "en-US,en;q=0.9",
-      },
-      redirect: "follow",
-    });
-    const finalUrl = res.url;
-    const html = await res.text();
-    if (finalUrl.includes("/login") || finalUrl.includes("/Login")) {
-      return { status: "invalid", is_valid: false };
-    }
-    if (/membership.*on.?hold|account.*hold/i.test(html)) {
-      return { status: "on_hold", is_valid: false };
-    }
-    const pick = (re: RegExp) => (html.match(re)?.[1] ?? "").trim() || null;
-    const email = pick(/"emailAddress"\s*:\s*"([^"]+)"/i) ?? pick(/data-uia="account-email"[^>]*>([^<]+)</i);
-    const plan = pick(/"planName"\s*:\s*"([^"]+)"/i) ?? pick(/current[- ]plan[^>]*>\s*<[^>]+>([^<]+)</i);
-    const country = pick(/"countryOfSignup"\s*:\s*"([^"]+)"/i);
-    const quality = pick(/"videoQuality"\s*:\s*"([^"]+)"/i);
-    const name = pick(/"firstName"\s*:\s*"([^"]+)"/i);
-    const pay = pick(/"paymentMethod"\s*:\s*"([^"]+)"/i);
-    const free = /free\s*trial|start\s*your\s*free\s*month/i.test(html);
-    return {
-      status: free ? "free" : "active",
-      is_valid: true,
-      email,
-      country,
-      plan_name: plan,
-      video_quality: quality,
-      name,
-      payment_method: pay,
-    };
-  } catch (e) {
-    console.error("[cookie-check]", e);
-    return { status: "invalid", is_valid: false };
-  }
+async function readProxyMode(supabaseAdmin: any): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "proxy_mode")
+    .maybeSingle();
+  return data?.value === "1";
 }
+
+async function checkNetflixCookie(pairs: CookiePair[], supabaseAdmin: any): Promise<CheckOutcome> {
+  const { checkCookieViaWorker } = await import("@/lib/worker.server");
+  const proxyMode = await readProxyMode(supabaseAdmin);
+  let proxyPayload: any = null;
+  if (proxyMode) {
+    const { data: pr } = await supabaseAdmin.rpc("pick_next_proxy");
+    const p = Array.isArray(pr) ? pr[0] : pr;
+    if (p) {
+      proxyPayload = { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password };
+      await supabaseAdmin.rpc("release_proxy", { _id: p.id, _success: true });
+    }
+  }
+  const out = await checkCookieViaWorker({ cookies: pairs, proxy: proxyPayload });
+  return {
+    status: out.status,
+    is_valid: out.is_valid,
+    email: out.email ?? null,
+    country: out.country ?? null,
+    plan_name: out.plan_name ?? null,
+    video_quality: out.video_quality ?? null,
+    name: out.name ?? null,
+    member_since: out.member_since ?? null,
+    max_streams: out.max_streams ?? null,
+    payment_method: out.payment_method ?? null,
+    last_error: out.error ?? null,
+  };
+}
+
 
 // -------------------- Cookie server functions --------------------
 
@@ -203,7 +201,7 @@ export const checkCookieNow = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("cookie_pool").select("cookies_json").eq("id", data.id).single();
     if (error || !row) throw new Error("Not found");
-    const outcome = await checkNetflixCookie(row.cookies_json as CookiePair[]);
+    const outcome = await checkNetflixCookie(row.cookies_json as CookiePair[], supabaseAdmin);
     await supabaseAdmin.from("cookie_pool").update({
       status: outcome.status,
       is_valid: outcome.is_valid,
@@ -227,7 +225,7 @@ export const checkAllCookies = createServerFn({ method: "POST" })
     const { data: rows } = await supabaseAdmin.from("cookie_pool").select("id, cookies_json").limit(500);
     let checked = 0, active = 0, invalid = 0;
     for (const r of rows ?? []) {
-      const o = await checkNetflixCookie(r.cookies_json as CookiePair[]);
+      const o = await checkNetflixCookie(r.cookies_json as CookiePair[], supabaseAdmin);
       await supabaseAdmin.from("cookie_pool").update({
         status: o.status, is_valid: o.is_valid,
         email: o.email ?? null, country: o.country ?? null, plan_name: o.plan_name ?? null,
