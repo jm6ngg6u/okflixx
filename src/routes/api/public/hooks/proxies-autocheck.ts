@@ -43,10 +43,11 @@ export const Route = createFileRoute("/api/public/hooks/proxies-autocheck")({
             if (res.ok) ok++;
             else dead++;
           }
-          const summary = { checked: (rows ?? []).length, ok, dead };
+          const summary = { checked: (rows ?? []).length, ok_count: ok, dead };
           await recordJobFinish(jobId, true, summary);
           return Response.json({ ok: true, ...summary });
         } catch (e: any) {
+
           await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
           return Response.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
         }

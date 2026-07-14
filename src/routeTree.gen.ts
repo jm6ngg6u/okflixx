@@ -23,6 +23,7 @@ import { Route as AdminSecurityRouteImport } from './routes/admin.security'
 import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
+import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
 import { Route as ApiPublicHooksPoolCheckRouteImport } from './routes/api/public/hooks/pool-check'
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
 
@@ -96,6 +97,12 @@ const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
   path: '/attempts',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicHooksProxiesAutocheckRoute =
+  ApiPublicHooksProxiesAutocheckRouteImport.update({
+    id: '/api/public/hooks/proxies-autocheck',
+    path: '/api/public/hooks/proxies-autocheck',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPoolCheckRoute = ApiPublicHooksPoolCheckRouteImport.update({
   id: '/api/public/hooks/pool-check',
   path: '/api/public/hooks/pool-check',
@@ -125,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/bg-preview/': typeof BgPreviewIndexRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
+  '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -142,6 +150,7 @@ export interface FileRoutesByTo {
   '/bg-preview': typeof BgPreviewIndexRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
+  '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -161,6 +170,7 @@ export interface FileRoutesById {
   '/bg-preview/': typeof BgPreviewIndexRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
+  '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/bg-preview/'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
+    | '/api/public/hooks/proxies-autocheck'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/bg-preview'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
+    | '/api/public/hooks/proxies-autocheck'
   id:
     | '__root__'
     | '/'
@@ -216,6 +228,7 @@ export interface FileRouteTypes {
     | '/bg-preview/'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
+    | '/api/public/hooks/proxies-autocheck'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -228,6 +241,7 @@ export interface RootRouteChildren {
   BgPreviewIndexRoute: typeof BgPreviewIndexRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
   ApiPublicHooksPoolCheckRoute: typeof ApiPublicHooksPoolCheckRoute
+  ApiPublicHooksProxiesAutocheckRoute: typeof ApiPublicHooksProxiesAutocheckRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -330,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAttemptsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/hooks/proxies-autocheck': {
+      id: '/api/public/hooks/proxies-autocheck'
+      path: '/api/public/hooks/proxies-autocheck'
+      fullPath: '/api/public/hooks/proxies-autocheck'
+      preLoaderRoute: typeof ApiPublicHooksProxiesAutocheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/pool-check': {
       id: '/api/public/hooks/pool-check'
       path: '/api/public/hooks/pool-check'
@@ -379,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   BgPreviewIndexRoute: BgPreviewIndexRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
   ApiPublicHooksPoolCheckRoute: ApiPublicHooksPoolCheckRoute,
+  ApiPublicHooksProxiesAutocheckRoute: ApiPublicHooksProxiesAutocheckRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
