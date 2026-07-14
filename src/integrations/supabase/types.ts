@@ -14,16 +14,467 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activation_attempts: {
+        Row: {
+          attempt_number: number
+          code: string
+          cookie_id: string | null
+          country: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          ip_hash: string | null
+          proxy_id: string | null
+          proxy_mode: boolean
+          result: string
+          user_agent: string | null
+        }
+        Insert: {
+          attempt_number?: number
+          code: string
+          cookie_id?: string | null
+          country?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          ip_hash?: string | null
+          proxy_id?: string | null
+          proxy_mode?: boolean
+          result: string
+          user_agent?: string | null
+        }
+        Update: {
+          attempt_number?: number
+          code?: string
+          cookie_id?: string | null
+          country?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          ip_hash?: string | null
+          proxy_id?: string | null
+          proxy_mode?: boolean
+          result?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activation_attempts_cookie_id_fkey"
+            columns: ["cookie_id"]
+            isOneToOne: false
+            referencedRelation: "cookie_pool"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activation_attempts_proxy_id_fkey"
+            columns: ["proxy_id"]
+            isOneToOne: false
+            referencedRelation: "proxy_pool"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_activity_log: {
+        Row: {
+          action: string
+          actor_label: string | null
+          admin_id: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          target: string | null
+        }
+        Insert: {
+          action: string
+          actor_label?: string | null
+          admin_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target?: string | null
+        }
+        Update: {
+          action?: string
+          actor_label?: string | null
+          admin_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target?: string | null
+        }
+        Relationships: []
+      }
+      admin_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
+      broadcasts: {
+        Row: {
+          audience: string
+          body_md: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_error: string | null
+          scheduled_at: string | null
+          sent_at: string | null
+          sent_count: number
+          status: string
+          subject: string
+        }
+        Insert: {
+          audience?: string
+          body_md: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          subject: string
+        }
+        Update: {
+          audience?: string
+          body_md?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          sent_count?: number
+          status?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      cookie_pool: {
+        Row: {
+          cookies_json: Json
+          country: string | null
+          created_at: string
+          email: string | null
+          fail_count: number
+          fingerprint: string
+          id: string
+          is_locked: boolean
+          is_valid: boolean
+          label: string | null
+          last_checked_at: string | null
+          last_checked_mode: string | null
+          last_error: string | null
+          last_used_at: string | null
+          locked_at: string | null
+          max_streams: number | null
+          member_since: string | null
+          name: string | null
+          payment_method: string | null
+          plan_name: string | null
+          status: string
+          success_count: number
+          total_uses: number
+          uploaded_by: string | null
+          video_quality: string | null
+        }
+        Insert: {
+          cookies_json: Json
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          fail_count?: number
+          fingerprint: string
+          id?: string
+          is_locked?: boolean
+          is_valid?: boolean
+          label?: string | null
+          last_checked_at?: string | null
+          last_checked_mode?: string | null
+          last_error?: string | null
+          last_used_at?: string | null
+          locked_at?: string | null
+          max_streams?: number | null
+          member_since?: string | null
+          name?: string | null
+          payment_method?: string | null
+          plan_name?: string | null
+          status?: string
+          success_count?: number
+          total_uses?: number
+          uploaded_by?: string | null
+          video_quality?: string | null
+        }
+        Update: {
+          cookies_json?: Json
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          fail_count?: number
+          fingerprint?: string
+          id?: string
+          is_locked?: boolean
+          is_valid?: boolean
+          label?: string | null
+          last_checked_at?: string | null
+          last_checked_mode?: string | null
+          last_error?: string | null
+          last_used_at?: string | null
+          locked_at?: string | null
+          max_streams?: number | null
+          member_since?: string | null
+          name?: string | null
+          payment_method?: string | null
+          plan_name?: string | null
+          status?: string
+          success_count?: number
+          total_uses?: number
+          uploaded_by?: string | null
+          video_quality?: string | null
+        }
+        Relationships: []
+      }
+      job_runs: {
+        Row: {
+          error: string | null
+          finished_at: string | null
+          id: string
+          job: string
+          ok: boolean | null
+          started_at: string
+          summary: Json | null
+        }
+        Insert: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job: string
+          ok?: boolean | null
+          started_at?: string
+          summary?: Json | null
+        }
+        Update: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job?: string
+          ok?: boolean | null
+          started_at?: string
+          summary?: Json | null
+        }
+        Relationships: []
+      }
+      proxy_pool: {
+        Row: {
+          country: string | null
+          created_at: string
+          id: string
+          ip: string
+          is_locked: boolean
+          is_valid: boolean
+          last_checked_at: string | null
+          last_error: string | null
+          last_latency_ms: number | null
+          last_used_at: string | null
+          locked_at: string | null
+          password: string | null
+          port: string
+          raw: string
+          scheme: string
+          total_uses: number
+          username: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          ip: string
+          is_locked?: boolean
+          is_valid?: boolean
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_used_at?: string | null
+          locked_at?: string | null
+          password?: string | null
+          port: string
+          raw: string
+          scheme?: string
+          total_uses?: number
+          username?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          ip?: string
+          is_locked?: boolean
+          is_valid?: boolean
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_used_at?: string | null
+          locked_at?: string | null
+          password?: string | null
+          port?: string
+          raw?: string
+          scheme?: string
+          total_uses?: number
+          username?: string | null
+        }
+        Relationships: []
+      }
+      staff_invites: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          used_at?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      count_recent_attempts: {
+        Args: { _ip_hash: string; _minutes: number }
+        Returns: number
+      }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { _role: string; _user_id: string }; Returns: boolean }
+      mark_cookie_invalid: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
+      pick_next_cookie: {
+        Args: never
+        Returns: {
+          cookies_json: Json
+          fingerprint: string
+          id: string
+        }[]
+      }
+      pick_next_proxy: {
+        Args: never
+        Returns: {
+          id: string
+          ip: string
+          password: string
+          port: string
+          raw: string
+          scheme: string
+          username: string
+        }[]
+      }
+      release_cookie: {
+        Args: { _id: string; _outcome?: string; _success: boolean }
+        Returns: undefined
+      }
+      release_proxy: {
+        Args: {
+          _err?: string
+          _id: string
+          _latency_ms?: number
+          _success: boolean
+        }
+        Returns: undefined
+      }
+      run_auto_cleanup: { Args: never; Returns: Json }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +601,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator"],
+    },
   },
 } as const
