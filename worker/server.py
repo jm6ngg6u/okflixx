@@ -17,7 +17,6 @@ in `requirements.txt`. See README.md for details.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import time
@@ -26,8 +25,7 @@ from typing import Any, Optional
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 
-from fast_checker import check_cookie
-from netflix_session import NetflixSession
+from netflix_adapter import activate_tv_code, check_cookie_sync
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("worker")
@@ -59,13 +57,15 @@ class ProxyPayload(BaseModel):
 
 
 class CheckRequest(BaseModel):
-    cookies: list[CookiePair]
+    cookies: list[CookiePair] = []
+    cookie_text: Optional[str] = None
     proxy: Optional[ProxyPayload] = None
 
 
 class ActivateRequest(BaseModel):
     code: str
-    cookies: list[CookiePair]
+    cookies: list[CookiePair] = []
+    cookie_text: Optional[str] = None
     proxy: Optional[ProxyPayload] = None
 
 
@@ -73,8 +73,16 @@ class ProxyCheckRequest(BaseModel):
     proxy: ProxyPayload
 
 
-def _cookie_blob(pairs: list[CookiePair]) -> str:
-    return "; ".join(f"{c.name}={c.value}" for c in pairs)
+def _cookie_dict(pairs: list[CookiePair]) -> dict[str, str]:
+    """The uploaded bot modules work on {cookie_name: value} dictionaries."""
+    return {c.name: c.value for c in pairs if c.name and c.value}
+
+
+def _cookie_payload(pairs: list[CookiePair], cookie_text: Optional[str]) -> Any:
+    """Accept website cookie pairs, pasted/header text, Netscape text, or JSON text."""
+    if cookie_text and cookie_text.strip():
+        return cookie_text
+    return _cookie_dict(pairs)
 
 
 def _proxy_url(p: Optional[ProxyPayload]) -> Optional[str]:
@@ -96,18 +104,24 @@ async def check(
     body: CheckRequest, x_worker_token: str = Header(default="", alias="X-Worker-Token")
 ) -> dict:
     _require_auth(x_worker_token)
-    blob = _cookie_blob(body.cookies)
+    cookie_payload = _cookie_payload(body.cookies, body.cookie_text)
     proxy = _proxy_url(body.proxy)
     try:
-        info = await asyncio.to_thread(check_cookie, blob, proxy)
+        result = check_cookie_sync(cookie_payload, proxy)
     except Exception as e:  # pragma: no cover
         log.exception("check_cookie failed")
-        return {"status": "invalid", "is_valid": False, "error": str(e)}
-    status = str(info.get("status", "invalid")).lower()
-    is_valid = status in ("active", "free")
+        return {"status": "unknown", "is_valid": False, "transient": True, "error": str(e)}
+
+    status = str(result.get("status", "invalid")).lower()
+    transient = bool(result.get("transient"))
+    if transient:
+        status = "unknown"
+    info = result.get("info") or {}
+
     return {
         "status": status,
-        "is_valid": is_valid,
+        "is_valid": status == "active",
+        "transient": transient,
         "email": info.get("email"),
         "country": info.get("country"),
         "plan_name": info.get("plan") or info.get("plan_name"),
@@ -116,7 +130,7 @@ async def check(
         "member_since": info.get("member_since"),
         "max_streams": info.get("max_streams"),
         "payment_method": info.get("payment_method") or info.get("cardBrand"),
-        "error": info.get("error"),
+        "error": result.get("error") or info.get("error"),
     }
 
 
@@ -125,13 +139,13 @@ async def activate(
     body: ActivateRequest, x_worker_token: str = Header(default="", alias="X-Worker-Token")
 ) -> dict:
     _require_auth(x_worker_token)
-    blob = _cookie_blob(body.cookies)
+    cookie_payload = _cookie_payload(body.cookies, body.cookie_text)
     proxy = _proxy_url(body.proxy)
     t0 = time.time()
     try:
-        # Reuse the exact NetflixSession from the Telegram bot.
-        async with NetflixSession(cookie_string=blob, proxy=proxy) as session:
-            res = await session.activate_tv(body.code)
+        # Reuse the exact adapter flow from the uploaded Telegram bot:
+        # fast cookie pre-check, proxy-aware activation, and bot status mapping.
+        res = activate_tv_code(cookie_payload, body.code, proxy_url=proxy)
     except Exception as e:  # pragma: no cover
         log.exception("activate_tv failed")
         return {
@@ -143,12 +157,20 @@ async def activate(
     if res.get("success"):
         return {"status": "success", "duration_ms": dur_ms}
     err_type = str(res.get("error_type") or "other")
-    if err_type == "auth":
+    if err_type in ("invalid_cookie", "session_expired", "blocked", "auth"):
         err_type = "cookie_dead"
+    elif err_type == "free_account":
+        err_type = "free"
+    elif err_type == "on_hold_account":
+        err_type = "on_hold"
+    elif err_type == "check_failed":
+        err_type = "tv8_unavailable"
+    elif err_type in ("not_accepted", "expired_code"):
+        err_type = "invalid_code"
     return {
         "status": err_type,
         "duration_ms": dur_ms,
-        "error": res.get("message"),
+        "error": res.get("error") or res.get("message"),
     }
 
 
@@ -164,7 +186,7 @@ async def check_proxy(
     try:
         import httpx
 
-        async with httpx.AsyncClient(proxies=url, timeout=8.0) as client:
+        async with httpx.AsyncClient(proxy=url, timeout=8.0, follow_redirects=True) as client:
             r = await client.get("https://api.ipify.org?format=json")
             data = r.json() if r.status_code == 200 else {}
         return {

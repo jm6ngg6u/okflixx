@@ -6,14 +6,22 @@ import { createHash } from "crypto";
 
 export type CookiePair = { name: string; value: string; domain?: string };
 
+const NETFLIX_COOKIE_KEYS = ["NetflixId", "SecureNetflixId", "nfvdid", "OptanonConsent"];
+
 export function parseCookieBlob(raw: string): CookiePair[] {
   raw = raw.trim();
   if (!raw) return [];
 
-  // JSON array (EditThisCookie / Cookie-Editor export)
+  // JSON array (EditThisCookie / Cookie-Editor export) or bot-style cookie dict.
   if (raw.startsWith("[") || raw.startsWith("{")) {
     try {
       const j = JSON.parse(raw);
+      if (j && !Array.isArray(j) && NETFLIX_COOKIE_KEYS.some((key) => typeof j[key] === "string")) {
+        return NETFLIX_COOKIE_KEYS
+          .map((key) => ({ name: key, value: String(j[key] ?? "") }))
+          .filter((c) => c.value);
+      }
+
       const arr = Array.isArray(j) ? j : Array.isArray(j.cookies) ? j.cookies : [];
       return arr
         .map((c: any) => ({
@@ -62,7 +70,13 @@ export function fingerprintOf(pairs: CookiePair[]): string {
   // which uniquely identifies the account. Falls back to a stable hash of all
   // pairs when NetflixId isn't present.
   const netflixId = pairs.find((c) => c.name === "NetflixId")?.value ?? "";
-  const pg = netflixId.match(/pg=([^&"']+)/i)?.[1];
+  let decoded = netflixId;
+  try {
+    decoded = decodeURIComponent(netflixId);
+  } catch {
+    decoded = netflixId;
+  }
+  const pg = decoded.match(/pg[=%3D]+([^&"'\s;]+)/i)?.[1] ?? netflixId.slice(0, 60);
   const key = pg
     ? `pg=${pg}`
     : pairs
@@ -70,4 +84,8 @@ export function fingerprintOf(pairs: CookiePair[]): string {
         .sort()
         .join("|");
   return createHash("sha256").update(key).digest("hex").slice(0, 32);
+}
+
+export function hasNetflixAuthCookie(pairs: CookiePair[]): boolean {
+  return pairs.some((cookie) => cookie.name === "NetflixId" || cookie.name === "SecureNetflixId");
 }

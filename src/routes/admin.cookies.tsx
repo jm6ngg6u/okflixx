@@ -54,12 +54,20 @@ function CookiePoolPage() {
 
   const checkMut = useMutation({
     mutationFn: async (id: string) => check({ data: { id } }),
-    onSuccess: (r) => { toast.success(`Rechecked · ${r.status}${r.email ? ` · ${r.email}` : ""}`); qc.invalidateQueries({ queryKey: ["cookies"] }); },
+    onSuccess: (r) => {
+      const mode = r.proxy_used ? "proxy" : "direct";
+      const message = r.last_error ? `${r.status} · ${r.last_error}` : `${r.status}${r.email ? ` · ${r.email}` : ""}`;
+      toast.success(`Rechecked (${mode}) · ${message}`);
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+    },
     onError: (e: any) => toast.error(e?.message ?? "Check failed"),
   });
   const checkAllMut = useMutation({
     mutationFn: async () => checkAll({}),
-    onSuccess: (r: any) => { toast.success(`Checked ${r.checked} · ${r.active} active · ${r.invalid} invalid`); qc.invalidateQueries({ queryKey: ["cookies"] }); },
+    onSuccess: (r: any) => {
+      toast.success(`Checked ${r.checked} · ${r.active} active · ${r.free} free · ${r.on_hold} hold · ${r.invalid} invalid · ${r.unknown} unknown`);
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+    },
     onError: (e: any) => toast.error(e?.message ?? "Bulk check failed"),
   });
   const delMut = useMutation({
@@ -131,12 +139,21 @@ function CookiePoolPage() {
                   <td className="p-3">
                     <Badge variant="outline" className={STATUS_STYLE[r.status] ?? STATUS_STYLE.unknown}>{r.status}</Badge>
                   </td>
-                  <td className="p-3 text-white/60 text-xs">{r.plan_name ?? "—"}{r.video_quality ? ` · ${r.video_quality}` : ""}</td>
+                  <td className="p-3 text-white/60 text-xs">
+                    <div>{r.plan_name ?? "—"}{r.video_quality ? ` · ${r.video_quality}` : ""}</div>
+                    {r.max_streams ? <div className="text-[10px] text-white/35">{r.max_streams} stream{r.max_streams === 1 ? "" : "s"}</div> : null}
+                  </td>
                   <td className="p-3 text-white/60 font-mono text-xs">{r.country ?? "—"}</td>
                   <td className="p-3 text-white/60 text-xs">
                     {r.total_uses ?? 0} <span className="text-emerald-400">✓{r.success_count ?? 0}</span> <span className="text-red-400">✗{r.fail_count ?? 0}</span>
                   </td>
-                  <td className="p-3 text-white/50 text-xs">{r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "never"}</td>
+                  <td className="p-3 text-white/50 text-xs">
+                    <div>{r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "never"}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {r.last_checked_mode && <Badge variant="outline" className="border-white/10 bg-white/5 text-[10px] text-white/45">{r.last_checked_mode}</Badge>}
+                      {r.last_error && <span className="max-w-[220px] truncate text-[10px] text-red-300/80" title={r.last_error}>{r.last_error}</span>}
+                    </div>
+                  </td>
                   <td className="p-3 text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => checkMut.mutate(r.id)} disabled={checkMut.isPending} className="hover:bg-white/10">
                       <RefreshCw className={`w-3.5 h-3.5 ${checkMut.isPending ? "animate-spin" : ""}`} />

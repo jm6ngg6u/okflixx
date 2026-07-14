@@ -3,8 +3,9 @@
 // from the original Telegram bot and exposes /check, /activate, /check-proxy.
 
 export type WorkerCookieCheck = {
-  status: "active" | "on_hold" | "free" | "invalid";
+  status: "active" | "on_hold" | "free" | "invalid" | "unknown";
   is_valid: boolean;
+  transient?: boolean;
   email?: string | null;
   country?: string | null;
   plan_name?: string | null;
@@ -27,6 +28,8 @@ export type ActivateOutcome =
         | "tv8_unavailable"
         | "expired_code"
         | "cookie_dead"
+        | "free"
+        | "on_hold"
         | "worker_error"
         | "other";
       duration_ms: number;
