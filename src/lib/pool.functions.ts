@@ -201,7 +201,7 @@ export const checkCookieNow = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("cookie_pool").select("cookies_json").eq("id", data.id).single();
     if (error || !row) throw new Error("Not found");
-    const outcome = await checkNetflixCookie(row.cookies_json as CookiePair[]);
+    const outcome = await checkNetflixCookie(row.cookies_json as CookiePair[], supabaseAdmin);
     await supabaseAdmin.from("cookie_pool").update({
       status: outcome.status,
       is_valid: outcome.is_valid,
@@ -225,7 +225,7 @@ export const checkAllCookies = createServerFn({ method: "POST" })
     const { data: rows } = await supabaseAdmin.from("cookie_pool").select("id, cookies_json").limit(500);
     let checked = 0, active = 0, invalid = 0;
     for (const r of rows ?? []) {
-      const o = await checkNetflixCookie(r.cookies_json as CookiePair[]);
+      const o = await checkNetflixCookie(r.cookies_json as CookiePair[], supabaseAdmin);
       await supabaseAdmin.from("cookie_pool").update({
         status: o.status, is_valid: o.is_valid,
         email: o.email ?? null, country: o.country ?? null, plan_name: o.plan_name ?? null,
