@@ -111,7 +111,7 @@ function AdminLayout() {
   if (role.isLoading) return <FullScreen label="Checking permissions…" />;
   if (role.error || !role.data?.isStaff) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-black text-white">
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden text-white">
         <LiveBackground />
         <div className="relative z-10 max-w-md text-center space-y-5 glass p-8">
           <ShieldAlert className="w-12 h-12 mx-auto text-[#ff2a3a]" />
@@ -139,7 +139,7 @@ function AdminLayout() {
   const visibleNav = nav.filter((n) => !n.adminOnly || role.data?.isAdmin);
 
   return (
-    <div className="min-h-screen relative bg-black text-white">
+    <div className="min-h-screen relative text-white">
       <LiveBackground />
       <ClickRipple />
 
@@ -216,7 +216,7 @@ function AdminLayout() {
 
 function FullScreen({ label }: { label: string }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center text-white relative overflow-hidden">
       <LiveBackground />
       <div className="relative z-10 flex flex-col items-center gap-4">
         <div className="w-10 h-10 rounded-full border-2 border-[#ff2a3a]/30 border-t-[#ff2a3a] animate-spin" />
