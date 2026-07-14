@@ -111,7 +111,7 @@ function AdminLayout() {
   if (role.isLoading) return <FullScreen label="Checking permissions…" />;
   if (role.error || !role.data?.isStaff) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-black text-white">
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden text-white">
         <LiveBackground />
         <div className="relative z-10 max-w-md text-center space-y-5 glass p-8">
           <ShieldAlert className="w-12 h-12 mx-auto text-[#ff2a3a]" />
