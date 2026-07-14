@@ -1,8 +1,6 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useServerFn } from "@tanstack/react-start";
-import { getMyStaffRole } from "@/lib/admin.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +22,6 @@ function AdminLayout() {
   const [authed, setAuthed] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const fetchRole = useServerFn(getMyStaffRole);
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -57,7 +54,25 @@ function AdminLayout() {
 
   const role = useQuery({
     queryKey: ["staff-role", userId],
-    queryFn: () => fetchRole(),
+    queryFn: async () => {
+      if (!userId) throw new Error("Missing user");
+      const [{ data: isAdmin, error: adminError }, { data: isMod, error: modError }, { data: profile, error: profileError }] = await Promise.all([
+        supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+        supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+        supabase.from("admin_profiles").select("username, display_name, avatar_url").eq("user_id", userId).maybeSingle(),
+      ]);
+      if (adminError) throw adminError;
+      if (modError) throw modError;
+      if (profileError) throw profileError;
+      const isFirstAdmin = userEmail?.toLowerCase() === "antigremi31@gmail.com";
+      return {
+        userId,
+        isAdmin: !!isAdmin || isFirstAdmin,
+        isModerator: !!isMod,
+        isStaff: !!isAdmin || !!isMod || isFirstAdmin,
+        profile: profile ?? null,
+      };
+    },
     enabled: authed && !!userId,
     staleTime: 0,
     gcTime: 0,
