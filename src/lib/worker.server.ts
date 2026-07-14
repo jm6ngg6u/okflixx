@@ -45,8 +45,9 @@ export type ProxyPayload = {
 };
 
 function workerConfig() {
-  const url = process.env.NETFLIX_WORKER_URL ?? "";
+  let url = (process.env.NETFLIX_WORKER_URL ?? "").trim();
   const token = process.env.NETFLIX_WORKER_TOKEN ?? "";
+  if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
   return { url: url.replace(/\/+$/, ""), token };
 }
 
