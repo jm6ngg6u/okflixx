@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LiveBackground } from "@/components/LiveBackground";
+import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
   Shield, ShieldAlert, KeyRound, Menu, X,
