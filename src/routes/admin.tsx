@@ -22,33 +22,47 @@ function AdminLayout() {
   const navigate = useNavigate();
   const [authReady, setAuthReady] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const fetchRole = useServerFn(getMyStaffRole);
   const qc = useQueryClient();
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return;
-      setAuthed(!!data.session);
+      const user = error ? null : data.user;
+      setAuthed(!!user);
+      setUserId(user?.id ?? null);
+      setUserEmail(user?.email ?? null);
       setAuthReady(true);
-      if (!data.session) navigate({ to: "/auth" });
+      if (!user) navigate({ to: "/auth" });
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         setAuthed(false);
+        setUserId(null);
+        setUserEmail(null);
         qc.clear();
         navigate({ to: "/auth" });
       } else if (event === "SIGNED_IN") {
         setAuthed(true);
+        setUserId(session.user.id);
+        setUserEmail(session.user.email ?? null);
+        qc.invalidateQueries({ queryKey: ["staff-role"] });
       }
     });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, [navigate, qc]);
 
   const role = useQuery({
-    queryKey: ["staff-role"],
+    queryKey: ["staff-role", userId],
     queryFn: () => fetchRole(),
-    enabled: authed,
+    enabled: authed && !!userId,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
     retry: false,
   });
 
@@ -73,6 +87,7 @@ function AdminLayout() {
           <p className="text-muted-foreground">
             You are signed in but not a staff member. Ask an existing admin to grant your account a role.
           </p>
+          {userEmail && <p className="text-xs text-muted-foreground">Current account: {userEmail}</p>}
           <div className="flex gap-2 justify-center">
             <Button variant="outline" onClick={signOut}>Sign out</Button>
             <Button asChild><Link to="/">Home</Link></Button>
