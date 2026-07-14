@@ -3,11 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-async function assertAdmin(supabase: any, userId: string) {
-  const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
-  if (!isAdmin) throw new Error("Forbidden");
-}
-
 /** Return every setting as a plain map. Publicly readable subset only for anon,
  *  but this fn requires staff so all keys are returned. */
 export const listSettings = createServerFn({ method: "GET" })
@@ -33,7 +28,8 @@ export const setSetting = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("app_settings")
@@ -54,7 +50,8 @@ export const toggleProxyMode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: cur } = await supabaseAdmin
       .from("app_settings")
@@ -80,7 +77,8 @@ export const setMaintenance = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("app_settings")
