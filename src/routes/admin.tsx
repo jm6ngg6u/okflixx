@@ -216,7 +216,7 @@ function AdminLayout() {
 
 function FullScreen({ label }: { label: string }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center text-white relative overflow-hidden">
       <LiveBackground />
       <div className="relative z-10 flex flex-col items-center gap-4">
         <div className="w-10 h-10 rounded-full border-2 border-[#ff2a3a]/30 border-t-[#ff2a3a] animate-spin" />
