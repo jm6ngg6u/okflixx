@@ -181,6 +181,18 @@ export const submitActivation = createServerFn({ method: "POST" })
           _id: cookie.id,
           _reason: ((outcome as any).error ?? outcome.status) as string,
         });
+      } else if (outcome.status === "free" || outcome.status === "on_hold") {
+        await supabaseAdmin
+          .from("cookie_pool")
+          .update({
+            status: outcome.status,
+            is_valid: false,
+            is_locked: false,
+            locked_at: null,
+            last_used_at: new Date().toISOString(),
+            last_error: ((outcome as any).error ?? outcome.status) as string,
+          })
+          .eq("id", cookie.id);
       } else {
         await supabaseAdmin.rpc("release_cookie", {
           _id: cookie.id,
