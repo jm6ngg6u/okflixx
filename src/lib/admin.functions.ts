@@ -2,15 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-async function assertStaff(supabase: any, userId: string) {
-  const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
-    supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
-    supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
-  ]);
-  if (!isAdmin && !isMod) throw new Error("Forbidden");
-  return { isAdmin: !!isAdmin, isModerator: !!isMod };
-}
-
 /** Returns whether current user is staff and which role. */
 export const getMyStaffRole = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -43,7 +34,11 @@ export const getDashboardStats = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => StatsInput.parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertStaff(supabase, userId);
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
 
     const since = new Date(Date.now() - data.windowHours * 3600_000).toISOString();
     const { data: rows, error } = await supabase
@@ -106,7 +101,11 @@ export const listAttempts = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => AttemptsInput.parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertStaff(supabase, userId);
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
 
     let q = supabase
       .from("activation_attempts")
@@ -128,7 +127,11 @@ export const getPoolSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
-    await assertStaff(supabase, userId);
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
     const [cookies, proxies] = await Promise.all([
       supabase.from("cookie_pool").select("status", { count: "exact", head: false }),
       supabase.from("proxy_pool").select("is_valid", { count: "exact", head: false }),

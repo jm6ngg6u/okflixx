@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,9 @@ function AdminLayout() {
   const [authed, setAuthed] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const auditedAccessRef = useRef<string | null>(null);
   const qc = useQueryClient();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     let mounted = true;
@@ -81,7 +83,18 @@ function AdminLayout() {
     retry: false,
   });
 
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useEffect(() => {
+    if (!authed || !userId || role.isLoading || role.isFetching) return;
+    const auditKey = `${userId}:${pathname}`;
+    if (auditedAccessRef.current === auditKey) return;
+    auditedAccessRef.current = auditKey;
+    const allowed = !role.error && !!role.data?.isStaff;
+    supabase
+      .rpc("log_admin_access_attempt", { _allowed: allowed, _path: pathname })
+      .then(({ error }) => {
+        if (error) console.warn("Unable to record admin access audit", error.message);
+      });
+  }, [authed, pathname, role.data?.isStaff, role.error, role.isFetching, role.isLoading, userId]);
 
   async function signOut() {
     await qc.cancelQueries();

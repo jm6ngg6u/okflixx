@@ -3,18 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { createHash } from "crypto";
 
-async function assertAdmin(supabase: any, userId: string) {
-  const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
-  if (!isAdmin) throw new Error("Forbidden");
-}
-async function assertStaff(supabase: any, userId: string) {
-  const [{ data: a }, { data: m }] = await Promise.all([
-    supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
-    supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
-  ]);
-  if (!a && !m) throw new Error("Forbidden");
-}
-
 // -------------------- Cookie parsing --------------------
 
 type CookiePair = { name: string; value: string; domain?: string };
@@ -131,7 +119,8 @@ export const uploadCookies = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => UploadInput.parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let inserted = 0, duplicates = 0, invalid = 0;
     for (const blob of data.blobs) {
@@ -168,7 +157,11 @@ export const listCookies = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ListCookiesInput.parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertStaff(supabase, userId);
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
     let q = supabase
       .from("cookie_pool")
       .select("id,label,email,country,plan_name,video_quality,name,payment_method,status,is_valid,total_uses,success_count,fail_count,last_used_at,last_checked_at,created_at", { count: "exact" })
@@ -185,7 +178,8 @@ export const deleteCookie = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("cookie_pool").delete().eq("id", data.id);
     await supabaseAdmin.from("admin_activity_log").insert({ admin_id: userId, action: "cookie.delete", details: { id: data.id } });
@@ -197,7 +191,11 @@ export const checkCookieNow = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertStaff(supabase, userId);
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("cookie_pool").select("cookies_json").eq("id", data.id).single();
     if (error || !row) throw new Error("Not found");
@@ -220,7 +218,8 @@ export const checkAllCookies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin.from("cookie_pool").select("id, cookies_json").limit(500);
     let checked = 0, active = 0, invalid = 0;
@@ -272,7 +271,8 @@ export const uploadProxies = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ text: z.string().max(500_000) }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let inserted = 0, invalid = 0, duplicates = 0;
     for (const line of data.text.split(/\r?\n/)) {
@@ -292,7 +292,11 @@ export const listProxies = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ page: z.number().int().min(0).default(0), pageSize: z.number().int().min(10).max(200).default(50) }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertStaff(supabase, userId);
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
     const { data: rows, count, error } = await supabase
       .from("proxy_pool")
       .select("*", { count: "exact" })
@@ -307,7 +311,8 @@ export const deleteProxy = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("proxy_pool").delete().eq("id", data.id);
     return { ok: true };
@@ -317,7 +322,8 @@ export const checkAllProxies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context as any;
-    await assertAdmin(supabase, userId);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows } = await supabaseAdmin.from("proxy_pool").select("id, scheme, ip, port").limit(500);
     let valid = 0, invalid = 0;

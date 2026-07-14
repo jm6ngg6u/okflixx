@@ -425,7 +425,17 @@ export type Database = {
         Args: { _ip_hash: string; _minutes: number }
         Returns: number
       }
-      has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      log_admin_access_attempt: {
+        Args: { _allowed: boolean; _path?: string }
+        Returns: undefined
+      }
       mark_cookie_invalid: {
         Args: { _id: string; _reason: string }
         Returns: undefined
