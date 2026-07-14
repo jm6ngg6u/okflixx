@@ -2,8 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const FIRST_ADMIN_EMAIL = "antigremi31@gmail.com";
-
 async function assertStaff(supabase: any, userId: string) {
   const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
     supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
@@ -18,13 +16,14 @@ export const getMyStaffRole = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId, claims } = context as any;
+    const firstAdminEmail = "antigremi31@gmail.com";
     const email = String(claims?.email ?? "").toLowerCase();
     const [{ data: isAdmin }, { data: isMod }, { data: profile }] = await Promise.all([
       supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
       supabase.from("admin_profiles").select("username, display_name, avatar_url").eq("user_id", userId).maybeSingle(),
     ]);
-    const isFirstAdmin = email === FIRST_ADMIN_EMAIL;
+    const isFirstAdmin = email === firstAdminEmail;
     return {
       userId,
       isAdmin: !!isAdmin || isFirstAdmin,
