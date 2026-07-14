@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LiveBackground } from "@/components/LiveBackground";
+import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
   Shield, ShieldAlert, KeyRound, Menu, X,
@@ -110,8 +112,8 @@ function AdminLayout() {
   if (role.error || !role.data?.isStaff) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-black text-white">
-        <EmberBackdrop />
-        <div className="relative max-w-md text-center space-y-5 glass p-8">
+        <LiveBackground />
+        <div className="relative z-10 max-w-md text-center space-y-5 glass p-8">
           <ShieldAlert className="w-12 h-12 mx-auto text-[#ff2a3a]" />
           <h1 className="font-display text-3xl">Access denied</h1>
           <p className="text-white/60 text-sm">You are signed in but not a staff member. Ask an existing admin to grant your account a role.</p>
@@ -138,12 +140,13 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen relative bg-black text-white">
-      <EmberBackdrop />
+      <LiveBackground />
+      <ClickRipple />
 
       {/* Top bar (mobile) */}
       <div className="md:hidden relative z-30 flex items-center justify-between px-4 py-3 border-b border-white/10 backdrop-blur bg-black/40">
         <Link to="/admin" className="flex items-center gap-2">
-          <img src={logo} alt="" className="h-7 w-7" />
+          <img src={logo} alt="" data-wave-origin className="h-7 w-7 logo-shine" />
           <span className="font-display text-sm">EMBER<span className="text-[#ff2a3a]">LORD</span> · Admin</span>
         </Link>
         <button onClick={() => setMobileOpen((v) => !v)} className="p-2 rounded-md border border-white/10">
@@ -154,7 +157,7 @@ function AdminLayout() {
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-[260px_1fr]">
         <aside className={`${mobileOpen ? "block" : "hidden"} md:block border-r border-white/5 bg-black/40 backdrop-blur-xl p-5 md:sticky md:top-0 md:h-screen md:overflow-y-auto`}>
           <Link to="/admin" className="hidden md:flex items-center gap-3 mb-8 group">
-            <img src={logo} alt="" className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
+            <img src={logo} alt="" data-wave-origin className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
             <div>
               <div className="font-display text-base leading-none">EMBER<span className="text-[#ff2a3a]">LORD</span></div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-white/40 mt-1">Control room</div>
@@ -211,26 +214,11 @@ function AdminLayout() {
   );
 }
 
-function EmberBackdrop() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-[#ff2a3a]/10 blur-[120px]" />
-      <div className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full bg-[#b0060f]/10 blur-[120px]" />
-      <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-[#ff2a3a]/5 blur-[100px]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,42,58,0.08),transparent_50%)]" />
-      <div className="absolute inset-0" style={{
-        backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
-        backgroundSize: "48px 48px",
-      }} />
-    </div>
-  );
-}
-
 function FullScreen({ label }: { label: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
-      <EmberBackdrop />
-      <div className="relative flex flex-col items-center gap-4">
+      <LiveBackground />
+      <div className="relative z-10 flex flex-col items-center gap-4">
         <div className="w-10 h-10 rounded-full border-2 border-[#ff2a3a]/30 border-t-[#ff2a3a] animate-spin" />
         <div className="text-sm text-white/60 font-mono uppercase tracking-widest">{label}</div>
       </div>
