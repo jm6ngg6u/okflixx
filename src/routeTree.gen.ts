@@ -26,6 +26,7 @@ import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
 import { Route as ApiPublicHooksPoolCheckRouteImport } from './routes/api/public/hooks/pool-check'
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
+import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -114,6 +115,12 @@ const ApiPublicHooksCookiesAutocheckRoute =
     path: '/api/public/hooks/cookies-autocheck',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAutoCleanupRoute =
+  ApiPublicHooksAutoCleanupRouteImport.update({
+    id: '/api/public/hooks/auto-cleanup',
+    path: '/api/public/hooks/auto-cleanup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
@@ -148,6 +156,7 @@ export interface FileRoutesByTo {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin': typeof AdminIndexRoute
   '/bg-preview': typeof BgPreviewIndexRoute
+  '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
@@ -168,6 +177,7 @@ export interface FileRoutesById {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin/'
     | '/bg-preview/'
+    | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
     | '/api/public/hooks/proxies-autocheck'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin'
     | '/bg-preview'
+    | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
     | '/api/public/hooks/proxies-autocheck'
@@ -226,6 +238,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin/'
     | '/bg-preview/'
+    | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-check'
     | '/api/public/hooks/proxies-autocheck'
@@ -239,6 +252,7 @@ export interface RootRouteChildren {
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
   BgPreviewIndexRoute: typeof BgPreviewIndexRoute
+  ApiPublicHooksAutoCleanupRoute: typeof ApiPublicHooksAutoCleanupRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
   ApiPublicHooksPoolCheckRoute: typeof ApiPublicHooksPoolCheckRoute
   ApiPublicHooksProxiesAutocheckRoute: typeof ApiPublicHooksProxiesAutocheckRoute
@@ -365,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCookiesAutocheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/auto-cleanup': {
+      id: '/api/public/hooks/auto-cleanup'
+      path: '/api/public/hooks/auto-cleanup'
+      fullPath: '/api/public/hooks/auto-cleanup'
+      preLoaderRoute: typeof ApiPublicHooksAutoCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -398,6 +419,7 @@ const rootRouteChildren: RootRouteChildren = {
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
   BgPreviewIndexRoute: BgPreviewIndexRoute,
+  ApiPublicHooksAutoCleanupRoute: ApiPublicHooksAutoCleanupRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
   ApiPublicHooksPoolCheckRoute: ApiPublicHooksPoolCheckRoute,
   ApiPublicHooksProxiesAutocheckRoute: ApiPublicHooksProxiesAutocheckRoute,
