@@ -140,12 +140,13 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen relative bg-black text-white">
-      <EmberBackdrop />
+      <LiveBackground />
+      <ClickRipple />
 
       {/* Top bar (mobile) */}
       <div className="md:hidden relative z-30 flex items-center justify-between px-4 py-3 border-b border-white/10 backdrop-blur bg-black/40">
         <Link to="/admin" className="flex items-center gap-2">
-          <img src={logo} alt="" className="h-7 w-7" />
+          <img src={logo} alt="" data-wave-origin className="h-7 w-7 logo-shine" />
           <span className="font-display text-sm">EMBER<span className="text-[#ff2a3a]">LORD</span> · Admin</span>
         </Link>
         <button onClick={() => setMobileOpen((v) => !v)} className="p-2 rounded-md border border-white/10">
@@ -156,7 +157,7 @@ function AdminLayout() {
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-[260px_1fr]">
         <aside className={`${mobileOpen ? "block" : "hidden"} md:block border-r border-white/5 bg-black/40 backdrop-blur-xl p-5 md:sticky md:top-0 md:h-screen md:overflow-y-auto`}>
           <Link to="/admin" className="hidden md:flex items-center gap-3 mb-8 group">
-            <img src={logo} alt="" className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
+            <img src={logo} alt="" data-wave-origin className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
             <div>
               <div className="font-display text-base leading-none">EMBER<span className="text-[#ff2a3a]">LORD</span></div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-white/40 mt-1">Control room</div>
