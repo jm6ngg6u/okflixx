@@ -65,17 +65,22 @@ function HomePage() {
         },
       });
       if (result.ok) {
-        toast.success("Code accepted — opening Netflix…");
-        setTimeout(() => { window.location.href = result.redirectUrl; }, 600);
+        toast.success(result.message ?? "Code accepted — opening Netflix…");
+        setTimeout(() => { window.location.href = result.redirectUrl; }, 800);
       } else if (result.error === "rate_limited") {
         toast.error("Too many attempts. Try again in 10 minutes.");
       } else if (result.error === "bot_detected") {
         toast.error("Something looked off. Please refresh and try again.");
       } else if (result.error === "invalid_code") {
-        toast.error("That code doesn't look right. Check your TV screen.");
+        toast.error(result.message ?? "That code doesn't look right. Check your TV screen.");
+      } else if (result.error === "maintenance") {
+        toast.error(result.message ?? "The service is temporarily unavailable.");
+      } else if (result.error === "no_cookie" || result.error === "exhausted") {
+        toast.error(result.message ?? "We couldn't activate right now. Please try again shortly.");
       } else {
         toast.error("Server hiccup. Try again in a moment.");
       }
+
     } catch (err) {
       console.error(err);
       toast.error("Network error. Please try again.");
