@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -77,21 +78,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "EMBERLORD — Command Netflix on any TV" },
+      { name: "description", content: "Wield the trident. Enter your 8-digit code and unleash Netflix on Smart TV, Apple TV, Roku, PS5 and more. Cinematic, encrypted, always-on." },
+      { name: "author", content: "Emberlord" },
+      { name: "theme-color", content: "#0a0000" },
+      { property: "og:title", content: "EMBERLORD — Command Netflix on any TV" },
+      { property: "og:description", content: "8-digit TV activation, encrypted end-to-end. Every device. Every screen." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -121,6 +122,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <Toaster theme="dark" position="top-center" richColors />
     </QueryClientProvider>
   );
 }
