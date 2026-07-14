@@ -25,6 +25,7 @@ import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
 import { Route as ApiPublicHooksPoolCheckRouteImport } from './routes/api/public/hooks/pool-check'
+import { Route as ApiPublicHooksPoolAlertRouteImport } from './routes/api/public/hooks/pool-alert'
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
 import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
@@ -109,6 +110,11 @@ const ApiPublicHooksPoolCheckRoute = ApiPublicHooksPoolCheckRouteImport.update({
   path: '/api/public/hooks/pool-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksPoolAlertRoute = ApiPublicHooksPoolAlertRouteImport.update({
+  id: '/api/public/hooks/pool-alert',
+  path: '/api/public/hooks/pool-alert',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksCookiesAutocheckRoute =
   ApiPublicHooksCookiesAutocheckRouteImport.update({
     id: '/api/public/hooks/cookies-autocheck',
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/bg-preview/': typeof BgPreviewIndexRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
+  '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/bg-preview': typeof BgPreviewIndexRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
+  '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/bg-preview/': typeof BgPreviewIndexRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
+  '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
   '/api/public/hooks/pool-check': typeof ApiPublicHooksPoolCheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/bg-preview/'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
+    | '/api/public/hooks/pool-alert'
     | '/api/public/hooks/pool-check'
     | '/api/public/hooks/proxies-autocheck'
   fileRoutesByTo: FileRoutesByTo
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/bg-preview'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
+    | '/api/public/hooks/pool-alert'
     | '/api/public/hooks/pool-check'
     | '/api/public/hooks/proxies-autocheck'
   id:
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/bg-preview/'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
+    | '/api/public/hooks/pool-alert'
     | '/api/public/hooks/pool-check'
     | '/api/public/hooks/proxies-autocheck'
   fileRoutesById: FileRoutesById
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   BgPreviewIndexRoute: typeof BgPreviewIndexRoute
   ApiPublicHooksAutoCleanupRoute: typeof ApiPublicHooksAutoCleanupRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
+  ApiPublicHooksPoolAlertRoute: typeof ApiPublicHooksPoolAlertRoute
   ApiPublicHooksPoolCheckRoute: typeof ApiPublicHooksPoolCheckRoute
   ApiPublicHooksProxiesAutocheckRoute: typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPoolCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/pool-alert': {
+      id: '/api/public/hooks/pool-alert'
+      path: '/api/public/hooks/pool-alert'
+      fullPath: '/api/public/hooks/pool-alert'
+      preLoaderRoute: typeof ApiPublicHooksPoolAlertRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/cookies-autocheck': {
       id: '/api/public/hooks/cookies-autocheck'
       path: '/api/public/hooks/cookies-autocheck'
@@ -421,6 +441,7 @@ const rootRouteChildren: RootRouteChildren = {
   BgPreviewIndexRoute: BgPreviewIndexRoute,
   ApiPublicHooksAutoCleanupRoute: ApiPublicHooksAutoCleanupRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
+  ApiPublicHooksPoolAlertRoute: ApiPublicHooksPoolAlertRoute,
   ApiPublicHooksPoolCheckRoute: ApiPublicHooksPoolCheckRoute,
   ApiPublicHooksProxiesAutocheckRoute: ApiPublicHooksProxiesAutocheckRoute,
 }
