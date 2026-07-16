@@ -144,7 +144,7 @@ function CookiePoolPage() {
     refetchInterval: 30_000,
   });
 
-  const rows: any[] = data?.rows ?? [];
+  const rows: any[] = useMemo(() => data?.rows ?? [], [data]);
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
 
   // -------- Realtime subscription: instant row flashes --------
@@ -175,9 +175,11 @@ function CookiePoolPage() {
   // Clear stale selections when rows change
   useEffect(() => {
     setSelection((prev) => {
+      if (prev.size === 0) return prev;
       const known = new Set(rows.map((r) => r.id));
       const next = new Set<string>();
       prev.forEach((id) => { if (known.has(id)) next.add(id); });
+      if (next.size === prev.size) return prev;
       return next;
     });
   }, [rows]);
