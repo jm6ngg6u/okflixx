@@ -71,6 +71,7 @@ export const getBackgroundSongAdmin = createServerFn({ method: "GET" })
 
     return {
       enabled: map.background_song_enabled === "true",
+      reactive: map.background_song_reactive !== "false",
       path,
       name: map.background_song_name || path,
       updatedAt: map.background_song_updated_at || "",
