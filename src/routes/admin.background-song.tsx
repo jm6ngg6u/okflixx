@@ -70,6 +70,19 @@ function BackgroundSongPage() {
     onError: (e: any) => toast.error(e?.message ?? "Remove failed"),
   });
 
+  const reactiveMut = useMutation({
+    mutationFn: (reactive: boolean) => doReactive({ data: { reactive } }),
+    onSuccess: (r: any) => {
+      toast.success(r.reactive ? "Audio-reactive background ON" : "Audio-reactive background OFF", {
+        description: r.reactive
+          ? "Beams pulse and swell with the music in real time."
+          : "Background animation plays independently of the song.",
+      });
+      invalidateAll();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Toggle failed"),
+  });
+
   const handleUpload = async (file: File) => {
     setUploadError("");
     setUploadName(file.name);
