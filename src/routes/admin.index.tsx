@@ -11,11 +11,17 @@ import {
 } from "@/lib/admin.functions";
 import { listSettings, toggleProxyMode } from "@/lib/settings.functions";
 import { checkAllCookies } from "@/lib/pool.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Activity, CheckCircle2, ShieldOff, Bot, XCircle, TrendingUp, MapPin, Zap,
   Cookie, Globe2, Server, RefreshCw, Users, ScrollText, Sparkles, ArrowUpRight,
   Pause, Play, Radio, Gauge, Timer, Flame, ArrowUp, ArrowDown, Minus,
+  Download, FileText, Bell, BellOff, AlertTriangle, X, Copy, Printer, Settings2,
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { toast } from "sonner";
@@ -34,7 +40,9 @@ const WINDOWS: { label: string; hours: number }[] = [
   { label: "ALL", hours: 24 * 365 * 5 },
 ];
 
-const REFRESH_MS = 2_000;
+// With realtime pushing new rows the moment they land, we only need slow
+// background refetches to keep aggregates + pool + health warm.
+const AGG_REFRESH_MS = 10_000;
 
 const RESULT_STYLE: Record<string, string> = {
   success: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -44,9 +52,52 @@ const RESULT_STYLE: Record<string, string> = {
   server_error: "bg-red-500/15 text-red-300 border-red-500/30",
 };
 
+type Attempt = {
+  id: string;
+  code: string | null;
+  result: string | null;
+  country: string | null;
+  user_agent: string | null;
+  created_at: string;
+  ip_hash: string | null;
+};
+
+type Thresholds = {
+  failureRatePct: number; // e.g. 40 = 40% failures in recent window triggers alert
+  failureWindowMin: number; // recent window size for failure rate
+  runwayHours: number; // alert when runway drops under this
+  alertsMuted: boolean;
+};
+
+const THRESHOLDS_KEY = "emberlord.dashboard.alerts";
+const DEFAULT_THRESHOLDS: Thresholds = {
+  failureRatePct: 40,
+  failureWindowMin: 10,
+  runwayHours: 6,
+  alertsMuted: false,
+};
+
+function loadThresholds(): Thresholds {
+  if (typeof window === "undefined") return DEFAULT_THRESHOLDS;
+  try {
+    const raw = localStorage.getItem(THRESHOLDS_KEY);
+    if (!raw) return DEFAULT_THRESHOLDS;
+    return { ...DEFAULT_THRESHOLDS, ...JSON.parse(raw) };
+  } catch { return DEFAULT_THRESHOLDS; }
+}
+function saveThresholds(t: Thresholds) {
+  try { localStorage.setItem(THRESHOLDS_KEY, JSON.stringify(t)); } catch { /* noop */ }
+}
+
 function DashboardPage() {
   const [hours, setHours] = useState(24);
   const [paused, setPaused] = useState(false);
+  const [modalAttempt, setModalAttempt] = useState<Attempt | null>(null);
+  const [liveRows, setLiveRows] = useState<Attempt[]>([]);
+  const [rtStatus, setRtStatus] = useState<"connecting" | "live" | "offline">("connecting");
+  const [thresholds, setThresholds] = useState<Thresholds>(() => loadThresholds());
+  const [activeAlerts, setActiveAlerts] = useState<{ id: string; kind: "failure" | "runway"; msg: string; at: number }[]>([]);
+
   const fetchStats = useServerFn(getDashboardStats);
   const fetchPool = useServerFn(getPoolSummary);
   const fetchHealth = useServerFn(getWorkerHealth);
@@ -57,28 +108,64 @@ function DashboardPage() {
   const doCheckAll = useServerFn(checkAllCookies);
   const qc = useQueryClient();
 
-  const interval = paused ? false : REFRESH_MS;
+  const aggInterval = paused ? false : AGG_REFRESH_MS;
 
   const stats = useQuery({
     queryKey: ["dashboard-stats", hours],
     queryFn: () => fetchStats({ data: { windowHours: hours } }),
-    refetchInterval: interval,
+    refetchInterval: aggInterval,
   });
-  // Previous window (same length, immediately before current) for deltas.
   const prevStats = useQuery({
     queryKey: ["dashboard-stats-prev", hours],
     queryFn: () => fetchStats({ data: { windowHours: hours * 2 } }),
-    refetchInterval: interval === false ? false : interval * 4,
+    refetchInterval: aggInterval === false ? false : aggInterval * 3,
   });
-  const pool = useQuery({ queryKey: ["pool-summary"], queryFn: () => fetchPool(), refetchInterval: interval });
-  const health = useQuery({ queryKey: ["worker-health"], queryFn: () => fetchHealth(), refetchInterval: interval });
-  const activity = useQuery({ queryKey: ["recent-activity"], queryFn: () => fetchActivity(), refetchInterval: interval });
-  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: interval === false ? false : 10_000 });
-  const liveAttempts = useQuery({
-    queryKey: ["dashboard-live-attempts"],
-    queryFn: () => fetchAttempts({ data: { page: 0, pageSize: 8 } }),
-    refetchInterval: interval,
+  const pool = useQuery({ queryKey: ["pool-summary"], queryFn: () => fetchPool(), refetchInterval: aggInterval });
+  const health = useQuery({ queryKey: ["worker-health"], queryFn: () => fetchHealth(), refetchInterval: aggInterval });
+  const activity = useQuery({ queryKey: ["recent-activity"], queryFn: () => fetchActivity(), refetchInterval: aggInterval });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: aggInterval === false ? false : 15_000 });
+  // Seed the live ticker on mount / hours change; realtime keeps it fresh after.
+  const initialAttempts = useQuery({
+    queryKey: ["dashboard-live-attempts-seed"],
+    queryFn: () => fetchAttempts({ data: { page: 0, pageSize: 20 } }),
+    staleTime: 60_000,
   });
+
+  // Merge seed into liveRows once
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    const rows = initialAttempts.data?.rows;
+    if (rows && rows.length) {
+      setLiveRows(rows.slice(0, 20));
+      seededRef.current = true;
+    }
+  }, [initialAttempts.data]);
+
+  // Supabase Realtime — instant push on new attempts
+  useEffect(() => {
+    setRtStatus("connecting");
+    const channel = supabase
+      .channel("dashboard-attempts")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "activation_attempts" },
+        (payload) => {
+          const row = payload.new as Attempt;
+          if (!row?.id) return;
+          setLiveRows((prev) => {
+            if (prev.some((r) => r.id === row.id)) return prev;
+            return [row, ...prev].slice(0, 20);
+          });
+          setPulseKey((k) => k + 1);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setRtStatus("live");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRtStatus("offline");
+      });
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const proxyOn = settingsQ.data?.settings?.proxy_mode === "1";
   const maintOn = settingsQ.data?.settings?.maintenance_enabled === "1";
@@ -86,7 +173,6 @@ function DashboardPage() {
   const kpi = stats.data?.kpi ?? { total: 0, success: 0, rate_limited: 0, bot_detected: 0, invalid_code: 0, other: 0 };
   const successRate = kpi.total ? Math.round((kpi.success / kpi.total) * 1000) / 10 : 0;
 
-  // Prior-window delta (previous covers hours*2, subtract current to isolate prior half).
   const prevKpi = useMemo(() => {
     const full = prevStats.data?.kpi;
     if (!full) return null;
@@ -100,10 +186,8 @@ function DashboardPage() {
   }, [prevStats.data, kpi]);
   const prevRate = prevKpi && prevKpi.total ? (prevKpi.success / prevKpi.total) * 100 : null;
 
-  // Throughput & runway
   const throughputPerMin = kpi.total / Math.max(1, hours * 60);
   const activeCookies = pool.data?.cookies.active ?? 0;
-  // Rough burn rate: cookies burnt = invalid+on_hold over window
   const burntPerHour = ((pool.data?.cookies.invalid ?? 0) + (pool.data?.cookies.on_hold ?? 0)) / Math.max(1, hours);
   const runwayHours = burntPerHour > 0.05 ? activeCookies / burntPerHour : Infinity;
 
@@ -116,32 +200,18 @@ function DashboardPage() {
   const c = pool.data?.cookies ?? { active: 0, on_hold: 0, free: 0, invalid: 0, unknown: 0, total: 0 };
   const p = pool.data?.proxies ?? { valid: 0, invalid: 0, total: 0 };
 
-  // Live "last synced" indicator
-  const lastSyncTs = Math.max(
-    stats.dataUpdatedAt || 0,
-    pool.dataUpdatedAt || 0,
-    liveAttempts.dataUpdatedAt || 0,
-  );
+  const lastSyncTs = Math.max(stats.dataUpdatedAt || 0, pool.dataUpdatedAt || 0, health.dataUpdatedAt || 0);
   const [nowTick, setNowTick] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 500);
     return () => clearInterval(id);
   }, []);
   const secSinceSync = lastSyncTs ? Math.max(0, Math.floor((nowTick - lastSyncTs) / 1000)) : 0;
-  const anyFetching = stats.isFetching || pool.isFetching || liveAttempts.isFetching || health.isFetching;
+  const anyFetching = stats.isFetching || pool.isFetching || health.isFetching;
 
-  // Detect new attempts arriving for pulse animation
-  const prevTopIdRef = useRef<string | null>(null);
   const [pulseKey, setPulseKey] = useState(0);
-  useEffect(() => {
-    const topId = liveAttempts.data?.rows?.[0]?.id ?? null;
-    if (topId && prevTopIdRef.current && topId !== prevTopIdRef.current) {
-      setPulseKey((k) => k + 1);
-    }
-    prevTopIdRef.current = topId;
-  }, [liveAttempts.data]);
 
-  // Failure share
+  // Failure share (from aggregate window)
   const failures = [
     { key: "rate_limited", label: "Rate limited", value: kpi.rate_limited, color: "#f59e0b" },
     { key: "bot_detected", label: "Bot detected", value: kpi.bot_detected, color: "#ff2a3a" },
@@ -150,13 +220,170 @@ function DashboardPage() {
   ];
   const failTotal = failures.reduce((a, b) => a + b.value, 0);
 
+  // ---------- Real-time alerting ----------
+  const lastToastRef = useRef<{ failure: number; runway: number }>({ failure: 0, runway: 0 });
+  useEffect(() => {
+    if (thresholds.alertsMuted) return;
+    const now = Date.now();
+    const nextAlerts: typeof activeAlerts = [];
+
+    // Failure spike in recent window from live ticker
+    const cutoff = now - thresholds.failureWindowMin * 60_000;
+    const recent = liveRows.filter((r) => new Date(r.created_at).getTime() >= cutoff);
+    if (recent.length >= 5) {
+      const fails = recent.filter((r) => r.result && r.result !== "success").length;
+      const rate = (fails / recent.length) * 100;
+      if (rate >= thresholds.failureRatePct) {
+        const id = "failure-spike";
+        nextAlerts.push({
+          id, kind: "failure", at: now,
+          msg: `Failure rate ${rate.toFixed(0)}% over last ${thresholds.failureWindowMin}m (${fails}/${recent.length}). Threshold ${thresholds.failureRatePct}%.`,
+        });
+        if (now - lastToastRef.current.failure > 60_000) {
+          toast.error(`Failure spike: ${rate.toFixed(0)}% fails in ${thresholds.failureWindowMin}m`, { duration: 6000 });
+          lastToastRef.current.failure = now;
+        }
+      }
+    }
+
+    // Runway
+    if (Number.isFinite(runwayHours) && runwayHours < thresholds.runwayHours && (pool.data?.cookies.total ?? 0) > 0) {
+      const id = "runway-low";
+      nextAlerts.push({
+        id, kind: "runway", at: now,
+        msg: `Cookie runway ${runwayHours.toFixed(1)}h — under ${thresholds.runwayHours}h threshold (${activeCookies} active).`,
+      });
+      if (now - lastToastRef.current.runway > 300_000) {
+        toast.error(`Cookie runway low: ${runwayHours.toFixed(1)}h left`, { duration: 6000 });
+        lastToastRef.current.runway = now;
+      }
+    }
+
+    setActiveAlerts(nextAlerts);
+  }, [liveRows, runwayHours, activeCookies, thresholds, pool.data?.cookies.total]);
+
+  // ---------- Export ----------
+  const exportCSV = () => {
+    const lines: string[] = [];
+    lines.push("# Emberlord Activation Dashboard export");
+    lines.push(`# Exported at: ${new Date().toISOString()}`);
+    lines.push(`# Window: ${hours}h`);
+    lines.push("");
+    lines.push("## KPI");
+    lines.push("metric,value");
+    lines.push(`total,${kpi.total}`);
+    lines.push(`success,${kpi.success}`);
+    lines.push(`success_rate_pct,${successRate}`);
+    lines.push(`rate_limited,${kpi.rate_limited}`);
+    lines.push(`bot_detected,${kpi.bot_detected}`);
+    lines.push(`invalid_code,${kpi.invalid_code}`);
+    lines.push(`other,${kpi.other}`);
+    lines.push(`throughput_per_min,${throughputPerMin.toFixed(3)}`);
+    lines.push(`runway_hours,${Number.isFinite(runwayHours) ? runwayHours.toFixed(2) : "inf"}`);
+    lines.push("");
+    lines.push("## Failure breakdown");
+    lines.push("reason,count,share_pct");
+    for (const f of failures) {
+      const share = failTotal ? (f.value / failTotal) * 100 : 0;
+      lines.push(`${f.label},${f.value},${share.toFixed(1)}`);
+    }
+    lines.push("");
+    lines.push("## Live ticker");
+    lines.push("time,code,result,country,ip_hash,user_agent");
+    for (const r of liveRows) {
+      const ua = (r.user_agent ?? "").replace(/"/g, '""');
+      lines.push(`${r.created_at},${r.code ?? ""},${r.result ?? ""},${r.country ?? ""},${r.ip_hash ?? ""},"${ua}"`);
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `activation-dashboard-${hours}h-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("CSV downloaded");
+  };
+
+  const exportPDF = () => {
+    const win = window.open("", "_blank", "width=900,height=1000");
+    if (!win) { toast.error("Pop-up blocked — allow pop-ups to print"); return; }
+    const rows = liveRows.map((r) => `
+      <tr>
+        <td>${new Date(r.created_at).toLocaleString()}</td>
+        <td>${escapeHtml(r.code ?? "")}</td>
+        <td>${escapeHtml(r.result ?? "")}</td>
+        <td>${escapeHtml(r.country ?? "")}</td>
+      </tr>`).join("");
+    const failRows = failures.map((f) => {
+      const share = failTotal ? (f.value / failTotal) * 100 : 0;
+      return `<tr><td>${f.label}</td><td>${f.value}</td><td>${share.toFixed(1)}%</td></tr>`;
+    }).join("");
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"/>
+      <title>Activation Dashboard — ${hours}h</title>
+      <style>
+        body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#111;padding:32px;max-width:820px;margin:auto}
+        h1{font-size:22px;margin:0 0 4px}h2{font-size:14px;margin:24px 0 8px;color:#e5091b;letter-spacing:.1em;text-transform:uppercase}
+        .meta{color:#666;font-size:12px;margin-bottom:24px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+        th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eee}
+        th{background:#fafafa;font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#666}
+        .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+        .kpi>div{border:1px solid #eee;padding:10px;border-radius:6px}
+        .kpi .lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#888}
+        .kpi .val{font-size:20px;font-weight:600;margin-top:4px}
+        @media print{@page{margin:.5in}}
+      </style></head><body>
+      <h1>Emberlord — Activation Dashboard</h1>
+      <div class="meta">Window: ${hours}h · Exported ${new Date().toLocaleString()}</div>
+      <h2>KPI</h2>
+      <div class="kpi">
+        <div><div class="lbl">Attempts</div><div class="val">${kpi.total}</div></div>
+        <div><div class="lbl">Success</div><div class="val">${kpi.success} · ${successRate}%</div></div>
+        <div><div class="lbl">Throughput</div><div class="val">${throughputPerMin.toFixed(2)}/min</div></div>
+        <div><div class="lbl">Runway</div><div class="val">${Number.isFinite(runwayHours) ? runwayHours.toFixed(1) + "h" : "∞"}</div></div>
+      </div>
+      <h2>Failure breakdown</h2>
+      <table><thead><tr><th>Reason</th><th>Count</th><th>Share</th></tr></thead><tbody>${failRows}</tbody></table>
+      <h2>Live ticker (${liveRows.length})</h2>
+      <table><thead><tr><th>Time</th><th>Code</th><th>Result</th><th>Country</th></tr></thead><tbody>${rows}</tbody></table>
+      <script>window.onload=()=>setTimeout(()=>window.print(),200)</script>
+      </body></html>`);
+    win.document.close();
+    toast.success("Print dialog opened — save as PDF");
+  };
+
   return (
     <div className="space-y-8">
+      {/* Alert banner */}
+      {activeAlerts.length > 0 && (
+        <div className="space-y-2">
+          {activeAlerts.map((a) => (
+            <div key={a.id} className="glass border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.06] p-4 flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-[#ff2a3a] mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="font-display text-sm text-[#ff8a90]">
+                  {a.kind === "failure" ? "Failure spike detected" : "Cookie runway low"}
+                </div>
+                <div className="text-xs text-white/70 font-mono mt-0.5">{a.msg}</div>
+              </div>
+              <button
+                onClick={() => setActiveAlerts((prev) => prev.filter((x) => x.id !== a.id))}
+                className="text-white/40 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#ff2a3a] mb-2 flex items-center gap-2">
-            <Radio className={`w-3 h-3 ${paused ? "text-white/30" : "text-[#ff2a3a] animate-pulse"}`} />
+            <Radio className={`w-3 h-3 ${rtStatus === "live" ? "text-[#ff2a3a] animate-pulse" : "text-white/30"}`} />
             // Control Room
           </div>
           <h1 className="font-display text-4xl md:text-5xl leading-none">
@@ -164,28 +391,43 @@ function DashboardPage() {
           </h1>
           <p className="text-white/50 text-sm mt-2 flex items-center gap-3 flex-wrap">
             <span className="inline-flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${paused ? "bg-white/30" : anyFetching ? "bg-emerald-400 animate-ping" : "bg-emerald-400"}`} />
-              {paused ? "Paused" : anyFetching ? "Syncing…" : "Live"}
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                rtStatus === "live" ? "bg-emerald-400 animate-pulse"
+                : rtStatus === "connecting" ? "bg-amber-400 animate-pulse"
+                : "bg-[#ff2a3a]"
+              }`} />
+              Realtime {rtStatus === "live" ? "connected" : rtStatus === "connecting" ? "connecting…" : "offline (polling)"}
             </span>
             <span className="font-mono text-xs text-white/40">
-              refresh · {REFRESH_MS / 1000}s · last {secSinceSync}s ago
+              aggregates · {AGG_REFRESH_MS / 1000}s · last {secSinceSync}s ago{anyFetching ? " · syncing" : ""}
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={exportCSV}
+            title="Export current window as CSV"
+            className="h-9 px-3 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-xs font-mono uppercase tracking-widest text-white/70 inline-flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" /> CSV
+          </button>
+          <button
+            onClick={exportPDF}
+            title="Print-ready PDF export"
+            className="h-9 px-3 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-xs font-mono uppercase tracking-widest text-white/70 inline-flex items-center gap-1.5"
+          >
+            <Printer className="w-3.5 h-3.5" /> PDF
+          </button>
+          <AlertsSettings thresholds={thresholds} onChange={(t) => { setThresholds(t); saveThresholds(t); }} />
           <button
             onClick={() => setPaused((v) => !v)}
             title={paused ? "Resume auto-refresh" : "Pause auto-refresh"}
-            className="h-9 px-3 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-xs font-mono uppercase tracking-widest text-white/70 inline-flex items-center gap-1.5"
+            className="h-9 w-9 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] inline-flex items-center justify-center"
           >
-            {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-            {paused ? "Resume" : "Pause"}
+            {paused ? <Play className="w-3.5 h-3.5 text-white/70" /> : <Pause className="w-3.5 h-3.5 text-white/70" />}
           </button>
           <button
-            onClick={() => {
-              qc.invalidateQueries();
-              toast.success("Refreshed");
-            }}
+            onClick={() => { qc.invalidateQueries(); toast.success("Refreshed"); }}
             title="Force refresh"
             className="h-9 w-9 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] inline-flex items-center justify-center"
           >
@@ -276,12 +518,12 @@ function DashboardPage() {
           delta={prevKpi ? deltaPct(kpi.bot_detected, prevKpi.bot_detected) : null} invertDelta />
         <Kpi icon={Flame} label="Runway" value={
           runwayHours === Infinity ? "∞" : runwayHours >= 48 ? `${Math.round(runwayHours / 24)}d` : `${runwayHours.toFixed(1)}h`
-        } tone={runwayHours < 6 ? "warning" : "success"} sub={`${activeCookies} active`} />
+        } tone={runwayHours < thresholds.runwayHours ? "warning" : "success"} sub={`${activeCookies} active`} />
       </div>
 
       <LiveJobsPanel />
 
-      {/* Live activation ticker + Failure breakdown */}
+      {/* Live ticker + Failure breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="glass p-5 lg:col-span-2 relative overflow-hidden">
           <div className="flex items-center justify-between mb-4">
@@ -291,7 +533,7 @@ function DashboardPage() {
                 <span key={pulseKey} className="absolute inset-0 rounded-full bg-[#ff2a3a]/40 animate-ping" />
               </div>
               <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Live feed</div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Live feed · realtime</div>
                 <div className="font-display text-lg">Latest activations</div>
               </div>
             </div>
@@ -300,16 +542,18 @@ function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-1.5">
-            {liveAttempts.isLoading ? (
-              <div className="text-sm text-white/40 font-mono py-6 text-center">Warming up…</div>
-            ) : (liveAttempts.data?.rows ?? []).length === 0 ? (
-              <div className="text-sm text-white/40 font-mono py-6 text-center">No activations yet</div>
+            {liveRows.length === 0 ? (
+              <div className="text-sm text-white/40 font-mono py-6 text-center">
+                {initialAttempts.isLoading ? "Warming up…" : "No activations yet"}
+              </div>
             ) : (
-              liveAttempts.data!.rows.map((r: any, idx: number) => (
-                <div
+              liveRows.map((r, idx) => (
+                <button
+                  type="button"
                   key={r.id}
-                  className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border border-transparent transition ${
-                    idx === 0 ? "bg-[#ff2a3a]/5 border-[#ff2a3a]/20" : "hover:bg-white/[0.03]"
+                  onClick={() => setModalAttempt(r)}
+                  className={`w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border border-transparent transition text-left ${
+                    idx === 0 ? "bg-[#ff2a3a]/5 border-[#ff2a3a]/20" : "hover:bg-white/[0.04] hover:border-white/10"
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${
@@ -318,12 +562,12 @@ function DashboardPage() {
                     r.result === "bot_detected" ? "bg-[#ff2a3a]" : "bg-white/30"
                   }`} />
                   <span className="text-[#ff8a90] truncate">{r.code}</span>
-                  <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[r.result] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                  <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/40 border-white/10"}`}>
                     {(r.result ?? "unknown").replace("_", " ")}
                   </span>
                   <span className="text-white/50 w-8 text-right">{r.country ?? "—"}</span>
                   <span className="text-white/30 w-14 text-right">{relTime(r.created_at, nowTick)}</span>
-                </div>
+                </button>
               ))
             )}
           </div>
@@ -363,10 +607,7 @@ function DashboardPage() {
       {/* Pool + quick actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <PoolCard
-          icon={Cookie}
-          title="Cookie pool"
-          total={c.total}
-          to="/admin/cookies"
+          icon={Cookie} title="Cookie pool" total={c.total} to="/admin/cookies"
           segments={[
             { label: "Active", value: c.active, color: "#22c55e" },
             { label: "On hold", value: c.on_hold, color: "#f59e0b" },
@@ -376,16 +617,12 @@ function DashboardPage() {
           ]}
         />
         <PoolCard
-          icon={Globe2}
-          title="Proxy pool"
-          total={p.total}
-          to="/admin/proxies"
+          icon={Globe2} title="Proxy pool" total={p.total} to="/admin/proxies"
           segments={[
             { label: "Healthy", value: p.valid, color: "#22c55e" },
             { label: "Dead", value: p.invalid, color: "#ff2a3a" },
           ]}
         />
-
         <div className="glass p-5 flex flex-col">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40 mb-4">
             <Sparkles className="w-3.5 h-3.5" /> Quick actions
@@ -442,15 +679,7 @@ function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                 <XAxis dataKey="t" stroke="rgba(255,255,255,0.4)" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} allowDecimals={false} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "rgba(0,0,0,0.85)",
-                    border: "1px solid rgba(255,42,58,0.4)",
-                    borderRadius: 12,
-                    fontFamily: "JetBrains Mono, monospace",
-                    fontSize: 11,
-                  }}
-                />
+                <Tooltip contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,42,58,0.4)", borderRadius: 12, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }} />
                 <Area type="monotone" dataKey="Total" stroke="#ff2a3a" fill="url(#gTotal)" strokeWidth={2} />
                 <Area type="monotone" dataKey="Success" stroke="#22c55e" fill="url(#gSuccess)" strokeWidth={2} />
               </AreaChart>
@@ -459,7 +688,7 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Countries + Activity feed */}
+      {/* Countries + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="glass p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -474,10 +703,8 @@ function DashboardPage() {
                 <div key={cn.country} className="flex items-center gap-3 text-sm">
                   <div className="font-mono text-white/70 w-10">{cn.country}</div>
                   <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]"
-                      style={{ width: `${Math.min(100, (cn.total / (stats.data!.countries[0]?.total || 1)) * 100)}%` }}
-                    />
+                    <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]"
+                      style={{ width: `${Math.min(100, (cn.total / (stats.data!.countries[0]?.total || 1)) * 100)}%` }} />
                   </div>
                   <div className="font-mono text-xs text-white/50 w-16 text-right">{cn.total}</div>
                   <div className={`font-mono text-xs w-14 text-right ${cn.rate >= 70 ? "text-emerald-400" : cn.rate >= 30 ? "text-amber-400" : "text-white/40"}`}>
@@ -517,8 +744,131 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Attempt detail modal */}
+      <AttemptModal attempt={modalAttempt} onClose={() => setModalAttempt(null)} />
     </div>
   );
+}
+
+function AlertsSettings({ thresholds, onChange }: { thresholds: Thresholds; onChange: (t: Thresholds) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          title="Alert thresholds"
+          className={`h-9 w-9 rounded-full border inline-flex items-center justify-center transition ${
+            thresholds.alertsMuted
+              ? "border-white/10 bg-white/[0.03] text-white/40"
+              : "border-[#ff2a3a]/30 bg-[#ff2a3a]/[0.08] text-[#ff8a90] hover:bg-[#ff2a3a]/[0.12]"
+          }`}
+        >
+          {thresholds.alertsMuted ? <BellOff className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] bg-black/95 backdrop-blur border-white/10">
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Settings2 className="w-3.5 h-3.5 text-[#ff2a3a]" />
+              <div className="font-display text-sm">Alert thresholds</div>
+            </div>
+            <div className="text-[10px] text-white/40 font-mono">Stored locally · toast + banner</div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest text-white/50">Failure rate %</Label>
+              <Input
+                type="number" min={5} max={100}
+                value={thresholds.failureRatePct}
+                onChange={(e) => onChange({ ...thresholds, failureRatePct: Math.max(5, Math.min(100, Number(e.target.value) || 0)) })}
+                className="bg-white/5 border-white/10 font-mono h-8 mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest text-white/50">Window (minutes)</Label>
+              <Input
+                type="number" min={1} max={60}
+                value={thresholds.failureWindowMin}
+                onChange={(e) => onChange({ ...thresholds, failureWindowMin: Math.max(1, Math.min(60, Number(e.target.value) || 1)) })}
+                className="bg-white/5 border-white/10 font-mono h-8 mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest text-white/50">Runway floor (hours)</Label>
+              <Input
+                type="number" min={1} max={168}
+                value={thresholds.runwayHours}
+                onChange={(e) => onChange({ ...thresholds, runwayHours: Math.max(1, Math.min(168, Number(e.target.value) || 1)) })}
+                className="bg-white/5 border-white/10 font-mono h-8 mt-1"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-white/70 cursor-pointer">
+              <Switch
+                checked={!thresholds.alertsMuted}
+                onCheckedChange={(v) => onChange({ ...thresholds, alertsMuted: !v })}
+              />
+              Alerts enabled
+            </label>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function AttemptModal({ attempt, onClose }: { attempt: Attempt | null; onClose: () => void }) {
+  const copy = (label: string, val: string) => {
+    if (!val) return;
+    navigator.clipboard.writeText(val).then(() => toast.success(`${label} copied`)).catch(() => toast.error("Copy failed"));
+  };
+  return (
+    <Dialog open={!!attempt} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl bg-black/95 backdrop-blur border-white/10">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">
+            Activation attempt
+            {attempt?.result && (
+              <span className={`ml-3 align-middle px-2 py-0.5 rounded border text-[11px] font-mono ${RESULT_STYLE[attempt.result] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                {attempt.result.replace("_", " ")}
+              </span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+        {attempt && (
+          <div className="space-y-3 text-sm mt-2">
+            <DetailRow label="Code" value={attempt.code ?? "—"} mono copy={() => copy("Code", attempt.code ?? "")} />
+            <DetailRow label="Time" value={new Date(attempt.created_at).toLocaleString()} mono />
+            <DetailRow label="Country" value={attempt.country ?? "—"} mono />
+            <DetailRow label="IP hash" value={attempt.ip_hash ?? "—"} mono copy={() => copy("IP hash", attempt.ip_hash ?? "")} />
+            <DetailRow label="User agent" value={attempt.user_agent ?? "—"} multiline copy={() => copy("User agent", attempt.user_agent ?? "")} />
+            <DetailRow label="Attempt ID" value={attempt.id} mono copy={() => copy("ID", attempt.id)} />
+            <div className="pt-3 border-t border-white/5 text-[11px] font-mono text-white/40 leading-relaxed">
+              Note · this is a completed historical record. Per-step logs, retry, and cancel require an in-flight activation orchestrator; no such flow exists for finished attempts.
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DetailRow({ label, value, mono, multiline, copy }: { label: string; value: string; mono?: boolean; multiline?: boolean; copy?: () => void }) {
+  return (
+    <div className="grid grid-cols-[110px_1fr_auto] gap-3 items-start">
+      <div className="text-[10px] uppercase tracking-widest text-white/40 pt-1">{label}</div>
+      <div className={`${mono ? "font-mono" : ""} text-white/80 ${multiline ? "break-all" : "truncate"} text-xs`}>{value}</div>
+      {copy && (
+        <button onClick={copy} className="text-white/40 hover:text-white transition" title="Copy">
+          <Copy className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
 function deltaPct(cur: number, prev: number) {
@@ -543,10 +893,7 @@ function Kpi({
   delta?: number | null; deltaSuffix?: string; invertDelta?: boolean;
 }) {
   const toneMap: Record<string, string> = {
-    primary: "text-[#ff2a3a]",
-    success: "text-emerald-400",
-    warning: "text-amber-400",
-    muted: "text-white/50",
+    primary: "text-[#ff2a3a]", success: "text-emerald-400", warning: "text-amber-400", muted: "text-white/50",
   };
   const showDelta = delta != null && Number.isFinite(delta);
   const good = showDelta && (invertDelta ? delta! < 0 : delta! > 0);
@@ -573,9 +920,7 @@ function Kpi({
   );
 }
 
-function PoolCard({
-  icon: Icon, title, total, to, segments,
-}: {
+function PoolCard({ icon: Icon, title, total, to, segments }: {
   icon: any; title: string; total: number; to: string;
   segments: { label: string; value: number; color: string }[];
 }) {
@@ -609,10 +954,7 @@ function PoolCard({
 
 function QuickBtn({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
   return (
-    <Link
-      to={to}
-      className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.02] hover:border-[#ff2a3a]/50 hover:bg-[#ff2a3a]/5 transition p-3"
-    >
+    <Link to={to} className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.02] hover:border-[#ff2a3a]/50 hover:bg-[#ff2a3a]/5 transition p-3">
       <Icon className="w-4 h-4 text-[#ff2a3a]" />
       <span className="text-xs text-white/70">{label}</span>
     </Link>
