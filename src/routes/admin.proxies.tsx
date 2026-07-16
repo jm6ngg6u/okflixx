@@ -51,9 +51,25 @@ function ProxiesPage() {
 
   const checkMut = useMutation({
     mutationFn: async () => checkAll({}),
-    onSuccess: (r) => { toast.success(`Checked · ${r.valid} valid · ${r.invalid} invalid`); qc.invalidateQueries({ queryKey: ["proxies"] }); },
+    onSuccess: (r) => {
+      toast.success("Proxy check complete", { description: `Checked ${r.valid + r.invalid} · ${r.valid} valid · ${r.invalid} invalid` });
+      qc.invalidateQueries({ queryKey: ["proxies"] });
+    },
     onError: (e: any) => toast.error(e?.message ?? "Bulk check failed"),
   });
+
+  const delAllMut = useMutation({
+    mutationFn: async () => delAll({}),
+    onSuccess: (r) => { toast.success("Proxy pool cleared", { description: `Removed ${r.deleted} proxies` }); qc.invalidateQueries({ queryKey: ["proxies"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Clear failed"),
+  });
+
+  const delInvalidMut = useMutation({
+    mutationFn: async () => delInvalid({}),
+    onSuccess: (r) => { toast.success("Invalid proxies removed", { description: `Removed ${r.deleted} invalid proxies` }); qc.invalidateQueries({ queryKey: ["proxies"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Cleanup failed"),
+  });
+
 
   const delMut = useMutation({
     mutationFn: async (id: string) => del({ data: { id } }),
