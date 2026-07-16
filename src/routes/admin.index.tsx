@@ -774,7 +774,14 @@ function DashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Timeline</div>
-            <div className="font-display text-xl mt-1">Attempts over time</div>
+            <div className="font-display text-xl mt-1">
+              Attempts over time
+              {compareMode && (
+                <span className="ml-3 align-middle text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded border border-[#ff2a3a]/30 bg-[#ff2a3a]/10 text-[#ff8a90]">
+                  vs previous {hours}h
+                </span>
+              )}
+            </div>
           </div>
           <div className="text-xs font-mono text-white/40 inline-flex items-center gap-2">
             <Timer className="w-3.5 h-3.5" /> {stats.isFetching ? "syncing…" : `refreshed ${secSinceSync}s ago`}
@@ -785,7 +792,7 @@ function DashboardPage() {
             <div className="h-full flex items-center justify-center text-sm text-white/40 font-mono">No data in this window</div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <ComposedChart data={series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#ff2a3a" stopOpacity={0.5} />
@@ -802,7 +809,19 @@ function DashboardPage() {
                 <Tooltip contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,42,58,0.4)", borderRadius: 12, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }} />
                 <Area type="monotone" dataKey="Total" stroke="#ff2a3a" fill="url(#gTotal)" strokeWidth={2} />
                 <Area type="monotone" dataKey="Success" stroke="#22c55e" fill="url(#gSuccess)" strokeWidth={2} />
-              </AreaChart>
+                {compareMode && (
+                  <Line
+                    type="monotone"
+                    dataKey="PrevTotal"
+                    name={`Prev ${hours}h`}
+                    stroke="#ff8a90"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
