@@ -262,10 +262,35 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       }
     };
 
+    // Reduced-motion + tab-hidden throttling.
+    let reducedMotion = false;
+    const mq = typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+    if (mq) {
+      reducedMotion = mq.matches;
+      const onMQ = (e: MediaQueryListEvent) => { reducedMotion = e.matches; };
+      mq.addEventListener?.("change", onMQ);
+    }
+    let hidden = typeof document !== "undefined" ? document.hidden : false;
+    const onVis = () => { hidden = document.hidden; };
+    document.addEventListener("visibilitychange", onVis);
+
+    // Frame limiter — cap when tab is hidden or reduced-motion is on.
+    let lastDraw = 0;
+
     let raf = 0;
     const tStart = performance.now();
     const tick = () => {
-      const tGlobal = (performance.now() - tStart) / 1000;
+      const now = performance.now();
+      const targetFps = reducedMotion ? 6 : hidden ? 8 : 60;
+      const minDelta = 1000 / targetFps - 1; // -1ms slack for jitter
+      if (now - lastDraw < minDelta) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      lastDraw = now;
+      noteFrame();
+
+      const tGlobal = (now - tStart) / 1000;
 
       if (mouse.active) {
         mouse.x += (mouse.tx - mouse.x) * 0.09;
@@ -278,11 +303,13 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       trackOrigin();
 
       // Audio reactivity — cheap when disabled (getLevels returns zeros).
+      // Live intensity multiplier from the admin slider — no rerender needed.
+      const inten2 = getIntensity();
       const lv = getLevels();
-      audioLevel = audioLevel * 0.75 + lv.level * 0.25;
-      audioBeat = audioBeat * 0.7 + lv.beat * 0.3;
+      audioLevel = audioLevel * 0.75 + lv.level * 0.25 * inten2;
+      audioBeat = audioBeat * 0.7 + lv.beat * 0.3 * inten2;
       if (lv.beat > 0.05) {
-        pulse.v = Math.max(pulse.v, lv.beat * 0.9);
+        pulse.v = Math.max(pulse.v, lv.beat * 0.9 * inten2);
         pulse.x = w * 0.5 + Math.sin(tGlobal * 0.7) * w * 0.15;
         pulse.y = h * 0.35 + Math.cos(tGlobal * 0.9) * 40;
       }
@@ -299,7 +326,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
 
       ctx.globalCompositeOperation = "lighter";
       for (const b of beams) {
-        b.phase += b.speed * 16;
+        if (!reducedMotion) b.phase += b.speed * 16;
         drawBeam(b, tGlobal);
       }
       ctx.globalCompositeOperation = "source-over";
