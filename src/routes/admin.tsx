@@ -8,7 +8,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
-  Shield, ShieldAlert, KeyRound, Menu, X,
+  Shield, ShieldAlert, KeyRound, Menu, X, Music4,
 } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
@@ -135,6 +135,7 @@ function AdminLayout() {
     { to: "/admin/staff", label: "Staff & roles", icon: Users, adminOnly: true },
     { to: "/admin/security", label: "Security (TOTP)", icon: KeyRound },
     { to: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
+    { to: "/admin/background-song", label: "Background song", icon: Music4, adminOnly: true },
   ];
   const visibleNav = nav.filter((n) => !n.adminOnly || role.data?.isAdmin);
 
