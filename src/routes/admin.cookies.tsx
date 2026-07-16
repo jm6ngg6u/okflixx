@@ -144,7 +144,7 @@ function CookiePoolPage() {
     refetchInterval: 30_000,
   });
 
-  const rows: any[] = data?.rows ?? [];
+  const rows: any[] = useMemo(() => data?.rows ?? [], [data]);
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
 
   // -------- Realtime subscription: instant row flashes --------
