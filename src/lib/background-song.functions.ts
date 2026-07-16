@@ -133,3 +133,26 @@ export const removeBackgroundSong = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/** Admin: toggle audio-reactive live background animation. */
+export const setBackgroundSongReactive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ reactive: z.boolean() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("app_settings").upsert({
+      key: "background_song_reactive",
+      value: data.reactive ? "true" : "false",
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    });
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "background_song.reactive_toggle",
+      details: { reactive: data.reactive },
+    });
+    return { ok: true, reactive: data.reactive };
+  });
