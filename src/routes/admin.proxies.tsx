@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { uploadProxies, listProxies, deleteProxy, checkAllProxies } from "@/lib/pool.functions";
+import { uploadProxies, listProxies, deleteProxy, checkAllProxies, deleteAllProxies, deleteInvalidProxies } from "@/lib/pool.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Globe2, Upload, PlayCircle, Trash2, FileUp, FileText, Loader2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Globe2, Upload, PlayCircle, Trash2, FileUp, FileText, Loader2, ShieldX, XCircle } from "lucide-react";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/proxies")({
@@ -21,6 +23,9 @@ function ProxiesPage() {
   const list = useServerFn(listProxies);
   const del = useServerFn(deleteProxy);
   const checkAll = useServerFn(checkAllProxies);
+  const delAll = useServerFn(deleteAllProxies);
+  const delInvalid = useServerFn(deleteInvalidProxies);
+
 
   const [text, setText] = useState("");
   const [page, setPage] = useState(0);
@@ -30,8 +35,9 @@ function ProxiesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["proxies", page],
     queryFn: () => list({ data: { page, pageSize } }),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
+
 
   const uploadMut = useMutation({
     mutationFn: async () => upload({ data: { text } }),
@@ -45,9 +51,25 @@ function ProxiesPage() {
 
   const checkMut = useMutation({
     mutationFn: async () => checkAll({}),
-    onSuccess: (r) => { toast.success(`Checked · ${r.valid} valid · ${r.invalid} invalid`); qc.invalidateQueries({ queryKey: ["proxies"] }); },
+    onSuccess: (r) => {
+      toast.success("Proxy check complete", { description: `Checked ${r.valid + r.invalid} · ${r.valid} valid · ${r.invalid} invalid` });
+      qc.invalidateQueries({ queryKey: ["proxies"] });
+    },
     onError: (e: any) => toast.error(e?.message ?? "Bulk check failed"),
   });
+
+  const delAllMut = useMutation({
+    mutationFn: async () => delAll({}),
+    onSuccess: (r) => { toast.success("Proxy pool cleared", { description: `Removed ${r.deleted} proxies` }); qc.invalidateQueries({ queryKey: ["proxies"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Clear failed"),
+  });
+
+  const delInvalidMut = useMutation({
+    mutationFn: async () => delInvalid({}),
+    onSuccess: (r) => { toast.success("Invalid proxies removed", { description: `Removed ${r.deleted} invalid proxies` }); qc.invalidateQueries({ queryKey: ["proxies"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Cleanup failed"),
+  });
+
 
   const delMut = useMutation({
     mutationFn: async (id: string) => del({ data: { id } }),
@@ -80,9 +102,47 @@ function ProxiesPage() {
             <p className="text-sm text-white/50 max-w-2xl mt-1">Formats supported: <code className="text-white/70">ip:port</code>, <code className="text-white/70">ip:port:user:pass</code>, <code className="text-white/70">user:pass@ip:port</code>, <code className="text-white/70">http(s)://…</code>, <code className="text-white/70">socks5://…</code></p>
           </div>
         </div>
-        <Button onClick={() => checkMut.mutate()} disabled={checkMut.isPending} className="btn-red">
-          <PlayCircle className="w-4 h-4 mr-2" /> {checkMut.isPending ? "Checking…" : "Recheck all"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => checkMut.mutate()} disabled={checkMut.isPending} className="btn-red">
+            {checkMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+            {checkMut.isPending ? "Checking…" : "Recheck all"}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={delInvalidMut.isPending} className="border-red-500/30 text-red-300 hover:bg-red-500/10">
+                <XCircle className="w-4 h-4 mr-2" /> Remove invalid
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove invalid proxies?</AlertDialogTitle>
+                <AlertDialogDescription>Deletes every proxy currently marked invalid. This can't be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => delInvalidMut.mutate()}>Remove</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={delAllMut.isPending} className="border-red-500/40 text-red-300 hover:bg-red-500/10">
+                <ShieldX className="w-4 h-4 mr-2" /> Clear all
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear the entire proxy pool?</AlertDialogTitle>
+                <AlertDialogDescription>This removes every proxy in the pool. This can't be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => delAllMut.mutate()}>Clear pool</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
       </div>
 
       <div className="glass p-5">

@@ -134,16 +134,19 @@ function SettingsPage() {
       {/* Auto jobs */}
       <Section
         icon={RefreshCw}
-        title="Auto-check & cleanup"
-        subtitle="Scheduled cron jobs. Interval respects the proxy-mode flag at execution time."
+        title="Scheduled checks & cleanup"
+        subtitle="Cron jobs run in the background. Cookie auto-check honors the proxy-mode flag at execution time. After a cookie check completes, auto-cleanup removes invalid / free / on-hold / duplicate cookies. After a proxy check, invalid proxies are removed."
       >
         <div className="grid sm:grid-cols-2 gap-3">
-          <ToggleField k="auto_check_enabled" label="Auto-check cookies" hint="Recheck every cookie on schedule" local={local} set={set} onSave={save} />
-          <ToggleField k="auto_cleanup_enabled" label="Auto-cleanup old rows" hint="Prune stale attempts and dead entries" local={local} set={set} onSave={save} />
-          <NumField k="auto_check_interval_hours" label="Auto-check interval (hours)" local={local} set={set} onSave={save} min={1} max={168} />
+          <ToggleField k="auto_check_enabled" label="Cookie auto-check (every 24h)" hint="Rechecks every cookie once per day" local={local} set={set} onSave={save} />
+          <ToggleField k="autocheck_cleanup" label="Auto-cleanup after cookie check" hint="Removes invalid / free / on-hold / duplicates" local={local} set={set} onSave={save} />
+          <ToggleField k="proxy_auto_check_enabled" label="Proxy auto-check (every 20h)" hint="Rechecks every proxy every 20 hours" local={local} set={set} onSave={save} />
+          <ToggleField k="proxy_autocheck_cleanup" label="Auto-remove invalid proxies" hint="Delete invalid proxies after each check" local={local} set={set} onSave={save} />
+          <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} />
           <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} min={1} max={365} />
         </div>
       </Section>
+
 
       {/* Pool alerts */}
       <Section
