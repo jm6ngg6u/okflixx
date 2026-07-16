@@ -23,6 +23,9 @@ function ProxiesPage() {
   const list = useServerFn(listProxies);
   const del = useServerFn(deleteProxy);
   const checkAll = useServerFn(checkAllProxies);
+  const delAll = useServerFn(deleteAllProxies);
+  const delInvalid = useServerFn(deleteInvalidProxies);
+
 
   const [text, setText] = useState("");
   const [page, setPage] = useState(0);
