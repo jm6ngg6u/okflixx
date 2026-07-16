@@ -133,7 +133,10 @@ function SettingsPage() {
         </div>
       </Section>
 
+      <LiveJobsPanel />
+
       {/* Auto jobs */}
+
       <Section
         icon={RefreshCw}
         title="Scheduled checks & cleanup"
