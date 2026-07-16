@@ -12,6 +12,13 @@ import {
 } from "@/lib/audio-reactive";
 import { Volume2, VolumeX, Music4, Play } from "lucide-react";
 import { toast } from "sonner";
+import {
+  updateBgsHealth,
+  recordBgsError,
+  bumpBgsRetries,
+  type BgsStatus,
+} from "@/lib/background-song-health";
+import { BackgroundSongHealthPanel } from "@/components/BackgroundSongHealthPanel";
 
 /**
  * Plays the site background song on loop and coordinates the audio-reactive
@@ -85,11 +92,61 @@ export function BackgroundSong() {
   const lastTrackKeyRef = useRef<string>("");
   const loopSwitchingRef = useRef(false);
   const lastProgressRef = useRef({ time: 0, at: 0 });
+  const retryCountRef = useRef(0);
+  const retryingRef = useRef(false);
+  const retryCooldownRef = useRef(0);
+  const statusRef = useRef<BgsStatus>("idle");
+  const setStatus = (s: BgsStatus) => {
+    statusRef.current = s;
+    updateBgsHealth({ status: s });
+  };
   const getAudioPair = () => [audioRef.current, loopAudioRef.current] as const;
   const getActiveAudio = () => getAudioPair()[activeAudioIndexRef.current] ?? audioRef.current ?? loopAudioRef.current;
   const getStandbyAudio = () => getAudioPair()[activeAudioIndexRef.current === 0 ? 1 : 0] ?? null;
   const applyToBothAudio = (fn: (el: HTMLAudioElement) => void) => {
     for (const el of getAudioPair()) if (el) fn(el);
+  };
+
+  // Auto-recover from AbortError / network drops / silence: reload the active
+  // audio element (keeps stableUrl intact) and resume playback. Rate-limited
+  // to avoid tight loops; retries within 30s share the same cooldown.
+  const attemptRecovery = (reason: string) => {
+    if (retryingRef.current) return;
+    const now = performance.now();
+    if (now - retryCooldownRef.current < 4000) return;
+    retryCooldownRef.current = now;
+    retryingRef.current = true;
+    retryCountRef.current += 1;
+    bumpBgsRetries();
+    setStatus("retrying");
+    recordBgsError(`Auto-retry (${reason})`);
+    const el = getActiveAudio();
+    if (!el) { retryingRef.current = false; return; }
+    const resumeAt = el.currentTime;
+    const onReady = () => {
+      el.removeEventListener("canplay", onReady);
+      el.removeEventListener("loadeddata", onReady);
+      try { if (Number.isFinite(resumeAt) && resumeAt > 0.1) el.currentTime = resumeAt; } catch { /* ignore */ }
+      el.play()
+        .then(() => {
+          setStatus("playing");
+          retryingRef.current = false;
+        })
+        .catch((err) => {
+          retryingRef.current = false;
+          if (err?.name === "NotAllowedError") {
+            setNeedsGesture(true);
+            setStatus("blocked");
+          } else {
+            setStatus("error");
+            recordBgsError(err);
+          }
+        });
+    };
+    el.addEventListener("canplay", onReady, { once: true });
+    el.addEventListener("loadeddata", onReady, { once: true });
+    try { el.load(); } catch (err) { recordBgsError(err); }
+    window.setTimeout(() => { retryingRef.current = false; }, 6000);
   };
 
   const switchSeamlessLoop = () => {
@@ -136,6 +193,10 @@ export function BackgroundSong() {
     } else if (trackKey && !stableUrl && url) {
       setStableUrl(url);
     }
+    updateBgsHealth({
+      stableUrl: url,
+      stableUrlActive: !!url && trackKey === lastTrackKeyRef.current,
+    });
   }, [q.data?.path, q.data?.updatedAt, q.data?.url, stableUrl]);
   const [showVolume, setShowVolume] = useState(false);
   const [nowMinute, setNowMinute] = useState(currentMinuteOfDay());
@@ -166,10 +227,11 @@ export function BackgroundSong() {
     return () => mq.removeEventListener?.("change", h);
   }, []);
 
-  // Silence-detected subscription — warn once + force STATIC.
+  // Silence-detected subscription — warn once + force STATIC + try recovery.
   useEffect(() => {
     const off = onSilenceChange((v) => {
       setAnalyserSilent(v);
+      updateBgsHealth({ silent: v });
       if (v && !fired.current.silence) {
         fired.current.silence = true;
         sendEvent("silence_detected");
@@ -177,6 +239,7 @@ export function BackgroundSong() {
           description: "Analyser returned silence for 3s — reactive background switched to STATIC. Check CORS or unmute the song.",
         });
         setReactiveEnabled(false);
+        attemptRecovery("silence");
       }
     });
     return off;
@@ -226,6 +289,7 @@ export function BackgroundSong() {
     if (q.data.scheduleEnabled && !inWindow) {
       applyToBothAudio((a) => { try { a.pause(); } catch { /* ignore */ } });
       setReactiveEnabled(false);
+      setStatus("out_of_schedule");
       return;
     }
 
@@ -236,20 +300,31 @@ export function BackgroundSong() {
     setReactiveEnabled(wantReactive);
 
     const tryPlay = async () => {
+      setStatus("loading");
       try {
         applyToBothAudio((a) => { a.muted = false; });
         await el.play();
         setMuted(false);
         setNeedsGesture(false);
+        setStatus("playing");
         if (!fired.current.autoplay) { fired.current.autoplay = true; sendEvent("autoplay"); }
-      } catch {
+      } catch (err1) {
+        recordBgsError(err1);
         try {
           applyToBothAudio((a) => { a.muted = true; });
           await el.play();
           setMuted(true);
           setNeedsGesture(true);
-        } catch {
+          setStatus("blocked");
+        } catch (err2) {
           setNeedsGesture(true);
+          setStatus("blocked");
+          recordBgsError(err2);
+          // AbortError / transient failure → try one automatic recovery.
+          const name = (err2 as { name?: string } | null)?.name;
+          if (name === "AbortError" || name === "NotSupportedError") {
+            attemptRecovery(name);
+          }
         }
       }
     };
@@ -319,6 +394,31 @@ export function BackgroundSong() {
     if (typeof window !== "undefined") window.localStorage.setItem(VOLUME_KEY, volume.toFixed(2));
   }, [volume]);
 
+  // Mirror UI state into the health store.
+  useEffect(() => {
+    updateBgsHealth({
+      needsGesture,
+      muted,
+      activeIndex: activeAudioIndexRef.current as 0 | 1,
+      silent: analyserSilent,
+    });
+  }, [needsGesture, muted, analyserSilent]);
+
+  // Poll currentTime / duration into the health store while playing.
+  useEffect(() => {
+    if (!stableUrl) return;
+    const id = window.setInterval(() => {
+      const el = getActiveAudio();
+      if (!el) return;
+      updateBgsHealth({
+        currentTime: el.currentTime || 0,
+        duration: Number.isFinite(el.duration) ? el.duration : 0,
+        activeIndex: activeAudioIndexRef.current as 0 | 1,
+      });
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [stableUrl]);
+
   if (!q.data?.enabled || !stableUrl) return null;
   const blocked = q.data.scheduleEnabled && !inWindow;
 
@@ -371,9 +471,34 @@ export function BackgroundSong() {
           // Safety net if the timeupdate pre-empt misses (tab throttled, etc.)
           if (e.currentTarget === getActiveAudio()) switchSeamlessLoop();
         }}
-        onPlaying={(e) => { lastProgressRef.current = { time: e.currentTarget.currentTime, at: performance.now() }; }}
-        onStalled={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
-        onWaiting={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
+        onPlaying={(e) => {
+          lastProgressRef.current = { time: e.currentTarget.currentTime, at: performance.now() };
+          if (e.currentTarget === getActiveAudio()) setStatus("playing");
+        }}
+        onPause={(e) => {
+          if (e.currentTarget === getActiveAudio() && statusRef.current !== "out_of_schedule") {
+            setStatus("paused");
+          }
+        }}
+        onStalled={(e) => {
+          setStatus("stalled");
+          recordBgsError("stalled");
+          if (!needsGesture) {
+            void e.currentTarget.play().catch(() => attemptRecovery("stalled"));
+          }
+        }}
+        onWaiting={(e) => {
+          setStatus("waiting");
+          if (!needsGesture) {
+            void e.currentTarget.play().catch(() => attemptRecovery("waiting"));
+          }
+        }}
+        onError={(e) => {
+          const mediaErr = e.currentTarget.error;
+          recordBgsError(mediaErr ? `MediaError ${mediaErr.code}: ${mediaErr.message || "network"}` : "unknown media error");
+          setStatus("error");
+          attemptRecovery("media-error");
+        }}
       />
       <audio
         ref={loopAudioRef}
@@ -384,7 +509,12 @@ export function BackgroundSong() {
         onEnded={(e) => {
           if (e.currentTarget === getActiveAudio()) switchSeamlessLoop();
         }}
+        onError={(e) => {
+          const mediaErr = e.currentTarget.error;
+          recordBgsError(mediaErr ? `MediaError ${mediaErr.code} (standby)` : "standby media error");
+        }}
       />
+      <BackgroundSongHealthPanel />
       <div
         className="fixed z-40 bottom-5 right-5 select-none"
         onMouseEnter={() => setShowVolume(true)}
