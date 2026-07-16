@@ -63,8 +63,8 @@ export function BackgroundSong() {
   const q = useQuery({
     queryKey: ["background-song-public"],
     queryFn: () => fetchSong(),
-    staleTime: 15 * 1000,
-    refetchInterval: 20 * 1000, // instant-apply admin changes without reload
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000, // pick up admin changes without churning the src
     refetchOnWindowFocus: false,
   });
 
@@ -76,6 +76,24 @@ export function BackgroundSong() {
     const raw = Number.parseFloat(window.localStorage.getItem(VOLUME_KEY) ?? "");
     return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.55;
   });
+  // Stable audio src: only changes when the *track* (path) changes, NOT when
+  // the query refetches a new signed URL for the same track. Otherwise the
+  // <audio> element reloads every 20s and playback aborts mid-song.
+  const [stableUrl, setStableUrl] = useState<string | null>(null);
+  const lastPathRef = useRef<string>("");
+  useEffect(() => {
+    const path = q.data?.path ?? "";
+    const url = q.data?.url ?? null;
+    if (path && path !== lastPathRef.current) {
+      lastPathRef.current = path;
+      setStableUrl(url);
+    } else if (!path && lastPathRef.current) {
+      lastPathRef.current = "";
+      setStableUrl(null);
+    } else if (path && !stableUrl && url) {
+      setStableUrl(url);
+    }
+  }, [q.data?.path, q.data?.url, stableUrl]);
   const [showVolume, setShowVolume] = useState(false);
   const [nowMinute, setNowMinute] = useState(currentMinuteOfDay());
   const [prefersReducedMotion, setPRM] = useState(false);
@@ -224,7 +242,7 @@ export function BackgroundSong() {
     if (typeof window !== "undefined") window.localStorage.setItem(VOLUME_KEY, volume.toFixed(2));
   }, [volume]);
 
-  if (!q.data?.enabled || !q.data.url) return null;
+  if (!q.data?.enabled || !stableUrl) return null;
   const blocked = q.data.scheduleEnabled && !inWindow;
 
   const toggle = () => {
@@ -252,12 +270,26 @@ export function BackgroundSong() {
     <>
       <audio
         ref={audioRef}
-        src={q.data.url}
-        loop
+        src={stableUrl ?? undefined}
         preload="auto"
         playsInline
         autoPlay
         crossOrigin="anonymous"
+        onTimeUpdate={(e) => {
+          // Seamless loop: pre-empt native `loop` gap by seeking to 0 just
+          // before the media ends. Native `loop` re-decodes and can produce
+          // a brief silence at wrap; a manual seek keeps playback continuous.
+          const el = e.currentTarget;
+          const d = el.duration;
+          if (Number.isFinite(d) && d > 0 && d - el.currentTime <= 0.08) {
+            try { el.currentTime = 0; el.play().catch(() => {}); } catch { /* ignore */ }
+          }
+        }}
+        onEnded={(e) => {
+          // Safety net if the timeupdate pre-empt misses (tab throttled, etc.)
+          const el = e.currentTarget;
+          try { el.currentTime = 0; el.play().catch(() => {}); } catch { /* ignore */ }
+        }}
       />
       <div
         className="fixed z-40 bottom-5 right-5 select-none"
