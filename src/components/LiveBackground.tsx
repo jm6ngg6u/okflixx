@@ -277,6 +277,16 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       pulse.v *= 0.93;
       trackOrigin();
 
+      // Audio reactivity — cheap when disabled (getLevels returns zeros).
+      const lv = getLevels();
+      audioLevel = audioLevel * 0.75 + lv.level * 0.25;
+      audioBeat = audioBeat * 0.7 + lv.beat * 0.3;
+      if (lv.beat > 0.05) {
+        pulse.v = Math.max(pulse.v, lv.beat * 0.9);
+        pulse.x = w * 0.5 + Math.sin(tGlobal * 0.7) * w * 0.15;
+        pulse.y = h * 0.35 + Math.cos(tGlobal * 0.9) * 40;
+      }
+
       ctx.globalCompositeOperation = "source-over";
       if (trailAmt <= 0) {
         ctx.clearRect(0, 0, w, h);
