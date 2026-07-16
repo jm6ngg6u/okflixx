@@ -63,8 +63,8 @@ export function BackgroundSong() {
   const q = useQuery({
     queryKey: ["background-song-public"],
     queryFn: () => fetchSong(),
-    staleTime: 15 * 1000,
-    refetchInterval: 20 * 1000, // instant-apply admin changes without reload
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000, // pick up admin changes without churning the src
     refetchOnWindowFocus: false,
   });
 
