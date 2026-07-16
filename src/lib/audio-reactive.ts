@@ -19,6 +19,7 @@ const ZERO: Levels = { bass: 0, mid: 0, treble: 0, level: 0, beat: 0 };
 let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let source: MediaElementAudioSourceNode | null = null;
+const sourceMap = new WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>();
 let data: Uint8Array<ArrayBuffer> | null = null;
 let attachedEl: HTMLAudioElement | null = null;
 
@@ -129,7 +130,8 @@ export function attachAudio(el: HTMLAudioElement) {
 
     if (attachedEl !== el) {
       try { source?.disconnect(); } catch { /* ignore */ }
-      source = ctx.createMediaElementSource(el);
+      source = sourceMap.get(el) ?? ctx.createMediaElementSource(el);
+      sourceMap.set(el, source);
 
       const hp = ctx.createBiquadFilter();
       hp.type = "highpass";
