@@ -159,7 +159,10 @@ function DashboardPage() {
         <Kpi icon={XCircle} label="Invalid" value={kpi.invalid_code} tone="muted" />
       </div>
 
+      <LiveJobsPanel />
+
       {/* Pool health + chart */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <PoolCard
           icon={Cookie}
