@@ -400,3 +400,113 @@ function ToggleField({ k, label, hint, local, set, onSave, defaultOn }: any) {
     </div>
   );
 }
+
+function fmtRelative(ms: number): string {
+  const abs = Math.abs(ms);
+  const s = Math.round(abs / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h < 48) return r ? `${h}h ${r}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
+function JobScheduleCard({
+  title, enabledKey, intervalKey, lastRunKey, cleanupKey, cleanupLabel,
+  defaultInterval, local, set, onSave, onRun, running,
+}: {
+  title: string;
+  enabledKey: string;
+  intervalKey: string;
+  lastRunKey: string;
+  cleanupKey: string;
+  cleanupLabel: string;
+  defaultInterval: number;
+  local: Record<string, string>;
+  set: (k: string, v: string) => void;
+  onSave: (k: string) => void;
+  onRun: () => void;
+  running: boolean;
+}) {
+  const enabled = local[enabledKey] === "1";
+  const cleanupOn = local[cleanupKey] !== "0";
+  const rawInterval = local[intervalKey];
+  const interval = Math.max(1, parseInt(rawInterval || String(defaultInterval), 10) || defaultInterval);
+  const lastRunIso = local[lastRunKey];
+  const lastRun = lastRunIso ? new Date(lastRunIso) : null;
+  const nextRun = lastRun ? new Date(lastRun.getTime() + interval * 3600 * 1000) : null;
+  const now = Date.now();
+  const nextDeltaMs = nextRun ? nextRun.getTime() - now : 0;
+  const overdue = enabled && nextRun && nextDeltaMs <= 0;
+
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-3 sm:col-span-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium">{title}</div>
+          <div className="text-[11px] text-white/40">
+            {enabled ? `Runs every ${interval}h` : "Disabled — will not run on schedule"}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge variant="outline" className={enabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-white/10 text-white/60 border-white/15"}>
+            {enabled ? "ON" : "OFF"}
+          </Badge>
+          <Switch checked={enabled} onCheckedChange={(v) => { set(enabledKey, v ? "1" : "0"); setTimeout(() => onSave(enabledKey), 0); }} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Interval (hours)</label>
+          <div className="flex gap-2 mt-1">
+            <Input
+              type="number" min={1} max={168}
+              value={rawInterval ?? String(defaultInterval)}
+              onChange={(e) => set(intervalKey, e.target.value)}
+              className="bg-white/5 border-white/10 font-mono"
+            />
+            <Button size="sm" onClick={() => onSave(intervalKey)} className="btn-red shrink-0">
+              <Save className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Next run</label>
+          <div className={`mt-1 rounded-md px-2.5 py-2 text-xs font-mono border ${overdue ? "border-amber-500/30 bg-amber-500/10 text-amber-200" : "border-white/10 bg-white/5 text-white/70"}`}>
+            {!enabled
+              ? "—"
+              : !nextRun
+                ? "Never run yet — due now"
+                : overdue
+                  ? `Overdue by ${fmtRelative(-nextDeltaMs)}`
+                  : `In ${fmtRelative(nextDeltaMs)} · ${nextRun.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+          </div>
+          <div className="text-[10px] text-white/40 mt-1 font-mono">
+            Last: {lastRun ? lastRun.toLocaleString() : "never"}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-2.5">
+        <div className="min-w-0 pr-3">
+          <div className="text-xs">{cleanupLabel}</div>
+        </div>
+        <Switch checked={cleanupOn} onCheckedChange={(v) => { set(cleanupKey, v ? "1" : "0"); setTimeout(() => onSave(cleanupKey), 0); }} />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={onRun} disabled={running} className="btn-red">
+          {running ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Play className="w-3.5 h-3.5 mr-1.5" />}
+          Run now
+        </Button>
+        <span className="text-[11px] text-white/40 self-center">
+          Manual run ignores schedule and enabled toggle.
+        </span>
+      </div>
+    </div>
+  );
+}
