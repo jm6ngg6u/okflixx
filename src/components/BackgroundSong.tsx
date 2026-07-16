@@ -12,6 +12,13 @@ import {
 } from "@/lib/audio-reactive";
 import { Volume2, VolumeX, Music4, Play } from "lucide-react";
 import { toast } from "sonner";
+import {
+  updateBgsHealth,
+  recordBgsError,
+  bumpBgsRetries,
+  type BgsStatus,
+} from "@/lib/background-song-health";
+import { BackgroundSongHealthPanel } from "@/components/BackgroundSongHealthPanel";
 
 /**
  * Plays the site background song on loop and coordinates the audio-reactive
