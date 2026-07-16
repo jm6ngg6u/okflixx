@@ -49,9 +49,17 @@ function CookiePoolPage() {
   const del = useServerFn(deleteCookie);
   const check = useServerFn(checkCookieNow);
   const checkAll = useServerFn(checkAllCookies);
+  const delAll = useServerFn(deleteAllCookies);
+  const delInvalid = useServerFn(deleteInvalidCookies);
+  const delFreeHold = useServerFn(deleteFreeHoldCookies);
+  const delDupes = useServerFn(deleteDuplicateCookies);
+  const detailFn = useServerFn(getCookieDetail);
 
   const [status, setStatus] = useState<string>("");
   const [page, setPage] = useState(0);
+  const [confirm, setConfirm] = useState<null | "all" | "invalid" | "freehold" | "dupes">(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<any>(null);
   const pageSize = 25;
 
   const { data, isLoading } = useQuery({
