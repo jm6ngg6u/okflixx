@@ -234,10 +234,13 @@ function CookiePoolPage() {
                     </div>
                   </td>
                   <td className="p-3 text-right space-x-1">
-                    <Button size="sm" variant="ghost" onClick={() => checkMut.mutate(r.id)} disabled={checkMut.isPending} className="hover:bg-white/10">
+                    <Button size="sm" variant="ghost" onClick={() => openDetails(r.id)} className="hover:bg-white/10" title="View full details">
+                      <Eye className="w-3.5 h-3.5 text-white/70" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => checkMut.mutate(r.id)} disabled={checkMut.isPending} className="hover:bg-white/10" title="Recheck now">
                       <RefreshCw className={`w-3.5 h-3.5 ${checkMut.isPending ? "animate-spin" : ""}`} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => delMut.mutate(r.id)} className="hover:bg-red-500/10">
+                    <Button size="sm" variant="ghost" onClick={() => delMut.mutate(r.id)} className="hover:bg-red-500/10" title="Delete">
                       <Trash2 className="w-3.5 h-3.5 text-red-400" />
                     </Button>
                   </td>
@@ -254,9 +257,102 @@ function CookiePoolPage() {
           </div>
         </div>
       </div>
+
+      {/* Bulk confirm */}
+      <AlertDialog open={confirm !== null} onOpenChange={(v) => !v && setConfirm(null)}>
+        <AlertDialogContent className="bg-black/90 border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              {confirm === "all" && "Delete every cookie?"}
+              {confirm === "invalid" && "Delete all invalid cookies?"}
+              {confirm === "freehold" && "Delete all free & on-hold cookies?"}
+              {confirm === "dupes" && "Remove duplicate cookies?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              {confirm === "all" && "This wipes the entire cookie pool. There is no undo."}
+              {confirm === "invalid" && "Removes every row where status is invalid or is_valid=false. Frees pool space."}
+              {confirm === "freehold" && "Removes cookies that came back free or on-hold from the last check."}
+              {confirm === "dupes" && "Keeps the newest cookie per email/fingerprint and deletes the rest."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirm && bulkMut.mutate(confirm)} className="btn-red">
+              {bulkMut.isPending ? "Working…" : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Detail modal */}
+      <Dialog open={detailId !== null} onOpenChange={(v) => { if (!v) { setDetailId(null); setDetail(null); } }}>
+        <DialogContent className="bg-black/95 border-white/10 text-white max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <Cookie className="w-5 h-5 text-[#ff2a3a]" /> Cookie details
+            </DialogTitle>
+          </DialogHeader>
+          {!detail && <div className="p-8 text-center text-white/50"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" /> Loading…</div>}
+          {detail && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ["Email", detail.email],
+                  ["Name", detail.name],
+                  ["Status", detail.status],
+                  ["Valid", String(detail.is_valid)],
+                  ["Plan", detail.plan_name],
+                  ["Quality", detail.video_quality],
+                  ["Max streams", detail.max_streams],
+                  ["Country", detail.country],
+                  ["Member since", detail.member_since],
+                  ["Payment", detail.payment_method],
+                  ["Total uses", detail.total_uses],
+                  ["Success / Fail", `${detail.success_count ?? 0} / ${detail.fail_count ?? 0}`],
+                  ["Last checked", detail.last_checked_at],
+                  ["Last used", detail.last_used_at],
+                  ["Last mode", detail.last_checked_mode],
+                  ["Fingerprint", detail.fingerprint],
+                ].map(([k, v]) => (
+                  <div key={k as string} className="glass p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40">{k}</div>
+                    <div className="text-white/85 font-mono text-xs mt-1 break-all">{v ?? "—"}</div>
+                  </div>
+                ))}
+              </div>
+              {detail.last_error && (
+                <div className="glass p-3 border-red-500/30">
+                  <div className="text-[10px] uppercase tracking-widest text-red-300">Last error</div>
+                  <div className="text-red-200 text-xs font-mono mt-1 break-all">{detail.last_error}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Full cookie capture ({(detail.cookies_json ?? []).length} pairs)</div>
+                <pre className="glass p-3 text-[11px] font-mono max-h-72 overflow-auto whitespace-pre-wrap break-all">
+{JSON.stringify(detail.cookies_json, null, 2)}
+                </pre>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="outline" className="border-white/10 bg-white/5"
+                    onClick={() => { navigator.clipboard.writeText(JSON.stringify(detail.cookies_json, null, 2)); toast.success("Copied JSON"); }}>
+                    <CopyIcon className="w-3.5 h-3.5 mr-1.5" /> Copy JSON
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-white/10 bg-white/5"
+                    onClick={() => {
+                      const header = (detail.cookies_json ?? []).map((c: any) => `${c.name}=${c.value}`).join("; ");
+                      navigator.clipboard.writeText(header); toast.success("Copied cookie header");
+                    }}>
+                    <CopyIcon className="w-3.5 h-3.5 mr-1.5" /> Copy header
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // -------------------- Upload panel --------------------
 
