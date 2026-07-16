@@ -92,11 +92,61 @@ export function BackgroundSong() {
   const lastTrackKeyRef = useRef<string>("");
   const loopSwitchingRef = useRef(false);
   const lastProgressRef = useRef({ time: 0, at: 0 });
+  const retryCountRef = useRef(0);
+  const retryingRef = useRef(false);
+  const retryCooldownRef = useRef(0);
+  const statusRef = useRef<BgsStatus>("idle");
+  const setStatus = (s: BgsStatus) => {
+    statusRef.current = s;
+    updateBgsHealth({ status: s });
+  };
   const getAudioPair = () => [audioRef.current, loopAudioRef.current] as const;
   const getActiveAudio = () => getAudioPair()[activeAudioIndexRef.current] ?? audioRef.current ?? loopAudioRef.current;
   const getStandbyAudio = () => getAudioPair()[activeAudioIndexRef.current === 0 ? 1 : 0] ?? null;
   const applyToBothAudio = (fn: (el: HTMLAudioElement) => void) => {
     for (const el of getAudioPair()) if (el) fn(el);
+  };
+
+  // Auto-recover from AbortError / network drops / silence: reload the active
+  // audio element (keeps stableUrl intact) and resume playback. Rate-limited
+  // to avoid tight loops; retries within 30s share the same cooldown.
+  const attemptRecovery = (reason: string) => {
+    if (retryingRef.current) return;
+    const now = performance.now();
+    if (now - retryCooldownRef.current < 4000) return;
+    retryCooldownRef.current = now;
+    retryingRef.current = true;
+    retryCountRef.current += 1;
+    bumpBgsRetries();
+    setStatus("retrying");
+    recordBgsError(`Auto-retry (${reason})`);
+    const el = getActiveAudio();
+    if (!el) { retryingRef.current = false; return; }
+    const resumeAt = el.currentTime;
+    const onReady = () => {
+      el.removeEventListener("canplay", onReady);
+      el.removeEventListener("loadeddata", onReady);
+      try { if (Number.isFinite(resumeAt) && resumeAt > 0.1) el.currentTime = resumeAt; } catch { /* ignore */ }
+      el.play()
+        .then(() => {
+          setStatus("playing");
+          retryingRef.current = false;
+        })
+        .catch((err) => {
+          retryingRef.current = false;
+          if (err?.name === "NotAllowedError") {
+            setNeedsGesture(true);
+            setStatus("blocked");
+          } else {
+            setStatus("error");
+            recordBgsError(err);
+          }
+        });
+    };
+    el.addEventListener("canplay", onReady, { once: true });
+    el.addEventListener("loadeddata", onReady, { once: true });
+    try { el.load(); } catch (err) { recordBgsError(err); }
+    window.setTimeout(() => { retryingRef.current = false; }, 6000);
   };
 
   const switchSeamlessLoop = () => {
