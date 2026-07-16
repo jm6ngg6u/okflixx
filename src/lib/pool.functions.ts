@@ -116,6 +116,7 @@ const ListCookiesInput = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(10).max(200).default(50),
   status: z.string().optional(),
+  country: z.string().optional(),
 });
 
 export const listCookies = createServerFn({ method: "POST" })
@@ -134,9 +135,35 @@ export const listCookies = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
     if (data.status) q = q.eq("status", data.status);
+    if (data.country) q = q.eq("country", data.country.toUpperCase());
     const { data: rows, count, error } = await q;
     if (error) throw error;
     return { rows: rows ?? [], count: count ?? 0 };
+  });
+
+export const listCookieCountries = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data, error } = await supabase
+      .from("cookie_pool")
+      .select("country")
+      .not("country", "is", null);
+    if (error) throw error;
+    const counts: Record<string, number> = {};
+    for (const r of (data ?? []) as any[]) {
+      const c = String(r.country ?? "").trim().toUpperCase();
+      if (!c) continue;
+      counts[c] = (counts[c] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count);
   });
 
 export const deleteCookie = createServerFn({ method: "POST" })
