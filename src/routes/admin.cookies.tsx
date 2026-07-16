@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import JSZip from "jszip";
 import {
   uploadCookies, listCookies, deleteCookie, checkCookieNow, checkAllCookies,
+  deleteAllCookies, deleteInvalidCookies, deleteFreeHoldCookies,
+  deleteDuplicateCookies, getCookieDetail,
 } from "@/lib/pool.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,8 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
   Cookie, Upload, RefreshCw, Trash2, PlayCircle, FileText, FileArchive,
-  FileUp, CheckCircle2, XCircle, Loader2,
+  FileUp, CheckCircle2, XCircle, Loader2, Eye, Download, Copy as CopyIcon,
+  FlameKindling, Ban, Layers, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,9 +49,17 @@ function CookiePoolPage() {
   const del = useServerFn(deleteCookie);
   const check = useServerFn(checkCookieNow);
   const checkAll = useServerFn(checkAllCookies);
+  const delAll = useServerFn(deleteAllCookies);
+  const delInvalid = useServerFn(deleteInvalidCookies);
+  const delFreeHold = useServerFn(deleteFreeHoldCookies);
+  const delDupes = useServerFn(deleteDuplicateCookies);
+  const detailFn = useServerFn(getCookieDetail);
 
   const [status, setStatus] = useState<string>("");
   const [page, setPage] = useState(0);
+  const [confirm, setConfirm] = useState<null | "all" | "invalid" | "freehold" | "dupes">(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<any>(null);
   const pageSize = 25;
 
   const { data, isLoading } = useQuery({
@@ -74,6 +90,42 @@ function CookiePoolPage() {
     mutationFn: async (id: string) => del({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cookies"] }),
   });
+  const bulkMut = useMutation({
+    mutationFn: async (kind: "all" | "invalid" | "freehold" | "dupes") => {
+      if (kind === "all") return { kind, ...(await delAll({})) };
+      if (kind === "invalid") return { kind, ...(await delInvalid({})) };
+      if (kind === "freehold") return { kind, ...(await delFreeHold({})) };
+      return { kind, ...(await delDupes({})) };
+    },
+    onSuccess: (r: any) => {
+      const label = r.kind === "all" ? "all cookies" : r.kind === "invalid" ? "invalid" : r.kind === "freehold" ? "free/hold" : "duplicates";
+      toast.success(`Removed ${r.deleted ?? 0} ${label}${r.scanned ? ` (scanned ${r.scanned})` : ""}`);
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      setConfirm(null);
+    },
+    onError: (e: any) => { toast.error(e?.message ?? "Bulk delete failed"); setConfirm(null); },
+  });
+
+  async function openDetails(id: string) {
+    setDetailId(id);
+    setDetail(null);
+    try {
+      const row = await detailFn({ data: { id } });
+      setDetail(row);
+    } catch (e: any) { toast.error(e?.message ?? "Load failed"); setDetailId(null); }
+  }
+
+  function exportCsv() {
+    const cols = ["id","email","status","is_valid","country","plan_name","video_quality","max_streams","payment_method","name","member_since","total_uses","success_count","fail_count","last_checked_at","last_used_at","last_error"];
+    const esc = (v: any) => { if (v == null) return ""; const s = String(v).replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; };
+    const csv = [cols.join(","), ...rows.map((r: any) => cols.map((c) => esc(r[c])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cookies-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
@@ -85,9 +137,14 @@ function CookiePoolPage() {
         subtitle="Upload Netflix session cookies used by the live TV activation flow. Supports single files, bulk .txt uploads, and .zip archives."
         icon={Cookie}
         action={
-          <Button onClick={() => checkAllMut.mutate()} disabled={checkAllMut.isPending} className="btn-red">
-            <PlayCircle className="w-4 h-4 mr-2" /> {checkAllMut.isPending ? "Checking…" : "Recheck all"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={exportCsv} className="border-white/10 bg-white/5 hover:bg-white/10">
+              <Download className="w-4 h-4 mr-2" /> Export CSV
+            </Button>
+            <Button onClick={() => checkAllMut.mutate()} disabled={checkAllMut.isPending} className="btn-red">
+              <PlayCircle className="w-4 h-4 mr-2" /> {checkAllMut.isPending ? "Checking…" : "Recheck all"}
+            </Button>
+          </div>
         }
       />
 
@@ -95,6 +152,28 @@ function CookiePoolPage() {
         onDone={() => qc.invalidateQueries({ queryKey: ["cookies"] })}
         runUpload={(blobs, label) => upload({ data: { blobs, label } })}
       />
+
+      {/* Bulk actions */}
+      <div className="glass p-4 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 mr-2">
+          <FlameKindling className="w-4 h-4 text-[#ff2a3a]" />
+          <span className="font-display text-sm">Bulk cleanup</span>
+        </div>
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("invalid")} className="border-white/10 bg-white/5 hover:bg-red-500/10">
+          <Ban className="w-3.5 h-3.5 mr-1.5 text-red-400" /> Remove invalid
+        </Button>
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("freehold")} className="border-white/10 bg-white/5 hover:bg-amber-500/10">
+          <Layers className="w-3.5 h-3.5 mr-1.5 text-amber-300" /> Remove free / on-hold
+        </Button>
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("dupes")} className="border-white/10 bg-white/5 hover:bg-sky-500/10">
+          <CopyIcon className="w-3.5 h-3.5 mr-1.5 text-sky-300" /> Remove duplicates
+        </Button>
+        <div className="flex-1" />
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("all")} className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20">
+          <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Delete ALL cookies
+        </Button>
+      </div>
+
 
       <div className="glass overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
@@ -155,10 +234,13 @@ function CookiePoolPage() {
                     </div>
                   </td>
                   <td className="p-3 text-right space-x-1">
-                    <Button size="sm" variant="ghost" onClick={() => checkMut.mutate(r.id)} disabled={checkMut.isPending} className="hover:bg-white/10">
+                    <Button size="sm" variant="ghost" onClick={() => openDetails(r.id)} className="hover:bg-white/10" title="View full details">
+                      <Eye className="w-3.5 h-3.5 text-white/70" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => checkMut.mutate(r.id)} disabled={checkMut.isPending} className="hover:bg-white/10" title="Recheck now">
                       <RefreshCw className={`w-3.5 h-3.5 ${checkMut.isPending ? "animate-spin" : ""}`} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => delMut.mutate(r.id)} className="hover:bg-red-500/10">
+                    <Button size="sm" variant="ghost" onClick={() => delMut.mutate(r.id)} className="hover:bg-red-500/10" title="Delete">
                       <Trash2 className="w-3.5 h-3.5 text-red-400" />
                     </Button>
                   </td>
@@ -175,9 +257,102 @@ function CookiePoolPage() {
           </div>
         </div>
       </div>
+
+      {/* Bulk confirm */}
+      <AlertDialog open={confirm !== null} onOpenChange={(v) => !v && setConfirm(null)}>
+        <AlertDialogContent className="bg-black/90 border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              {confirm === "all" && "Delete every cookie?"}
+              {confirm === "invalid" && "Delete all invalid cookies?"}
+              {confirm === "freehold" && "Delete all free & on-hold cookies?"}
+              {confirm === "dupes" && "Remove duplicate cookies?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              {confirm === "all" && "This wipes the entire cookie pool. There is no undo."}
+              {confirm === "invalid" && "Removes every row where status is invalid or is_valid=false. Frees pool space."}
+              {confirm === "freehold" && "Removes cookies that came back free or on-hold from the last check."}
+              {confirm === "dupes" && "Keeps the newest cookie per email/fingerprint and deletes the rest."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirm && bulkMut.mutate(confirm)} className="btn-red">
+              {bulkMut.isPending ? "Working…" : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Detail modal */}
+      <Dialog open={detailId !== null} onOpenChange={(v) => { if (!v) { setDetailId(null); setDetail(null); } }}>
+        <DialogContent className="bg-black/95 border-white/10 text-white max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <Cookie className="w-5 h-5 text-[#ff2a3a]" /> Cookie details
+            </DialogTitle>
+          </DialogHeader>
+          {!detail && <div className="p-8 text-center text-white/50"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" /> Loading…</div>}
+          {detail && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ["Email", detail.email],
+                  ["Name", detail.name],
+                  ["Status", detail.status],
+                  ["Valid", String(detail.is_valid)],
+                  ["Plan", detail.plan_name],
+                  ["Quality", detail.video_quality],
+                  ["Max streams", detail.max_streams],
+                  ["Country", detail.country],
+                  ["Member since", detail.member_since],
+                  ["Payment", detail.payment_method],
+                  ["Total uses", detail.total_uses],
+                  ["Success / Fail", `${detail.success_count ?? 0} / ${detail.fail_count ?? 0}`],
+                  ["Last checked", detail.last_checked_at],
+                  ["Last used", detail.last_used_at],
+                  ["Last mode", detail.last_checked_mode],
+                  ["Fingerprint", detail.fingerprint],
+                ].map(([k, v]) => (
+                  <div key={k as string} className="glass p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40">{k}</div>
+                    <div className="text-white/85 font-mono text-xs mt-1 break-all">{v ?? "—"}</div>
+                  </div>
+                ))}
+              </div>
+              {detail.last_error && (
+                <div className="glass p-3 border-red-500/30">
+                  <div className="text-[10px] uppercase tracking-widest text-red-300">Last error</div>
+                  <div className="text-red-200 text-xs font-mono mt-1 break-all">{detail.last_error}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Full cookie capture ({(detail.cookies_json ?? []).length} pairs)</div>
+                <pre className="glass p-3 text-[11px] font-mono max-h-72 overflow-auto whitespace-pre-wrap break-all">
+{JSON.stringify(detail.cookies_json, null, 2)}
+                </pre>
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" variant="outline" className="border-white/10 bg-white/5"
+                    onClick={() => { navigator.clipboard.writeText(JSON.stringify(detail.cookies_json, null, 2)); toast.success("Copied JSON"); }}>
+                    <CopyIcon className="w-3.5 h-3.5 mr-1.5" /> Copy JSON
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-white/10 bg-white/5"
+                    onClick={() => {
+                      const header = (detail.cookies_json ?? []).map((c: any) => `${c.name}=${c.value}`).join("; ");
+                      navigator.clipboard.writeText(header); toast.success("Copied cookie header");
+                    }}>
+                    <CopyIcon className="w-3.5 h-3.5 mr-1.5" /> Copy header
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // -------------------- Upload panel --------------------
 

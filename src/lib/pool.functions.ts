@@ -318,3 +318,114 @@ export const checkAllProxies = createServerFn({ method: "POST" })
     }
     return { valid, invalid };
   });
+
+// -------------------- Bulk cookie ops (admin-only) --------------------
+
+async function assertAdmin(supabase: any, userId: string) {
+  const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+  if (!isAdmin) throw new Error("Forbidden");
+}
+
+export const deleteAllCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true });
+    const { error } = await supabaseAdmin.from("cookie_pool").delete().not("id", "is", null);
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "cookie.delete_all", details: { deleted: count ?? 0 },
+    });
+    return { deleted: count ?? 0 };
+  });
+
+export const deleteInvalidCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin
+      .from("cookie_pool").select("id", { count: "exact", head: true })
+      .or("status.eq.invalid,is_valid.eq.false");
+    const { error } = await supabaseAdmin
+      .from("cookie_pool").delete().or("status.eq.invalid,is_valid.eq.false");
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "cookie.delete_invalid", details: { deleted: count ?? 0 },
+    });
+    return { deleted: count ?? 0 };
+  });
+
+export const deleteFreeHoldCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin
+      .from("cookie_pool").select("id", { count: "exact", head: true })
+      .in("status", ["free", "on_hold"]);
+    const { error } = await supabaseAdmin
+      .from("cookie_pool").delete().in("status", ["free", "on_hold"]);
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "cookie.delete_free_hold", details: { deleted: count ?? 0 },
+    });
+    return { deleted: count ?? 0 };
+  });
+
+// Mirrors bot.remove_duplicate_cookies — keep newest per email, then dedupe by fingerprint.
+export const deleteDuplicateCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("cookie_pool")
+      .select("id,email,fingerprint,created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const seenEmail = new Set<string>();
+    const seenFp = new Set<string>();
+    const toDelete: string[] = [];
+    for (const r of rows ?? []) {
+      const em = (r.email ?? "").trim().toLowerCase();
+      const fp = (r.fingerprint ?? "").trim();
+      let dup = false;
+      if (em) { if (seenEmail.has(em)) dup = true; else seenEmail.add(em); }
+      if (!dup && fp) { if (seenFp.has(fp)) dup = true; else seenFp.add(fp); }
+      if (dup) toDelete.push(r.id);
+    }
+    let deleted = 0;
+    for (let i = 0; i < toDelete.length; i += 200) {
+      const chunk = toDelete.slice(i, i + 200);
+      const { error: delErr } = await supabaseAdmin.from("cookie_pool").delete().in("id", chunk);
+      if (delErr) throw delErr;
+      deleted += chunk.length;
+    }
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "cookie.remove_duplicates", details: { deleted },
+    });
+    return { deleted, scanned: rows?.length ?? 0 };
+  });
+
+export const getCookieDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("cookie_pool").select("*").eq("id", data.id).single();
+    if (error || !row) throw new Error("Not found");
+    return row;
+  });
