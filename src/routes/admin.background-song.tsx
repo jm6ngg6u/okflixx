@@ -246,6 +246,55 @@ function BackgroundSongPage() {
         )}
       </div>
 
+      {/* Audio-reactive live background */}
+      <div className="glass p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-md bg-white/5 border border-white/10 flex items-center justify-center">
+              <Activity className={`w-4 h-4 ${d?.reactive ? "text-[#ff2a3a]" : "text-white/40"}`} />
+            </div>
+            <div>
+              <div className="font-display text-lg leading-tight">Audio-reactive background</div>
+              <div className="text-xs text-white/50 mt-1 max-w-xl">
+                Beams glow, swell and pulse to the music in real time using the Web Audio analyser — zero delay, runs on the same animation frame with no extra network or CPU pressure when the song is silent.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className={d?.reactive
+              ? "bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30"
+              : "bg-white/10 text-white/60 border-white/15"}>
+              {d?.reactive ? "REACTIVE" : "STATIC"}
+            </Badge>
+            <Switch
+              checked={!!d?.reactive}
+              disabled={reactiveMut.isPending}
+              onCheckedChange={(v) => reactiveMut.mutate(v)}
+            />
+          </div>
+        </div>
+        <div className="mt-4 grid sm:grid-cols-3 gap-3 text-[11px]">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="font-mono uppercase tracking-widest text-white/40 mb-1">Bass</div>
+            <div className="text-white/70">Kicks trigger a red pulse that ripples outward across the beams.</div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="font-mono uppercase tracking-widest text-white/40 mb-1">Mids</div>
+            <div className="text-white/70">Vocals and melody widen the wave amplitude for organic motion.</div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="font-mono uppercase tracking-widest text-white/40 mb-1">Overall level</div>
+            <div className="text-white/70">Loud sections brighten the beams; silence returns to base intensity.</div>
+          </div>
+        </div>
+        {!d?.enabled && (
+          <div className="mt-4 rounded-md border border-white/10 bg-white/[0.02] text-white/50 text-xs p-3">
+            Reactive mode only runs while background music is playing. Turn playback ON above to see it live.
+          </div>
+        )}
+      </div>
+
+
       {/* Upload */}
       <div className="glass p-5">
         <div className="flex items-start gap-3 mb-4">
