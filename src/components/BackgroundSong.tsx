@@ -471,9 +471,34 @@ export function BackgroundSong() {
           // Safety net if the timeupdate pre-empt misses (tab throttled, etc.)
           if (e.currentTarget === getActiveAudio()) switchSeamlessLoop();
         }}
-        onPlaying={(e) => { lastProgressRef.current = { time: e.currentTarget.currentTime, at: performance.now() }; }}
-        onStalled={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
-        onWaiting={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
+        onPlaying={(e) => {
+          lastProgressRef.current = { time: e.currentTarget.currentTime, at: performance.now() };
+          if (e.currentTarget === getActiveAudio()) setStatus("playing");
+        }}
+        onPause={(e) => {
+          if (e.currentTarget === getActiveAudio() && statusRef.current !== "out_of_schedule") {
+            setStatus("paused");
+          }
+        }}
+        onStalled={(e) => {
+          setStatus("stalled");
+          recordBgsError("stalled");
+          if (!needsGesture) {
+            void e.currentTarget.play().catch(() => attemptRecovery("stalled"));
+          }
+        }}
+        onWaiting={(e) => {
+          setStatus("waiting");
+          if (!needsGesture) {
+            void e.currentTarget.play().catch(() => attemptRecovery("waiting"));
+          }
+        }}
+        onError={(e) => {
+          const mediaErr = e.currentTarget.error;
+          recordBgsError(mediaErr ? `MediaError ${mediaErr.code}: ${mediaErr.message || "network"}` : "unknown media error");
+          setStatus("error");
+          attemptRecovery("media-error");
+        }}
       />
       <audio
         ref={loopAudioRef}
@@ -484,7 +509,12 @@ export function BackgroundSong() {
         onEnded={(e) => {
           if (e.currentTarget === getActiveAudio()) switchSeamlessLoop();
         }}
+        onError={(e) => {
+          const mediaErr = e.currentTarget.error;
+          recordBgsError(mediaErr ? `MediaError ${mediaErr.code} (standby)` : "standby media error");
+        }}
       />
+      <BackgroundSongHealthPanel />
       <div
         className="fixed z-40 bottom-5 right-5 select-none"
         onMouseEnter={() => setShowVolume(true)}
