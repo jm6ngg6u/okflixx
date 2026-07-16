@@ -250,42 +250,45 @@ function SettingsPage() {
       <Section
         icon={RefreshCw}
         title="Scheduled checks & cleanup"
-        subtitle="Cron jobs run in the background. Cookie auto-check honors the proxy-mode flag at execution time. After a cookie check completes, auto-cleanup removes invalid / free / on-hold / duplicate cookies. After a proxy check, invalid proxies are removed."
+        subtitle="Cron jobs run in the background. Configure each job's interval (hours) and enable/disable independently. Next-run time is computed from the last successful run."
       >
         <div className="grid sm:grid-cols-2 gap-3">
-          <ToggleField k="auto_check_enabled" label="Cookie auto-check (every 24h)" hint="Rechecks every cookie once per day" local={local} set={set} onSave={save} />
-          <ToggleField k="autocheck_cleanup" label="Auto-cleanup after cookie check" hint="Removes invalid / free / on-hold / duplicates" local={local} set={set} onSave={save} />
-          <ToggleField k="proxy_auto_check_enabled" label="Proxy auto-check (every 20h)" hint="Rechecks every proxy every 20 hours" local={local} set={set} onSave={save} />
-          <ToggleField k="proxy_autocheck_cleanup" label="Auto-remove invalid proxies" hint="Delete invalid proxies after each check" local={local} set={set} onSave={save} />
+          <JobScheduleCard
+            title="Cookie auto-check"
+            enabledKey="auto_check_enabled"
+            intervalKey="cookies_autocheck_interval_hours"
+            lastRunKey="cookies_last_run_at"
+            cleanupKey="autocheck_cleanup"
+            cleanupLabel="Auto-cleanup after check (invalid / free / on-hold / duplicates)"
+            defaultInterval={24}
+            local={local} set={set} onSave={save}
+            onRun={() => runCookiesMut.mutate()}
+            running={runCookiesMut.isPending}
+          />
+          <JobScheduleCard
+            title="Proxy auto-check"
+            enabledKey="proxy_auto_check_enabled"
+            intervalKey="proxies_autocheck_interval_hours"
+            lastRunKey="proxies_last_run_at"
+            cleanupKey="proxy_autocheck_cleanup"
+            cleanupLabel="Auto-remove invalid proxies after check"
+            defaultInterval={20}
+            local={local} set={set} onSave={save}
+            onRun={() => runProxiesMut.mutate()}
+            running={runProxiesMut.isPending}
+          />
           <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} />
           <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} min={1} max={365} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-white/10">
-          <Button
-            size="sm"
-            onClick={() => runCookiesMut.mutate()}
-            disabled={runCookiesMut.isPending}
-            className="btn-red"
-          >
-            {runCookiesMut.isPending
-              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              : <Play className="w-3.5 h-3.5 mr-1.5" />}
-            Run cookie check now
+          <Button size="sm" variant="outline" onClick={exportRunsCSV} className="border-white/15 bg-white/5">
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export runs (CSV)
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => runProxiesMut.mutate()}
-            disabled={runProxiesMut.isPending}
-            className="border-white/15 bg-white/5"
-          >
-            {runProxiesMut.isPending
-              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              : <Play className="w-3.5 h-3.5 mr-1.5" />}
-            Run proxy check now
+          <Button size="sm" variant="outline" onClick={exportRunsPDF} className="border-white/15 bg-white/5">
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export runs (PDF)
           </Button>
           <span className="text-[11px] text-white/40 self-center ml-1">
-            Manual runs ignore the enabled toggle and use current proxy mode.
+            Exports the last 20 cookie / proxy / cleanup runs with removed counts, timestamps, and reasons.
           </span>
         </div>
       </Section>
