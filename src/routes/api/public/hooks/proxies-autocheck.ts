@@ -54,7 +54,21 @@ export const Route = createFileRoute("/api/public/hooks/proxies-autocheck")({
               .eq("id", p.id);
             if (res.ok) ok++;
             else dead++;
+            const done = ok + dead;
+            if (done % 5 === 0 || done === (rows?.length ?? 0)) {
+              await recordJobProgress(jobId, {
+                phase: "checking",
+                total: rows?.length ?? 0,
+                checked: done, ok_count: ok, dead,
+              });
+            }
           }
+          await recordJobProgress(jobId, {
+            phase: "cleanup",
+            total: rows?.length ?? 0,
+            checked: (rows ?? []).length, ok_count: ok, dead,
+          });
+
           let removed_invalid = 0;
           if (map.proxy_autocheck_cleanup !== "0") {
             const { count: c } = await supabaseAdmin
