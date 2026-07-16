@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import JSZip from "jszip";
 import {
-  uploadCookies, listCookies, deleteCookie, checkCookieNow, checkAllCookies,
+  uploadCookies, listCookies, listCookieCountries, deleteCookie, checkCookieNow, checkAllCookies,
   deleteAllCookies, deleteInvalidCookies, deleteFreeHoldCookies,
   deleteDuplicateCookies, getCookieDetail,
 } from "@/lib/pool.functions";
+import { countryFlag, countryName } from "@/lib/countries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -23,7 +29,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Cookie, Upload, RefreshCw, Trash2, PlayCircle, FileText, FileArchive,
   FileUp, CheckCircle2, XCircle, Loader2, Eye, Download, Copy as CopyIcon,
-  FlameKindling, Ban, Layers, AlertTriangle,
+  FlameKindling, Ban, Layers, AlertTriangle, Globe2, Filter, Sparkles,
+  ShieldCheck, PauseCircle, HelpCircle, Mail, CreditCard, Tv, Users2,
+  CalendarClock, Fingerprint, Wifi, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,20 +40,22 @@ export const Route = createFileRoute("/admin/cookies")({
   component: CookiePoolPage,
 });
 
-const STATUS_STYLE: Record<string, string> = {
-  active: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  free: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-  on_hold: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  invalid: "bg-red-500/15 text-red-300 border-red-500/30",
-  unknown: "bg-white/5 text-white/50 border-white/10",
+const STATUS_META: Record<string, { label: string; cls: string; Icon: any; dot: string }> = {
+  active:  { label: "Active",  cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", Icon: ShieldCheck,   dot: "bg-emerald-400" },
+  free:    { label: "Free",    cls: "bg-sky-500/15 text-sky-300 border-sky-500/30",              Icon: Sparkles,      dot: "bg-sky-400" },
+  on_hold: { label: "On hold", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",       Icon: PauseCircle,   dot: "bg-amber-400" },
+  invalid: { label: "Invalid", cls: "bg-red-500/15 text-red-300 border-red-500/30",              Icon: XCircle,       dot: "bg-red-400" },
+  unknown: { label: "Unknown", cls: "bg-white/5 text-white/50 border-white/10",                  Icon: HelpCircle,    dot: "bg-white/40" },
 };
 
 type BatchResult = { inserted: number; duplicates: number; invalid: number };
+type BulkKind = "all" | "invalid" | "freehold" | "dupes";
 
 function CookiePoolPage() {
   const qc = useQueryClient();
   const upload = useServerFn(uploadCookies);
   const list = useServerFn(listCookies);
+  const listCountries = useServerFn(listCookieCountries);
   const del = useServerFn(deleteCookie);
   const check = useServerFn(checkCookieNow);
   const checkAll = useServerFn(checkAllCookies);
@@ -56,54 +66,148 @@ function CookiePoolPage() {
   const detailFn = useServerFn(getCookieDetail);
 
   const [status, setStatus] = useState<string>("");
+  const [country, setCountry] = useState<string>("");
   const [page, setPage] = useState(0);
-  const [confirm, setConfirm] = useState<null | "all" | "invalid" | "freehold" | "dupes">(null);
+  const [confirm, setConfirm] = useState<null | BulkKind>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
+  const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
+  const [pageCheckProgress, setPageCheckProgress] = useState<{ done: number; total: number } | null>(null);
   const pageSize = 25;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["cookies", page, status],
-    queryFn: () => list({ data: { page, pageSize, status: status || undefined } }),
-    refetchInterval: 15_000,
+  const isAnyChecking = checkingIds.size > 0 || pageCheckProgress !== null;
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["cookies", page, status, country],
+    queryFn: () => list({ data: { page, pageSize, status: status || undefined, country: country || undefined } }),
+    // Faster live refresh while any check is in flight
+    refetchInterval: isAnyChecking ? 2_000 : 15_000,
   });
 
-  const checkMut = useMutation({
-    mutationFn: async (id: string) => check({ data: { id } }),
-    onSuccess: (r) => {
+  const { data: countries } = useQuery({
+    queryKey: ["cookie-countries"],
+    queryFn: () => listCountries({}),
+    refetchInterval: 30_000,
+  });
+
+  const rows = data?.rows ?? [];
+  const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
+
+  async function runOneCheck(id: string) {
+    setCheckingIds((s) => { const n = new Set(s); n.add(id); return n; });
+    try {
+      const r = await check({ data: { id } });
       const mode = r.proxy_used ? "proxy" : "direct";
-      const message = r.last_error ? `${r.status} · ${r.last_error}` : `${r.status}${r.email ? ` · ${r.email}` : ""}`;
-      toast.success(`Rechecked (${mode}) · ${message}`);
+      const meta = STATUS_META[r.status] ?? STATUS_META.unknown;
+      const detailsBits = [
+        r.email,
+        r.plan_name,
+        r.country ? `${countryFlag(r.country)} ${countryName(r.country)}` : null,
+      ].filter(Boolean).join(" · ");
+      const msg = r.last_error ? r.last_error : detailsBits || meta.label;
+      const line = `${meta.label} · ${mode}${msg ? " · " + msg : ""}`;
+      if (r.status === "active" || r.status === "free") toast.success(line);
+      else if (r.status === "invalid") toast.error(line);
+      else toast(line);
       qc.invalidateQueries({ queryKey: ["cookies"] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Check failed"),
-  });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+      return r;
+    } catch (e: any) {
+      toast.error(e?.message ?? "Check failed");
+      throw e;
+    } finally {
+      setCheckingIds((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
+  }
+
+  async function runPageCheck() {
+    if (rows.length === 0) return;
+    setPageCheckProgress({ done: 0, total: rows.length });
+    const tId = toast.loading(`Checking ${rows.length} cookies on this page…`);
+    const tally = { active: 0, free: 0, on_hold: 0, invalid: 0, unknown: 0 };
+    let done = 0;
+    for (const r of rows) {
+      try {
+        const out = await check({ data: { id: r.id } });
+        tally[out.status as keyof typeof tally] = (tally[out.status as keyof typeof tally] ?? 0) + 1;
+      } catch { /* keep going */ }
+      done++;
+      setPageCheckProgress({ done, total: rows.length });
+      toast.loading(`Checking cookies… ${done}/${rows.length}`, { id: tId });
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+    }
+    toast.success(
+      `Page rechecked · ${done}/${rows.length}   ✓ ${tally.active} active · ${tally.free} free · ${tally.on_hold} hold · ${tally.invalid} invalid · ${tally.unknown} unknown`,
+      { id: tId },
+    );
+    setPageCheckProgress(null);
+    qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+  }
+
   const checkAllMut = useMutation({
-    mutationFn: async () => checkAll({}),
-    onSuccess: (r: any) => {
-      toast.success(`Checked ${r.checked} · ${r.active} active · ${r.free} free · ${r.on_hold} hold · ${r.invalid} invalid · ${r.unknown} unknown`);
-      qc.invalidateQueries({ queryKey: ["cookies"] });
+    mutationFn: async () => {
+      const tId = toast.loading("Rechecking entire pool… this can take a while");
+      try {
+        const r: any = await checkAll({});
+        toast.success(
+          `Pool rechecked · ${r.checked} total   ✓ ${r.active} active · ${r.free} free · ${r.on_hold} hold · ${r.invalid} invalid · ${r.unknown} unknown`,
+          { id: tId },
+        );
+        return r;
+      } catch (e: any) {
+        toast.error(e?.message ?? "Bulk check failed", { id: tId });
+        throw e;
+      }
     },
-    onError: (e: any) => toast.error(e?.message ?? "Bulk check failed"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+    },
   });
+
   const delMut = useMutation({
     mutationFn: async (id: string) => del({ data: { id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cookies"] }),
-  });
-  const bulkMut = useMutation({
-    mutationFn: async (kind: "all" | "invalid" | "freehold" | "dupes") => {
-      if (kind === "all") return { kind, ...(await delAll({})) };
-      if (kind === "invalid") return { kind, ...(await delInvalid({})) };
-      if (kind === "freehold") return { kind, ...(await delFreeHold({})) };
-      return { kind, ...(await delDupes({})) };
-    },
-    onSuccess: (r: any) => {
-      const label = r.kind === "all" ? "all cookies" : r.kind === "invalid" ? "invalid" : r.kind === "freehold" ? "free/hold" : "duplicates";
-      toast.success(`Removed ${r.deleted ?? 0} ${label}${r.scanned ? ` (scanned ${r.scanned})` : ""}`);
+    onSuccess: () => {
+      toast.success("Cookie deleted");
       qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Delete failed"),
+  });
+
+  const bulkMut = useMutation({
+    mutationFn: async (kind: BulkKind) => {
+      const label =
+        kind === "all" ? "Deleting all cookies" :
+        kind === "invalid" ? "Removing invalid cookies" :
+        kind === "freehold" ? "Removing free & on-hold cookies" :
+        "Scanning for duplicates";
+      const tId = toast.loading(`${label}…`);
+      try {
+        let res: any;
+        if (kind === "all") res = await delAll({});
+        else if (kind === "invalid") res = await delInvalid({});
+        else if (kind === "freehold") res = await delFreeHold({});
+        else res = await delDupes({});
+        const deleted = res.deleted ?? 0;
+        let line = "";
+        if (kind === "all")      line = `🗑️  Wiped ${deleted} cookies from the pool`;
+        else if (kind === "invalid")  line = `❌ Removed ${deleted} invalid cookie${deleted === 1 ? "" : "s"}`;
+        else if (kind === "freehold") line = `⏸️  Removed ${deleted} · Free: ${res.free ?? 0} · Hold: ${res.on_hold ?? 0}`;
+        else                     line = `🔁 Removed ${deleted} duplicate${deleted === 1 ? "" : "s"} (scanned ${res.scanned ?? 0})`;
+        toast.success(line, { id: tId });
+        return { kind, ...res };
+      } catch (e: any) {
+        toast.error(e?.message ?? "Bulk delete failed", { id: tId });
+        throw e;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
       setConfirm(null);
     },
-    onError: (e: any) => { toast.error(e?.message ?? "Bulk delete failed"); setConfirm(null); },
+    onError: () => setConfirm(null),
   });
 
   async function openDetails(id: string) {
@@ -116,7 +220,7 @@ function CookiePoolPage() {
   }
 
   function exportCsv() {
-    const cols = ["id","email","status","is_valid","country","plan_name","video_quality","max_streams","payment_method","name","member_since","total_uses","success_count","fail_count","last_checked_at","last_used_at","last_error"];
+    const cols = ["id","email","status","is_valid","country","plan_name","video_quality","max_streams","payment_method","member_since","total_uses","success_count","fail_count","last_checked_at","last_used_at","last_error"];
     const esc = (v: any) => { if (v == null) return ""; const s = String(v).replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; };
     const csv = [cols.join(","), ...rows.map((r: any) => cols.map((c) => esc(r[c])).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -125,10 +229,15 @@ function CookiePoolPage() {
     a.download = `cookies-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+    toast.success(`Exported ${rows.length} rows to CSV`);
   }
 
-  const rows = data?.rows ?? [];
-  const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
+  const activeFilters = useMemo(() => {
+    const parts: string[] = [];
+    if (status) parts.push(STATUS_META[status]?.label ?? status);
+    if (country) parts.push(`${countryFlag(country)} ${countryName(country)}`);
+    return parts;
+  }, [status, country]);
 
   return (
     <div className="space-y-6">
@@ -141,58 +250,163 @@ function CookiePoolPage() {
             <Button variant="outline" onClick={exportCsv} className="border-white/10 bg-white/5 hover:bg-white/10">
               <Download className="w-4 h-4 mr-2" /> Export CSV
             </Button>
+            <Button
+              variant="outline"
+              onClick={runPageCheck}
+              disabled={pageCheckProgress !== null || rows.length === 0}
+              className="border-white/10 bg-white/5 hover:bg-white/10"
+              title="Recheck the cookies currently visible on this page"
+            >
+              {pageCheckProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+              {pageCheckProgress ? `Checking ${pageCheckProgress.done}/${pageCheckProgress.total}` : "Check page"}
+            </Button>
             <Button onClick={() => checkAllMut.mutate()} disabled={checkAllMut.isPending} className="btn-red">
-              <PlayCircle className="w-4 h-4 mr-2" /> {checkAllMut.isPending ? "Checking…" : "Recheck all"}
+              {checkAllMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+              {checkAllMut.isPending ? "Rechecking all…" : "Recheck all"}
             </Button>
           </div>
         }
       />
 
       <UploadPanel
-        onDone={() => qc.invalidateQueries({ queryKey: ["cookies"] })}
+        onDone={() => {
+          qc.invalidateQueries({ queryKey: ["cookies"] });
+          qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+        }}
         runUpload={(blobs, label) => upload({ data: { blobs, label } })}
       />
 
-      {/* Bulk actions */}
-      <div className="glass p-4 flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 mr-2">
-          <FlameKindling className="w-4 h-4 text-[#ff2a3a]" />
-          <span className="font-display text-sm">Bulk cleanup</span>
+      {/* Bulk cleanup — nested dropdown */}
+      <div className="glass p-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-md bg-[#ff2a3a]/15 border border-[#ff2a3a]/30 flex items-center justify-center">
+            <FlameKindling className="w-4 h-4 text-[#ff2a3a]" />
+          </div>
+          <div>
+            <div className="font-display text-sm leading-tight">Bulk cleanup</div>
+            <div className="text-[11px] text-white/45">Group actions across the entire pool</div>
+          </div>
         </div>
-        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("invalid")} className="border-white/10 bg-white/5 hover:bg-red-500/10">
-          <Ban className="w-3.5 h-3.5 mr-1.5 text-red-400" /> Remove invalid
-        </Button>
-        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("freehold")} className="border-white/10 bg-white/5 hover:bg-amber-500/10">
-          <Layers className="w-3.5 h-3.5 mr-1.5 text-amber-300" /> Remove free / on-hold
-        </Button>
-        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("dupes")} className="border-white/10 bg-white/5 hover:bg-sky-500/10">
-          <CopyIcon className="w-3.5 h-3.5 mr-1.5 text-sky-300" /> Remove duplicates
-        </Button>
+
         <div className="flex-1" />
-        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("all")} className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20">
-          <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Delete ALL cookies
-        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10">
+              <Layers className="w-3.5 h-3.5 mr-1.5" /> Cleanup actions
+              <ChevronDown className="w-3.5 h-3.5 ml-1.5 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64 bg-black/95 border-white/10 text-white">
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-white/40">Non-destructive</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setConfirm("dupes")} className="focus:bg-sky-500/10">
+              <CopyIcon className="w-3.5 h-3.5 mr-2 text-sky-300" />
+              <div className="flex flex-col">
+                <span className="text-sm">Remove duplicates</span>
+                <span className="text-[10px] text-white/40">Keep newest per email / fingerprint</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-white/40">Selective purge</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setConfirm("invalid")} className="focus:bg-red-500/10">
+              <Ban className="w-3.5 h-3.5 mr-2 text-red-400" />
+              <div className="flex flex-col">
+                <span className="text-sm">Remove invalid</span>
+                <span className="text-[10px] text-white/40">Deletes status=invalid or is_valid=false</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setConfirm("freehold")} className="focus:bg-amber-500/10">
+              <PauseCircle className="w-3.5 h-3.5 mr-2 text-amber-300" />
+              <div className="flex flex-col">
+                <span className="text-sm">Remove free / on-hold</span>
+                <span className="text-[10px] text-white/40">Reports free & hold counts separately</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-red-300/80">Destructive</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setConfirm("all")} className="focus:bg-red-500/15 text-red-200">
+              <AlertTriangle className="w-3.5 h-3.5 mr-2 text-red-300" />
+              <div className="flex flex-col">
+                <span className="text-sm">Delete ALL cookies</span>
+                <span className="text-[10px] text-red-300/60">Wipes the entire pool · no undo</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-
+      {/* Pool table */}
       <div className="glass overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 flex-wrap gap-3">
           <div>
-            <div className="font-display text-lg">Pool <span className="text-white/40 text-sm">({data?.count ?? 0})</span></div>
-            <div className="text-xs text-white/50">Live · auto-refresh every 15s</div>
+            <div className="font-display text-lg flex items-center gap-2">
+              Pool <span className="text-white/40 text-sm font-body font-normal">({data?.count ?? 0})</span>
+              {(isFetching || isAnyChecking) && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff2a3a]" />}
+            </div>
+            <div className="text-xs text-white/50">
+              Live · auto-refresh every {isAnyChecking ? "2s while checking" : "15s"}
+              {activeFilters.length > 0 && (
+                <span className="ml-2 text-white/70">· filtered: {activeFilters.join(" + ")}</span>
+              )}
+            </div>
           </div>
-          <Select value={status || "all"} onValueChange={(v) => { setStatus(v === "all" ? "" : v); setPage(0); }}>
-            <SelectTrigger className="w-44 bg-white/5 border-white/10"><SelectValue placeholder="Filter status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="free">Free</SelectItem>
-              <SelectItem value="on_hold">On hold</SelectItem>
-              <SelectItem value="invalid">Invalid</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] text-white/45">
+              <Filter className="w-3.5 h-3.5" /> Filters
+            </div>
+            <Select value={status || "all"} onValueChange={(v) => { setStatus(v === "all" ? "" : v); setPage(0); }}>
+              <SelectTrigger className="w-40 bg-white/5 border-white/10 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent className="bg-black/95 border-white/10 text-white">
+                <SelectItem value="all">All statuses</SelectItem>
+                {(["active","free","on_hold","invalid","unknown"] as const).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    <span className="inline-flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
+                      {STATUS_META[s].label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={country || "all"} onValueChange={(v) => { setCountry(v === "all" ? "" : v); setPage(0); }}>
+              <SelectTrigger className="w-52 bg-white/5 border-white/10 h-9">
+                <SelectValue placeholder="Country">
+                  {country
+                    ? <span className="inline-flex items-center gap-2"><span className="text-base leading-none">{countryFlag(country)}</span>{countryName(country)}</span>
+                    : "All countries"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-black/95 border-white/10 text-white max-h-72">
+                <SelectItem value="all">🌍 All countries</SelectItem>
+                {(countries ?? []).map((c: any) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="text-base leading-none">{countryFlag(c.code)}</span>
+                      <span>{countryName(c.code)}</span>
+                      <span className="text-white/40 text-[10px] ml-1">({c.count})</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        {/* Live progress bar while a page-check is running */}
+        {pageCheckProgress && (
+          <div className="px-5 pt-3">
+            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#b0060f] transition-all"
+                style={{ width: `${Math.round((pageCheckProgress.done / pageCheckProgress.total) * 100)}%` }}
+              />
+            </div>
+            <div className="text-[11px] text-white/50 font-mono mt-1">
+              Checking {pageCheckProgress.done} / {pageCheckProgress.total} on this page…
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/5">
@@ -208,44 +422,64 @@ function CookiePoolPage() {
             </thead>
             <tbody>
               {isLoading && <tr><td colSpan={7} className="p-8 text-center text-white/40">Loading…</td></tr>}
-              {!isLoading && rows.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-white/40">Pool is empty — upload cookies above.</td></tr>}
-              {rows.map((r: any) => (
-                <tr key={r.id} className="border-b border-white/5 hover:bg-white/[0.03] transition">
-                  <td className="p-3">
-                    <div className="font-medium truncate max-w-[260px]">{r.email ?? r.label ?? "—"}</div>
-                    {r.name && <div className="text-xs text-white/40">{r.name}</div>}
-                  </td>
-                  <td className="p-3">
-                    <Badge variant="outline" className={STATUS_STYLE[r.status] ?? STATUS_STYLE.unknown}>{r.status}</Badge>
-                  </td>
-                  <td className="p-3 text-white/60 text-xs">
-                    <div>{r.plan_name ?? "—"}{r.video_quality ? ` · ${r.video_quality}` : ""}</div>
-                    {r.max_streams ? <div className="text-[10px] text-white/35">{r.max_streams} stream{r.max_streams === 1 ? "" : "s"}</div> : null}
-                  </td>
-                  <td className="p-3 text-white/60 font-mono text-xs">{r.country ?? "—"}</td>
-                  <td className="p-3 text-white/60 text-xs">
-                    {r.total_uses ?? 0} <span className="text-emerald-400">✓{r.success_count ?? 0}</span> <span className="text-red-400">✗{r.fail_count ?? 0}</span>
-                  </td>
-                  <td className="p-3 text-white/50 text-xs">
-                    <div>{r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "never"}</div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {r.last_checked_mode && <Badge variant="outline" className="border-white/10 bg-white/5 text-[10px] text-white/45">{r.last_checked_mode}</Badge>}
-                      {r.last_error && <span className="max-w-[220px] truncate text-[10px] text-red-300/80" title={r.last_error}>{r.last_error}</span>}
-                    </div>
-                  </td>
-                  <td className="p-3 text-right space-x-1">
-                    <Button size="sm" variant="ghost" onClick={() => openDetails(r.id)} className="hover:bg-white/10" title="View full details">
-                      <Eye className="w-3.5 h-3.5 text-white/70" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => checkMut.mutate(r.id)} disabled={checkMut.isPending} className="hover:bg-white/10" title="Recheck now">
-                      <RefreshCw className={`w-3.5 h-3.5 ${checkMut.isPending ? "animate-spin" : ""}`} />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => delMut.mutate(r.id)} className="hover:bg-red-500/10" title="Delete">
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {!isLoading && rows.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-white/40">Pool is empty for the current filters.</td></tr>}
+              {rows.map((r: any) => {
+                const meta = STATUS_META[r.status] ?? STATUS_META.unknown;
+                const StatusIcon = meta.Icon;
+                const rowChecking = checkingIds.has(r.id);
+                return (
+                  <tr key={r.id} className={`border-b border-white/5 transition ${rowChecking ? "bg-[#ff2a3a]/[0.04]" : "hover:bg-white/[0.03]"}`}>
+                    <td className="p-3">
+                      <div className="font-medium truncate max-w-[260px]">{r.email ?? r.label ?? "—"}</div>
+                      {r.label && r.email && <div className="text-[10px] text-white/35 truncate max-w-[260px]">{r.label}</div>}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant="outline" className={`${meta.cls} gap-1.5`}>
+                        <StatusIcon className="w-3 h-3" />
+                        {meta.label}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-white/70 text-xs">
+                      <div>{r.plan_name ?? "—"}{r.video_quality ? ` · ${r.video_quality}` : ""}</div>
+                      {r.max_streams ? <div className="text-[10px] text-white/40">{r.max_streams} stream{r.max_streams === 1 ? "" : "s"}</div> : null}
+                    </td>
+                    <td className="p-3 text-white/75 text-xs">
+                      {r.country ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="text-base leading-none">{countryFlag(r.country)}</span>
+                          <span className="truncate max-w-[140px]">{countryName(r.country)}</span>
+                        </span>
+                      ) : <span className="text-white/40">—</span>}
+                    </td>
+                    <td className="p-3 text-white/70 text-xs">
+                      {r.total_uses ?? 0} <span className="text-emerald-400">✓{r.success_count ?? 0}</span> <span className="text-red-400">✗{r.fail_count ?? 0}</span>
+                    </td>
+                    <td className="p-3 text-white/55 text-xs">
+                      <div>{r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "never"}</div>
+                      <div className="mt-1 flex flex-wrap gap-1 items-center">
+                        {rowChecking && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-[#ff2a3a]">
+                            <Loader2 className="w-3 h-3 animate-spin" /> checking…
+                          </span>
+                        )}
+                        {!rowChecking && r.last_checked_mode && <Badge variant="outline" className="border-white/10 bg-white/5 text-[10px] text-white/50">{r.last_checked_mode}</Badge>}
+                        {r.last_error && <span className="max-w-[220px] truncate text-[10px] text-red-300/80" title={r.last_error}>{r.last_error}</span>}
+                      </div>
+                    </td>
+                    <td className="p-3 text-right space-x-1 whitespace-nowrap">
+                      <Button size="sm" variant="ghost" onClick={() => openDetails(r.id)} className="hover:bg-white/10" title="View full details">
+                        <Eye className="w-3.5 h-3.5 text-white/70" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => runOneCheck(r.id)} disabled={rowChecking} className="hover:bg-white/10" title="Recheck now">
+                        <RefreshCw className={`w-3.5 h-3.5 ${rowChecking ? "animate-spin text-[#ff2a3a]" : ""}`} />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => delMut.mutate(r.id)} className="hover:bg-red-500/10" title="Delete">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -271,7 +505,7 @@ function CookiePoolPage() {
             <AlertDialogDescription className="text-white/60">
               {confirm === "all" && "This wipes the entire cookie pool. There is no undo."}
               {confirm === "invalid" && "Removes every row where status is invalid or is_valid=false. Frees pool space."}
-              {confirm === "freehold" && "Removes cookies that came back free or on-hold from the last check."}
+              {confirm === "freehold" && "Removes cookies that came back free or on-hold from the last check. You'll get separate counts."}
               {confirm === "dupes" && "Keeps the newest cookie per email/fingerprint and deletes the rest."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -284,74 +518,151 @@ function CookiePoolPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Detail modal */}
+      {/* Detail modal — restructured */}
       <Dialog open={detailId !== null} onOpenChange={(v) => { if (!v) { setDetailId(null); setDetail(null); } }}>
-        <DialogContent className="bg-black/95 border-white/10 text-white max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-black/95 border-white/10 text-white max-w-3xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-xl flex items-center gap-2">
               <Cookie className="w-5 h-5 text-[#ff2a3a]" /> Cookie details
             </DialogTitle>
           </DialogHeader>
           {!detail && <div className="p-8 text-center text-white/50"><Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" /> Loading…</div>}
-          {detail && (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  ["Email", detail.email],
-                  ["Name", detail.name],
-                  ["Status", detail.status],
-                  ["Valid", String(detail.is_valid)],
-                  ["Plan", detail.plan_name],
-                  ["Quality", detail.video_quality],
-                  ["Max streams", detail.max_streams],
-                  ["Country", detail.country],
-                  ["Member since", detail.member_since],
-                  ["Payment", detail.payment_method],
-                  ["Total uses", detail.total_uses],
-                  ["Success / Fail", `${detail.success_count ?? 0} / ${detail.fail_count ?? 0}`],
-                  ["Last checked", detail.last_checked_at],
-                  ["Last used", detail.last_used_at],
-                  ["Last mode", detail.last_checked_mode],
-                  ["Fingerprint", detail.fingerprint],
-                ].map(([k, v]) => (
-                  <div key={k as string} className="glass p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-white/40">{k}</div>
-                    <div className="text-white/85 font-mono text-xs mt-1 break-all">{v ?? "—"}</div>
-                  </div>
-                ))}
-              </div>
-              {detail.last_error && (
-                <div className="glass p-3 border-red-500/30">
-                  <div className="text-[10px] uppercase tracking-widest text-red-300">Last error</div>
-                  <div className="text-red-200 text-xs font-mono mt-1 break-all">{detail.last_error}</div>
-                </div>
-              )}
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1">Full cookie capture ({(detail.cookies_json ?? []).length} pairs)</div>
-                <pre className="glass p-3 text-[11px] font-mono max-h-72 overflow-auto whitespace-pre-wrap break-all">
-{JSON.stringify(detail.cookies_json, null, 2)}
-                </pre>
-                <div className="flex gap-2 mt-2">
-                  <Button size="sm" variant="outline" className="border-white/10 bg-white/5"
-                    onClick={() => { navigator.clipboard.writeText(JSON.stringify(detail.cookies_json, null, 2)); toast.success("Copied JSON"); }}>
-                    <CopyIcon className="w-3.5 h-3.5 mr-1.5" /> Copy JSON
-                  </Button>
-                  <Button size="sm" variant="outline" className="border-white/10 bg-white/5"
-                    onClick={() => {
-                      const header = (detail.cookies_json ?? []).map((c: any) => `${c.name}=${c.value}`).join("; ");
-                      navigator.clipboard.writeText(header); toast.success("Copied cookie header");
-                    }}>
-                    <CopyIcon className="w-3.5 h-3.5 mr-1.5" /> Copy header
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {detail && <CookieDetailView detail={detail} />}
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+// -------------------- Detail view --------------------
+
+function DetailField({ icon: Icon, label, value, mono = false, accent }: { icon: any; label: string; value: React.ReactNode; mono?: boolean; accent?: "red" | "emerald" | "amber" | "sky" }) {
+  const accentCls =
+    accent === "red" ? "text-red-300" :
+    accent === "emerald" ? "text-emerald-300" :
+    accent === "amber" ? "text-amber-300" :
+    accent === "sky" ? "text-sky-300" : "text-white/90";
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/45">
+        <Icon className="w-3 h-3" />
+        {label}
+      </div>
+      <div className={`mt-1.5 text-sm ${mono ? "font-mono text-xs" : ""} ${accentCls} break-all`}>
+        {value ?? <span className="text-white/35">—</span>}
+      </div>
+    </div>
+  );
+}
+
+function CookieDetailView({ detail }: { detail: any }) {
+  const meta = STATUS_META[detail.status] ?? STATUS_META.unknown;
+  const StatusIcon = meta.Icon;
+  const flag = countryFlag(detail.country);
+  const cName = countryName(detail.country);
+  const cookiePairs = detail.cookies_json ?? [];
+  return (
+    <div className="space-y-5 text-sm">
+      {/* Header banner */}
+      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-[#ff2a3a]/10 via-white/[0.02] to-transparent p-4">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div className="min-w-0">
+            <div className="font-display text-lg truncate">{detail.email ?? detail.label ?? "Unnamed cookie"}</div>
+            <div className="text-xs text-white/50 mt-0.5">
+              {detail.plan_name ?? "No plan"}
+              {detail.video_quality ? <> · <span className="text-white/70">{detail.video_quality}</span></> : null}
+              {detail.max_streams ? <> · {detail.max_streams} stream{detail.max_streams === 1 ? "" : "s"}</> : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className={`${meta.cls} gap-1.5`}>
+              <StatusIcon className="w-3 h-3" /> {meta.label}
+            </Badge>
+            {detail.country && (
+              <Badge variant="outline" className="border-white/10 bg-white/5 text-white/80 gap-1.5">
+                <span className="text-base leading-none">{flag}</span> {cName}
+              </Badge>
+            )}
+            <Badge variant="outline" className={detail.is_valid ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-white/10 bg-white/5 text-white/50"}>
+              {detail.is_valid ? "Valid" : "Not valid"}
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* Account fields */}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-white/45 mb-2 flex items-center gap-1.5">
+          <Users2 className="w-3 h-3" /> Account
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <DetailField icon={Mail} label="Email" value={detail.email} />
+          <DetailField icon={Tv} label="Plan" value={detail.plan_name} />
+          <DetailField icon={Sparkles} label="Quality" value={detail.video_quality} />
+          <DetailField icon={Users2} label="Max streams" value={detail.max_streams} />
+          <DetailField icon={CreditCard} label="Payment" value={detail.payment_method} />
+          <DetailField
+            icon={Globe2}
+            label="Country"
+            value={detail.country ? <span className="inline-flex items-center gap-1.5"><span className="text-base leading-none">{flag}</span>{cName}<span className="text-white/40 text-xs ml-1">({String(detail.country).toUpperCase()})</span></span> : null}
+          />
+          <DetailField icon={CalendarClock} label="Member since" value={detail.member_since} />
+        </div>
+      </div>
+
+      {/* Usage + timings */}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-white/45 mb-2 flex items-center gap-1.5">
+          <CalendarClock className="w-3 h-3" /> Usage & timings
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <DetailField icon={PlayCircle} label="Total uses" value={detail.total_uses ?? 0} />
+          <DetailField icon={CheckCircle2} label="Successes" value={detail.success_count ?? 0} accent="emerald" />
+          <DetailField icon={XCircle} label="Failures" value={detail.fail_count ?? 0} accent="red" />
+          <DetailField icon={CalendarClock} label="Last checked" value={detail.last_checked_at ? new Date(detail.last_checked_at).toLocaleString() : null} />
+          <DetailField icon={PlayCircle} label="Last used" value={detail.last_used_at ? new Date(detail.last_used_at).toLocaleString() : null} />
+          <DetailField icon={Wifi} label="Last mode" value={detail.last_checked_mode} />
+          <DetailField icon={Fingerprint} label="Fingerprint" value={detail.fingerprint} mono />
+        </div>
+      </div>
+
+      {detail.last_error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/[0.06] p-3">
+          <div className="text-[10px] uppercase tracking-widest text-red-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3 h-3" /> Last error
+          </div>
+          <div className="text-red-200 text-xs font-mono mt-1.5 break-all">{detail.last_error}</div>
+        </div>
+      )}
+
+      {/* Full cookie capture */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] uppercase tracking-widest text-white/45 flex items-center gap-1.5">
+            <Cookie className="w-3 h-3" /> Full cookie capture ({cookiePairs.length} pairs)
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="border-white/10 bg-white/5 h-7 text-xs"
+              onClick={() => { navigator.clipboard.writeText(JSON.stringify(cookiePairs, null, 2)); toast.success("Copied JSON"); }}>
+              <CopyIcon className="w-3 h-3 mr-1.5" /> JSON
+            </Button>
+            <Button size="sm" variant="outline" className="border-white/10 bg-white/5 h-7 text-xs"
+              onClick={() => {
+                const header = cookiePairs.map((c: any) => `${c.name}=${c.value}`).join("; ");
+                navigator.clipboard.writeText(header); toast.success("Copied cookie header");
+              }}>
+              <CopyIcon className="w-3 h-3 mr-1.5" /> Header
+            </Button>
+          </div>
+        </div>
+        <pre className="rounded-lg border border-white/10 bg-black/60 p-3 text-[11px] font-mono max-h-72 overflow-auto whitespace-pre-wrap break-all text-white/80">
+{JSON.stringify(cookiePairs, null, 2)}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 
 
 // -------------------- Upload panel --------------------

@@ -116,6 +116,7 @@ const ListCookiesInput = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(10).max(200).default(50),
   status: z.string().optional(),
+  country: z.string().optional(),
 });
 
 export const listCookies = createServerFn({ method: "POST" })
@@ -134,9 +135,35 @@ export const listCookies = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
     if (data.status) q = q.eq("status", data.status);
+    if (data.country) q = q.eq("country", data.country.toUpperCase());
     const { data: rows, count, error } = await q;
     if (error) throw error;
     return { rows: rows ?? [], count: count ?? 0 };
+  });
+
+export const listCookieCountries = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data, error } = await supabase
+      .from("cookie_pool")
+      .select("country")
+      .not("country", "is", null);
+    if (error) throw error;
+    const counts: Record<string, number> = {};
+    for (const r of (data ?? []) as any[]) {
+      const c = String(r.country ?? "").trim().toUpperCase();
+      if (!c) continue;
+      counts[c] = (counts[c] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count);
   });
 
 export const deleteCookie = createServerFn({ method: "POST" })
@@ -365,16 +392,20 @@ export const deleteFreeHoldCookies = createServerFn({ method: "POST" })
     const { supabase, userId } = context as any;
     await assertAdmin(supabase, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { count } = await supabaseAdmin
-      .from("cookie_pool").select("id", { count: "exact", head: true })
-      .in("status", ["free", "on_hold"]);
+    const [{ count: freeCount }, { count: holdCount }] = await Promise.all([
+      supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true }).eq("status", "free"),
+      supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true }).eq("status", "on_hold"),
+    ]);
     const { error } = await supabaseAdmin
       .from("cookie_pool").delete().in("status", ["free", "on_hold"]);
     if (error) throw error;
+    const free = freeCount ?? 0;
+    const on_hold = holdCount ?? 0;
+    const deleted = free + on_hold;
     await supabaseAdmin.from("admin_activity_log").insert({
-      admin_id: userId, action: "cookie.delete_free_hold", details: { deleted: count ?? 0 },
+      admin_id: userId, action: "cookie.delete_free_hold", details: { deleted, free, on_hold },
     });
-    return { deleted: count ?? 0 };
+    return { deleted, free, on_hold };
   });
 
 // Mirrors bot.remove_duplicate_cookies — keep newest per email, then dedupe by fingerprint.
