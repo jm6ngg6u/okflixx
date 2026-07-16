@@ -207,10 +207,12 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       }
       const y1 = b.bandY + b.yOffset + bob - parallax + scroll.vel * 0.25 + endDrift;
 
-      // Control point creates the arcing wave; animated for live motion
+      // Control point creates the arcing wave; animated for live motion.
+      // Audio adds extra swell to bob amplitude when a song is reactive.
+      const audioBob = 1 + audioLevel * 1.6;
       const cx = x0 + (x1 - x0) * (0.35 + 0.1 * Math.sin(tGlobal * 0.3 + b.phase));
       let cy = (y0 + y1) / 2 + b.curve
-        + Math.sin(tGlobal * (b.bobSpeed + 0.2) + b.phase * 1.5) * (b.bobAmp * 0.9 + 20);
+        + Math.sin(tGlobal * (b.bobSpeed + 0.2) + b.phase * 1.5) * (b.bobAmp * 0.9 + 20) * audioBob;
 
       // tap pulse — push beams radially outward from tap point
       if (pulse.v > 0.01) {
