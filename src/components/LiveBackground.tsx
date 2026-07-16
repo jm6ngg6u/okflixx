@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { getLevels } from "@/lib/audio-reactive";
 
 /**
  * Florzin-style light beam background.
