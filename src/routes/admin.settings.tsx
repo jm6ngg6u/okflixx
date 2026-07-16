@@ -28,8 +28,39 @@ function SettingsPage() {
   const doMaint = useServerFn(setMaintenance);
   const qc = useQueryClient();
 
+  const doRunCookies = useServerFn(runCookiesAutocheckNow);
+  const doRunProxies = useServerFn(runProxiesAutocheckNow);
+
   const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
   const [local, setLocal] = useState<Record<string, string>>({});
+
+  const runCookiesMut = useMutation({
+    mutationFn: () => doRunCookies(),
+    onSuccess: (r: any) => {
+      toast.success("Cookie check finished", {
+        description: r?.skipped
+          ? `Skipped (${r.skipped})`
+          : `${r.checked ?? 0} checked · ${r.active ?? 0} active · ${r.invalid ?? 0} invalid · ${r.on_hold ?? 0} on-hold · ${r.free ?? 0} free`,
+      });
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+      qc.invalidateQueries({ queryKey: ["job-runs"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Run failed"),
+  });
+  const runProxiesMut = useMutation({
+    mutationFn: () => doRunProxies(),
+    onSuccess: (r: any) => {
+      toast.success("Proxy check finished", {
+        description: r?.skipped
+          ? `Skipped (${r.skipped})`
+          : `${r.checked ?? 0} checked · ${r.ok_count ?? 0} valid · ${r.dead ?? 0} invalid${r.removed_invalid ? ` · ${r.removed_invalid} removed` : ""}`,
+      });
+      qc.invalidateQueries({ queryKey: ["proxies"] });
+      qc.invalidateQueries({ queryKey: ["job-runs"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Run failed"),
+  });
 
   useEffect(() => {
     if (q.data?.settings) setLocal(q.data.settings);
