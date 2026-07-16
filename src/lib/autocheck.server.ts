@@ -17,8 +17,25 @@ type CookieRunResult = {
   removed_on_hold?: number;
   removed_duplicates?: number;
   proxy_mode?: boolean;
+  reasons?: Record<string, number>;
   error?: string;
 };
+
+function bucketReason(msg: string | null | undefined): string {
+  const s = String(msg ?? "").toLowerCase().trim();
+  if (!s) return "unknown";
+  if (s.includes("timeout") || s.includes("timed out")) return "timeout";
+  if (s.includes("proxy")) return "proxy_error";
+  if (s.includes("network") || s.includes("econn") || s.includes("fetch")) return "network";
+  if (s.includes("expired") || s.includes("session")) return "session_expired";
+  if (s.includes("captcha") || s.includes("challenge")) return "captcha";
+  if (s.includes("forbidden") || s.includes("403")) return "forbidden";
+  if (s.includes("unauth") || s.includes("401") || s.includes("login")) return "auth_failed";
+  if (s.includes("hold")) return "on_hold";
+  if (s.includes("free")) return "free_account";
+  if (s.includes("invalid") || s.includes("cookie")) return "invalid_cookie";
+  return s.slice(0, 40);
+}
 
 /** Run the cookie auto-check. When `force=true`, ignores the enabled flag. */
 export async function runCookiesAutocheck(force = false): Promise<CookieRunResult> {
