@@ -102,9 +102,47 @@ function ProxiesPage() {
             <p className="text-sm text-white/50 max-w-2xl mt-1">Formats supported: <code className="text-white/70">ip:port</code>, <code className="text-white/70">ip:port:user:pass</code>, <code className="text-white/70">user:pass@ip:port</code>, <code className="text-white/70">http(s)://…</code>, <code className="text-white/70">socks5://…</code></p>
           </div>
         </div>
-        <Button onClick={() => checkMut.mutate()} disabled={checkMut.isPending} className="btn-red">
-          <PlayCircle className="w-4 h-4 mr-2" /> {checkMut.isPending ? "Checking…" : "Recheck all"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => checkMut.mutate()} disabled={checkMut.isPending} className="btn-red">
+            {checkMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+            {checkMut.isPending ? "Checking…" : "Recheck all"}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={delInvalidMut.isPending} className="border-red-500/30 text-red-300 hover:bg-red-500/10">
+                <XCircle className="w-4 h-4 mr-2" /> Remove invalid
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove invalid proxies?</AlertDialogTitle>
+                <AlertDialogDescription>Deletes every proxy currently marked invalid. This can't be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => delInvalidMut.mutate()}>Remove</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={delAllMut.isPending} className="border-red-500/40 text-red-300 hover:bg-red-500/10">
+                <ShieldX className="w-4 h-4 mr-2" /> Clear all
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear the entire proxy pool?</AlertDialogTitle>
+                <AlertDialogDescription>This removes every proxy in the pool. This can't be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => delAllMut.mutate()}>Clear pool</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
       </div>
 
       <div className="glass p-5">
