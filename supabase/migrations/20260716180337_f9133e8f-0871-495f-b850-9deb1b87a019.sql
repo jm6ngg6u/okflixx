@@ -1,0 +1,1 @@
+insert into public.app_settings (key, value, updated_at) values ('background_song_reactive', 'true', now()) on conflict (key) do nothing;
