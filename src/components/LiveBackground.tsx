@@ -35,6 +35,9 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
     const mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false };
     const scroll = { y: 0, ty: 0, vel: 0 };
     const pulse = { v: 0, x: 0, y: 0 };
+    // Smoothed audio-reactive values (0..1). Zero when no song / reactive off.
+    let audioLevel = 0;
+    let audioBeat = 0;
 
     type Beam = {
       bandY: number;
