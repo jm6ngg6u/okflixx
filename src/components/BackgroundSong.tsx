@@ -76,6 +76,24 @@ export function BackgroundSong() {
     const raw = Number.parseFloat(window.localStorage.getItem(VOLUME_KEY) ?? "");
     return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.55;
   });
+  // Stable audio src: only changes when the *track* (path) changes, NOT when
+  // the query refetches a new signed URL for the same track. Otherwise the
+  // <audio> element reloads every 20s and playback aborts mid-song.
+  const [stableUrl, setStableUrl] = useState<string | null>(null);
+  const lastPathRef = useRef<string>("");
+  useEffect(() => {
+    const path = q.data?.path ?? "";
+    const url = q.data?.url ?? null;
+    if (path && path !== lastPathRef.current) {
+      lastPathRef.current = path;
+      setStableUrl(url);
+    } else if (!path && lastPathRef.current) {
+      lastPathRef.current = "";
+      setStableUrl(null);
+    } else if (path && !stableUrl && url) {
+      setStableUrl(url);
+    }
+  });
   const [showVolume, setShowVolume] = useState(false);
   const [nowMinute, setNowMinute] = useState(currentMinuteOfDay());
   const [prefersReducedMotion, setPRM] = useState(false);
