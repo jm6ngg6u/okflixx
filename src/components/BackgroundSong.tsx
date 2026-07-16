@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getBackgroundSong } from "@/lib/background-song.functions";
+import { attachAudio, setReactiveEnabled } from "@/lib/audio-reactive";
 import { Volume2, VolumeX } from "lucide-react";
 
 /**
