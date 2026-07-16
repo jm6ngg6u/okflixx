@@ -29,8 +29,11 @@ export function BackgroundSong() {
       return;
     }
     el.volume = 0.55;
+    // Attach the studio-mix + analyser chain the moment audio is available so
+    // (a) the compressor keeps the bass tight even when reactive is off, and
+    // (b) frequency data is ready the first time it plays.
+    attachAudio(el);
     setReactiveEnabled(!!q.data.reactive);
-    if (q.data.reactive) attachAudio(el);
     const tryPlay = async () => {
       try {
         el.muted = false;
