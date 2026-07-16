@@ -184,8 +184,68 @@ function SettingsPage() {
           <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} />
           <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} min={1} max={365} />
         </div>
+        <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-white/10">
+          <Button
+            size="sm"
+            onClick={() => runCookiesMut.mutate()}
+            disabled={runCookiesMut.isPending}
+            className="btn-red"
+          >
+            {runCookiesMut.isPending
+              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              : <Play className="w-3.5 h-3.5 mr-1.5" />}
+            Run cookie check now
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => runProxiesMut.mutate()}
+            disabled={runProxiesMut.isPending}
+            className="border-white/15 bg-white/5"
+          >
+            {runProxiesMut.isPending
+              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              : <Play className="w-3.5 h-3.5 mr-1.5" />}
+            Run proxy check now
+          </Button>
+          <span className="text-[11px] text-white/40 self-center ml-1">
+            Manual runs ignore the enabled toggle and use current proxy mode.
+          </span>
+        </div>
       </Section>
 
+      {/* Admin notifications */}
+      <Section
+        icon={Bell}
+        title="Admin notifications"
+        subtitle="Toast notifications when scheduled or manual jobs finish. Quiet hours mute toasts within a time window (24h HH:MM, local time)."
+      >
+        <div className="grid sm:grid-cols-2 gap-3">
+          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} defaultOn />
+          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} defaultOn />
+          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} defaultOn />
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-sm font-medium mb-2">Quiet hours</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Start</label>
+                <div className="flex gap-2 mt-1">
+                  <Input type="time" value={local.notify_quiet_start ?? ""} onChange={(e) => set("notify_quiet_start", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
+                  <Button size="sm" onClick={() => save("notify_quiet_start")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">End</label>
+                <div className="flex gap-2 mt-1">
+                  <Input type="time" value={local.notify_quiet_end ?? ""} onChange={(e) => set("notify_quiet_end", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
+                  <Button size="sm" onClick={() => save("notify_quiet_end")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+                </div>
+              </div>
+            </div>
+            <div className="text-[11px] text-white/40 mt-2">Leave blank to always notify. Window may wrap midnight.</div>
+          </div>
+        </div>
+      </Section>
 
       {/* Pool alerts */}
       <Section
