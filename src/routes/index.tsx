@@ -94,6 +94,7 @@ function HomePage() {
     <div className="relative min-h-screen text-white">
       <LiveBackground />
       <ClickRipple />
+      <BackgroundSong />
 
       {/* NAV */}
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto">
