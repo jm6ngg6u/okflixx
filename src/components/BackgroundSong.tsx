@@ -270,12 +270,26 @@ export function BackgroundSong() {
     <>
       <audio
         ref={audioRef}
-        src={q.data.url}
-        loop
+        src={stableUrl ?? undefined}
         preload="auto"
         playsInline
         autoPlay
         crossOrigin="anonymous"
+        onTimeUpdate={(e) => {
+          // Seamless loop: pre-empt native `loop` gap by seeking to 0 just
+          // before the media ends. Native `loop` re-decodes and can produce
+          // a brief silence at wrap; a manual seek keeps playback continuous.
+          const el = e.currentTarget;
+          const d = el.duration;
+          if (Number.isFinite(d) && d > 0 && d - el.currentTime <= 0.08) {
+            try { el.currentTime = 0; el.play().catch(() => {}); } catch { /* ignore */ }
+          }
+        }}
+        onEnded={(e) => {
+          // Safety net if the timeupdate pre-empt misses (tab throttled, etc.)
+          const el = e.currentTarget;
+          try { el.currentTime = 0; el.play().catch(() => {}); } catch { /* ignore */ }
+        }}
       />
       <div
         className="fixed z-40 bottom-5 right-5 select-none"
