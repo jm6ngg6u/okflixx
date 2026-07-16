@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import JSZip from "jszip";
 import {
   uploadCookies, listCookies, deleteCookie, checkCookieNow, checkAllCookies,
+  deleteAllCookies, deleteInvalidCookies, deleteFreeHoldCookies,
+  deleteDuplicateCookies, getCookieDetail,
 } from "@/lib/pool.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,8 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
   Cookie, Upload, RefreshCw, Trash2, PlayCircle, FileText, FileArchive,
-  FileUp, CheckCircle2, XCircle, Loader2,
+  FileUp, CheckCircle2, XCircle, Loader2, Eye, Download, Copy as CopyIcon,
+  FlameKindling, Ban, Layers, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
