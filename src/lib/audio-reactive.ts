@@ -38,6 +38,16 @@ export function isReactiveEnabled() {
   return enabled;
 }
 
+/**
+ * Wire the audio element into a shared AudioContext with a studio-mix chain:
+ *
+ *   source → highpass (rumble cut) → compressor → high-shelf (air) → analyser → destination
+ *
+ * The compressor keeps bass from swamping the mix and prevents clipping when
+ * loud sections hit, while the analyser captures a real frequency spectrum
+ * for the reactive background. `crossOrigin="anonymous"` on the audio element
+ * is REQUIRED — without it the graph runs but analyser output is zeroed.
+ */
 export function attachAudio(el: HTMLAudioElement) {
   if (typeof window === "undefined") return;
   if (attachedEl === el && source && analyser) return;
@@ -48,21 +58,52 @@ export function attachAudio(el: HTMLAudioElement) {
       ctx = new AC();
     }
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    // createMediaElementSource can be called only ONCE per element. If we've
-    // already wired up this element previously, the analyser is still valid.
+
     if (attachedEl !== el) {
       source = ctx.createMediaElementSource(el);
+
+      // Rumble cut — sub-bass below 40Hz that only muddies the mix.
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 40;
+      hp.Q.value = 0.7;
+
+      // Compressor — tames peaks so bass hits punch without distorting.
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -20;
+      comp.knee.value = 24;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.005;
+      comp.release.value = 0.18;
+
+      // High-shelf "air" boost for crisp top-end without hyping the bass.
+      const shelf = ctx.createBiquadFilter();
+      shelf.type = "highshelf";
+      shelf.frequency.value = 8000;
+      shelf.gain.value = 2.5;
+
       analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.72;
       data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
-      source.connect(analyser);
+
+      source.connect(hp);
+      hp.connect(comp);
+      comp.connect(shelf);
+      shelf.connect(analyser);
       analyser.connect(ctx.destination);
+
       attachedEl = el;
     }
   } catch {
-    // Already-connected element or unsupported browser — leave prior graph intact.
+    // createMediaElementSource can only be called once per element; if we hit
+    // that path the earlier graph is still valid — leave it alone.
   }
+}
+
+/** Resume the audio context on a user gesture (call from click handlers). */
+export function resumeAudio() {
+  if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
 }
 
 /** Called every frame by the animation loop. Cheap when disabled. */

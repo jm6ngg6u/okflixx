@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getBackgroundSong } from "@/lib/background-song.functions";
-import { attachAudio, setReactiveEnabled } from "@/lib/audio-reactive";
+import { attachAudio, setReactiveEnabled, resumeAudio } from "@/lib/audio-reactive";
 import { Volume2, VolumeX } from "lucide-react";
 
 /**
@@ -29,8 +29,11 @@ export function BackgroundSong() {
       return;
     }
     el.volume = 0.55;
+    // Attach the studio-mix + analyser chain the moment audio is available so
+    // (a) the compressor keeps the bass tight even when reactive is off, and
+    // (b) frequency data is ready the first time it plays.
+    attachAudio(el);
     setReactiveEnabled(!!q.data.reactive);
-    if (q.data.reactive) attachAudio(el);
     const tryPlay = async () => {
       try {
         el.muted = false;
@@ -51,6 +54,7 @@ export function BackgroundSong() {
     tryPlay();
 
     const onFirstGesture = async () => {
+      resumeAudio();
       if (!el.paused && !el.muted) return;
       try {
         el.muted = false;
@@ -76,11 +80,12 @@ export function BackgroundSong() {
   const toggle = () => {
     const el = audioRef.current;
     if (!el) return;
+    resumeAudio();
     if (el.paused) {
       el.muted = false;
       el.play().catch(() => {});
       setMuted(false);
-      if (q.data?.reactive) attachAudio(el);
+      attachAudio(el);
     } else {
       const next = !el.muted;
       el.muted = next;
@@ -91,7 +96,7 @@ export function BackgroundSong() {
 
   return (
     <>
-      <audio ref={audioRef} src={q.data.url} loop preload="auto" playsInline autoPlay />
+      <audio ref={audioRef} src={q.data.url} loop preload="auto" playsInline autoPlay crossOrigin="anonymous" />
       <button
         onClick={toggle}
         aria-label={muted ? "Unmute background music" : "Mute background music"}
