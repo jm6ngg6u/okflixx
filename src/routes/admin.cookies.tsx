@@ -90,6 +90,42 @@ function CookiePoolPage() {
     mutationFn: async (id: string) => del({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cookies"] }),
   });
+  const bulkMut = useMutation({
+    mutationFn: async (kind: "all" | "invalid" | "freehold" | "dupes") => {
+      if (kind === "all") return { kind, ...(await delAll({})) };
+      if (kind === "invalid") return { kind, ...(await delInvalid({})) };
+      if (kind === "freehold") return { kind, ...(await delFreeHold({})) };
+      return { kind, ...(await delDupes({})) };
+    },
+    onSuccess: (r: any) => {
+      const label = r.kind === "all" ? "all cookies" : r.kind === "invalid" ? "invalid" : r.kind === "freehold" ? "free/hold" : "duplicates";
+      toast.success(`Removed ${r.deleted ?? 0} ${label}${r.scanned ? ` (scanned ${r.scanned})` : ""}`);
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      setConfirm(null);
+    },
+    onError: (e: any) => { toast.error(e?.message ?? "Bulk delete failed"); setConfirm(null); },
+  });
+
+  async function openDetails(id: string) {
+    setDetailId(id);
+    setDetail(null);
+    try {
+      const row = await detailFn({ data: { id } });
+      setDetail(row);
+    } catch (e: any) { toast.error(e?.message ?? "Load failed"); setDetailId(null); }
+  }
+
+  function exportCsv() {
+    const cols = ["id","email","status","is_valid","country","plan_name","video_quality","max_streams","payment_method","name","member_since","total_uses","success_count","fail_count","last_checked_at","last_used_at","last_error"];
+    const esc = (v: any) => { if (v == null) return ""; const s = String(v).replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; };
+    const csv = [cols.join(","), ...rows.map((r: any) => cols.map((c) => esc(r[c])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cookies-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
@@ -101,9 +137,14 @@ function CookiePoolPage() {
         subtitle="Upload Netflix session cookies used by the live TV activation flow. Supports single files, bulk .txt uploads, and .zip archives."
         icon={Cookie}
         action={
-          <Button onClick={() => checkAllMut.mutate()} disabled={checkAllMut.isPending} className="btn-red">
-            <PlayCircle className="w-4 h-4 mr-2" /> {checkAllMut.isPending ? "Checking…" : "Recheck all"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={exportCsv} className="border-white/10 bg-white/5 hover:bg-white/10">
+              <Download className="w-4 h-4 mr-2" /> Export CSV
+            </Button>
+            <Button onClick={() => checkAllMut.mutate()} disabled={checkAllMut.isPending} className="btn-red">
+              <PlayCircle className="w-4 h-4 mr-2" /> {checkAllMut.isPending ? "Checking…" : "Recheck all"}
+            </Button>
+          </div>
         }
       />
 
@@ -111,6 +152,28 @@ function CookiePoolPage() {
         onDone={() => qc.invalidateQueries({ queryKey: ["cookies"] })}
         runUpload={(blobs, label) => upload({ data: { blobs, label } })}
       />
+
+      {/* Bulk actions */}
+      <div className="glass p-4 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 mr-2">
+          <FlameKindling className="w-4 h-4 text-[#ff2a3a]" />
+          <span className="font-display text-sm">Bulk cleanup</span>
+        </div>
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("invalid")} className="border-white/10 bg-white/5 hover:bg-red-500/10">
+          <Ban className="w-3.5 h-3.5 mr-1.5 text-red-400" /> Remove invalid
+        </Button>
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("freehold")} className="border-white/10 bg-white/5 hover:bg-amber-500/10">
+          <Layers className="w-3.5 h-3.5 mr-1.5 text-amber-300" /> Remove free / on-hold
+        </Button>
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("dupes")} className="border-white/10 bg-white/5 hover:bg-sky-500/10">
+          <CopyIcon className="w-3.5 h-3.5 mr-1.5 text-sky-300" /> Remove duplicates
+        </Button>
+        <div className="flex-1" />
+        <Button size="sm" variant="outline" disabled={bulkMut.isPending} onClick={() => setConfirm("all")} className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20">
+          <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Delete ALL cookies
+        </Button>
+      </div>
+
 
       <div className="glass overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
