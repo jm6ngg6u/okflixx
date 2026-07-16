@@ -47,16 +47,26 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     const { data: settings } = await supabaseAdmin
       .from("app_settings")
       .select("key,value")
-      .in("key", ["proxy_mode", "auto_check_enabled", "autocheck_cleanup"]);
+      .in("key", ["proxy_mode", "auto_check_enabled", "autocheck_cleanup", "cookies_autocheck_interval_hours", "cookies_last_run_at"]);
     const map: Record<string, string> = {};
     for (const s of settings ?? []) map[s.key] = s.value;
     if (!force && map.auto_check_enabled !== "1") {
       await recordJobFinish(jobId, true, { skipped: "auto_check_enabled=0" });
       return { ok: true, skipped: "auto_check_enabled=0" };
     }
+    const intervalHours = Math.max(1, parseInt(map.cookies_autocheck_interval_hours ?? "24", 10) || 24);
+    if (!force && map.cookies_last_run_at) {
+      const last = new Date(map.cookies_last_run_at).getTime();
+      const nextDue = last + intervalHours * 3600 * 1000;
+      if (Date.now() < nextDue) {
+        const skip = `interval_not_elapsed (next in ${Math.ceil((nextDue - Date.now()) / 60000)}m)`;
+        await recordJobFinish(jobId, true, { skipped: skip });
+        return { ok: true, skipped: skip };
+      }
+    }
     const proxyMode = map.proxy_mode === "1";
 
-    const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - intervalHours * 3600 * 1000).toISOString();
     const query = supabaseAdmin
       .from("cookie_pool")
       .select("id, cookies_json")
@@ -67,6 +77,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       : await query.or(`last_checked_at.is.null,last_checked_at.lt.${cutoff}`);
 
     let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, deleted = 0;
+    const reasons: Record<string, number> = {};
 
     for (const r of rows ?? []) {
       let proxyPayload: any = null;
