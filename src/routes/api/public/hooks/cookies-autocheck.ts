@@ -20,7 +20,8 @@ export const Route = createFileRoute("/api/public/hooks/cookies-autocheck")({
           const { data: settings } = await supabaseAdmin
             .from("app_settings")
             .select("key,value")
-            .in("key", ["proxy_mode", "auto_check_enabled"]);
+            .in("key", ["proxy_mode", "auto_check_enabled", "autocheck_cleanup"]);
+
           const map: Record<string, string> = {};
           for (const s of settings ?? []) map[s.key] = s.value;
           if (map.auto_check_enabled !== "1") {
