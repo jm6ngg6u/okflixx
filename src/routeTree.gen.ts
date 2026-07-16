@@ -23,6 +23,7 @@ import { Route as AdminSecurityRouteImport } from './routes/admin.security'
 import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
+import { Route as ApiAdminUploadBackgroundSongRouteImport } from './routes/api/admin/upload-background-song'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
 import { Route as ApiPublicHooksPoolAlertRouteImport } from './routes/api/public/hooks/pool-alert'
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
@@ -98,6 +99,12 @@ const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
   path: '/attempts',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiAdminUploadBackgroundSongRoute =
+  ApiAdminUploadBackgroundSongRouteImport.update({
+    id: '/api/admin/upload-background-song',
+    path: '/api/admin/upload-background-song',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksProxiesAutocheckRoute =
   ApiPublicHooksProxiesAutocheckRouteImport.update({
     id: '/api/public/hooks/proxies-autocheck',
@@ -137,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
@@ -156,6 +164,7 @@ export interface FileRoutesByTo {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin': typeof AdminIndexRoute
   '/bg-preview': typeof BgPreviewIndexRoute
+  '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
@@ -177,6 +186,7 @@ export interface FileRoutesById {
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
+  '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin/'
     | '/bg-preview/'
+    | '/api/admin/upload-background-song'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-alert'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin'
     | '/bg-preview'
+    | '/api/admin/upload-background-song'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-alert'
@@ -238,6 +250,7 @@ export interface FileRouteTypes {
     | '/bg-preview/particles'
     | '/admin/'
     | '/bg-preview/'
+    | '/api/admin/upload-background-song'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-alert'
@@ -252,6 +265,7 @@ export interface RootRouteChildren {
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
   BgPreviewIndexRoute: typeof BgPreviewIndexRoute
+  ApiAdminUploadBackgroundSongRoute: typeof ApiAdminUploadBackgroundSongRoute
   ApiPublicHooksAutoCleanupRoute: typeof ApiPublicHooksAutoCleanupRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
   ApiPublicHooksPoolAlertRoute: typeof ApiPublicHooksPoolAlertRoute
@@ -358,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAttemptsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/admin/upload-background-song': {
+      id: '/api/admin/upload-background-song'
+      path: '/api/admin/upload-background-song'
+      fullPath: '/api/admin/upload-background-song'
+      preLoaderRoute: typeof ApiAdminUploadBackgroundSongRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/proxies-autocheck': {
       id: '/api/public/hooks/proxies-autocheck'
       path: '/api/public/hooks/proxies-autocheck'
@@ -419,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
   BgPreviewIndexRoute: BgPreviewIndexRoute,
+  ApiAdminUploadBackgroundSongRoute: ApiAdminUploadBackgroundSongRoute,
   ApiPublicHooksAutoCleanupRoute: ApiPublicHooksAutoCleanupRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
   ApiPublicHooksPoolAlertRoute: ApiPublicHooksPoolAlertRoute,
