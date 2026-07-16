@@ -63,8 +63,8 @@ export function BackgroundSong() {
   const q = useQuery({
     queryKey: ["background-song-public"],
     queryFn: () => fetchSong(),
-    staleTime: 60 * 1000,
-    refetchInterval: 60 * 1000, // pick up admin changes without churning the src
+    staleTime: 10 * 1000,
+    refetchInterval: 15 * 1000, // stable same-origin URL lets admin changes apply quickly without playback churn
     refetchOnWindowFocus: false,
   });
 
@@ -80,20 +80,24 @@ export function BackgroundSong() {
   // the query refetches a new signed URL for the same track. Otherwise the
   // <audio> element reloads every 20s and playback aborts mid-song.
   const [stableUrl, setStableUrl] = useState<string | null>(null);
-  const lastPathRef = useRef<string>("");
+  const lastTrackKeyRef = useRef<string>("");
+  const loopResettingRef = useRef(false);
+  const lastProgressRef = useRef({ time: 0, at: 0 });
   useEffect(() => {
     const path = q.data?.path ?? "";
+    const updatedAt = q.data?.updatedAt ?? "";
     const url = q.data?.url ?? null;
-    if (path && path !== lastPathRef.current) {
-      lastPathRef.current = path;
+    const trackKey = path ? `${path}|${updatedAt}` : "";
+    if (trackKey && trackKey !== lastTrackKeyRef.current) {
+      lastTrackKeyRef.current = trackKey;
       setStableUrl(url);
-    } else if (!path && lastPathRef.current) {
-      lastPathRef.current = "";
+    } else if (!trackKey && lastTrackKeyRef.current) {
+      lastTrackKeyRef.current = "";
       setStableUrl(null);
-    } else if (path && !stableUrl && url) {
+    } else if (trackKey && !stableUrl && url) {
       setStableUrl(url);
     }
-  }, [q.data?.path, q.data?.url, stableUrl]);
+  }, [q.data?.path, q.data?.updatedAt, q.data?.url, stableUrl]);
   const [showVolume, setShowVolume] = useState(false);
   const [nowMinute, setNowMinute] = useState(currentMinuteOfDay());
   const [prefersReducedMotion, setPRM] = useState(false);
@@ -175,7 +179,7 @@ export function BackgroundSong() {
   // Play / attach / react to config changes.
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !q.data?.enabled || !q.data.url) {
+    if (!el || !q.data?.enabled || !stableUrl) {
       setReactiveEnabled(false);
       return;
     }
@@ -232,7 +236,39 @@ export function BackgroundSong() {
       window.removeEventListener("pointerdown", onFirstGesture);
       window.removeEventListener("keydown", onFirstGesture);
     };
-  }, [q.data?.enabled, q.data?.url, q.data?.reactive, q.data?.scheduleEnabled, inWindow, prefersReducedMotion, analyserSilent, volume]);
+  }, [q.data?.enabled, stableUrl, q.data?.reactive, q.data?.scheduleEnabled, inWindow, prefersReducedMotion, analyserSilent, volume]);
+
+  // Playback watchdog: if the browser stalls/pauses unexpectedly, resume without
+  // changing src. This protects long tracks from network range hiccups and keeps
+  // the 59s loop running continuously.
+  useEffect(() => {
+    if (!q.data?.enabled || !stableUrl || (q.data.scheduleEnabled && !inWindow)) return;
+    const id = window.setInterval(() => {
+      const el = audioRef.current;
+      if (!el) return;
+      if (el.paused && !needsGesture) {
+        void el.play().catch(() => setNeedsGesture(true));
+        return;
+      }
+      const now = performance.now();
+      const prev = lastProgressRef.current;
+      if (!el.paused && !el.seeking && el.readyState >= 2) {
+        if (Math.abs(el.currentTime - prev.time) < 0.01 && now - prev.at > 3500) {
+          const d = el.duration;
+          if (Number.isFinite(d) && d - el.currentTime <= 0.5) {
+            restartLoop(el);
+          } else {
+            try { el.currentTime = Math.min(el.currentTime + 0.05, Math.max(0, (d || el.currentTime + 1) - 0.5)); } catch { /* ignore */ }
+            void el.play().catch(() => setNeedsGesture(true));
+          }
+          lastProgressRef.current = { time: el.currentTime, at: now };
+        } else if (Math.abs(el.currentTime - prev.time) >= 0.01) {
+          lastProgressRef.current = { time: el.currentTime, at: now };
+        }
+      }
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [q.data?.enabled, q.data?.scheduleEnabled, stableUrl, inWindow, needsGesture]);
 
   // Apply live volume changes without restarting playback.
   useEffect(() => {
@@ -266,6 +302,16 @@ export function BackgroundSong() {
 
   const trackLabel = q.data.trackTitle?.trim() || q.data.name?.replace(/\.[a-z0-9]+$/i, "") || "Background";
 
+  const restartLoop = (el: HTMLAudioElement) => {
+    if (loopResettingRef.current) return;
+    loopResettingRef.current = true;
+    try {
+      el.currentTime = 0.001;
+      if (!el.paused) void el.play().catch(() => {});
+    } catch { /* ignore */ }
+    window.setTimeout(() => { loopResettingRef.current = false; }, 350);
+  };
+
   return (
     <>
       <audio
@@ -273,7 +319,6 @@ export function BackgroundSong() {
         src={stableUrl ?? undefined}
         preload="auto"
         playsInline
-        autoPlay
         crossOrigin="anonymous"
         onTimeUpdate={(e) => {
           // Seamless loop: pre-empt native `loop` gap by seeking to 0 just
@@ -281,15 +326,17 @@ export function BackgroundSong() {
           // a brief silence at wrap; a manual seek keeps playback continuous.
           const el = e.currentTarget;
           const d = el.duration;
-          if (Number.isFinite(d) && d > 0 && d - el.currentTime <= 0.08) {
-            try { el.currentTime = 0; el.play().catch(() => {}); } catch { /* ignore */ }
+          if (Number.isFinite(d) && d > 0 && d - el.currentTime <= 0.035) {
+            restartLoop(el);
           }
         }}
         onEnded={(e) => {
           // Safety net if the timeupdate pre-empt misses (tab throttled, etc.)
-          const el = e.currentTarget;
-          try { el.currentTime = 0; el.play().catch(() => {}); } catch { /* ignore */ }
+          restartLoop(e.currentTarget);
         }}
+        onPlaying={(e) => { lastProgressRef.current = { time: e.currentTarget.currentTime, at: performance.now() }; }}
+        onStalled={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
+        onWaiting={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
       />
       <div
         className="fixed z-40 bottom-5 right-5 select-none"
