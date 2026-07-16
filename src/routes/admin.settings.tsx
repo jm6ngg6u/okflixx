@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save } from "lucide-react";
 import { toast } from "sonner";
+import { LiveJobsPanel } from "@/components/LiveJobsPanel";
+
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Settings — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
