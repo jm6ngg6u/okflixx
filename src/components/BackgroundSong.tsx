@@ -289,6 +289,7 @@ export function BackgroundSong() {
     if (q.data.scheduleEnabled && !inWindow) {
       applyToBothAudio((a) => { try { a.pause(); } catch { /* ignore */ } });
       setReactiveEnabled(false);
+      setStatus("out_of_schedule");
       return;
     }
 
@@ -299,20 +300,31 @@ export function BackgroundSong() {
     setReactiveEnabled(wantReactive);
 
     const tryPlay = async () => {
+      setStatus("loading");
       try {
         applyToBothAudio((a) => { a.muted = false; });
         await el.play();
         setMuted(false);
         setNeedsGesture(false);
+        setStatus("playing");
         if (!fired.current.autoplay) { fired.current.autoplay = true; sendEvent("autoplay"); }
-      } catch {
+      } catch (err1) {
+        recordBgsError(err1);
         try {
           applyToBothAudio((a) => { a.muted = true; });
           await el.play();
           setMuted(true);
           setNeedsGesture(true);
-        } catch {
+          setStatus("blocked");
+        } catch (err2) {
           setNeedsGesture(true);
+          setStatus("blocked");
+          recordBgsError(err2);
+          // AbortError / transient failure → try one automatic recovery.
+          const name = (err2 as { name?: string } | null)?.name;
+          if (name === "AbortError" || name === "NotSupportedError") {
+            attemptRecovery(name);
+          }
         }
       }
     };
