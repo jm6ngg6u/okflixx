@@ -11,11 +11,18 @@ export const getBackgroundSong = createServerFn({ method: "GET" }).handler(async
   const { data } = await supabaseAdmin
     .from("app_settings")
     .select("key,value")
-    .in("key", ["background_song_enabled", "background_song_path", "background_song_name", "background_song_updated_at"]);
+    .in("key", [
+      "background_song_enabled",
+      "background_song_path",
+      "background_song_name",
+      "background_song_updated_at",
+      "background_song_reactive",
+    ]);
   const map: Record<string, string> = {};
   for (const r of data ?? []) map[r.key] = r.value;
 
   const enabled = map.background_song_enabled === "true";
+  const reactive = map.background_song_reactive !== "false"; // default ON
   const path = map.background_song_path || "";
   const name = map.background_song_name || path;
   const updatedAt = map.background_song_updated_at || "";
@@ -27,7 +34,7 @@ export const getBackgroundSong = createServerFn({ method: "GET" }).handler(async
       .createSignedUrl(path, 60 * 60 * 6); // 6h
     url = signed?.signedUrl ?? null;
   }
-  return { enabled, url, name, path, updatedAt };
+  return { enabled, reactive, url, name, path, updatedAt };
 });
 
 /** Admin: full detail including size + list of stored objects. */
