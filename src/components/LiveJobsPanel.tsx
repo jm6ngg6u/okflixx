@@ -271,6 +271,7 @@ function HistoryRow({ row }: { row: JobRow }) {
         </div>
         {a && <div className="text-xs text-white/60 mt-0.5 font-mono">{a}</div>}
         {b && <div className="text-xs text-emerald-300/80 mt-0.5 font-mono">{b}</div>}
+        {(() => { const rl = reasonsLine(row.summary); return rl ? <div className="text-[11px] text-amber-300/80 mt-0.5 font-mono truncate" title={rl}>{rl}</div> : null; })()}
         {!ok && row.error && <div className="text-xs text-red-300 mt-0.5 font-mono truncate">{row.error}</div>}
       </div>
     </div>
