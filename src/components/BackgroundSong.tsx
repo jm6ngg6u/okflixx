@@ -54,6 +54,7 @@ export function BackgroundSong() {
     tryPlay();
 
     const onFirstGesture = async () => {
+      resumeAudio();
       if (!el.paused && !el.muted) return;
       try {
         el.muted = false;
