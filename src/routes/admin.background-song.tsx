@@ -3,12 +3,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getBackgroundSongAdmin, setBackgroundSongEnabled, removeBackgroundSong } from "@/lib/background-song.functions";
+import { getBackgroundSongAdmin, setBackgroundSongEnabled, removeBackgroundSong, setBackgroundSongReactive } from "@/lib/background-song.functions";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Music4, Upload, Trash2, Play, Pause, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Music4, Upload, Trash2, Play, Pause, CheckCircle2, AlertCircle, Loader2, Activity } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/background-song")({
