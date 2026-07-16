@@ -13,11 +13,22 @@ export const Route = createFileRoute("/api/public/hooks/proxies-autocheck")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { checkProxyViaWorker } = await import("@/lib/worker.server");
         try {
+          const { data: settings } = await supabaseAdmin
+            .from("app_settings")
+            .select("key,value")
+            .in("key", ["proxy_auto_check_enabled", "proxy_autocheck_cleanup"]);
+          const map: Record<string, string> = {};
+          for (const s of settings ?? []) map[s.key] = s.value;
+          if (map.proxy_auto_check_enabled === "0") {
+            await recordJobFinish(jobId, true, { skipped: "proxy_auto_check_enabled=0" });
+            return Response.json({ ok: true, skipped: true });
+          }
           const { data: rows } = await supabaseAdmin
             .from("proxy_pool")
             .select("id, scheme, ip, port, username, password")
             .order("last_checked_at", { ascending: true, nullsFirst: true })
             .limit(500);
+
           let ok = 0,
             dead = 0;
           for (const p of rows ?? []) {
