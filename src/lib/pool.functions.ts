@@ -117,6 +117,10 @@ const ListCookiesInput = z.object({
   pageSize: z.number().int().min(10).max(200).default(50),
   status: z.string().optional(),
   country: z.string().optional(),
+  q: z.string().trim().max(120).optional(),
+  sort: z.enum(["created_at","last_checked_at","total_uses","success_count","fail_count","email"]).default("created_at"),
+  sortDir: z.enum(["asc","desc"]).default("desc"),
+  stuckOnly: z.boolean().optional(),
 });
 
 export const listCookies = createServerFn({ method: "POST" })
@@ -131,15 +135,108 @@ export const listCookies = createServerFn({ method: "POST" })
     if (!isAdmin && !isMod) throw new Error("Forbidden");
     let q = supabase
       .from("cookie_pool")
-      .select("id,label,email,country,plan_name,video_quality,name,member_since,max_streams,payment_method,status,is_valid,total_uses,success_count,fail_count,last_used_at,last_checked_at,last_checked_mode,last_error,created_at", { count: "exact" })
-      .order("created_at", { ascending: false })
+      .select("id,label,email,country,plan_name,video_quality,name,member_since,max_streams,payment_method,status,is_valid,total_uses,success_count,fail_count,is_locked,locked_at,last_used_at,last_checked_at,last_checked_mode,last_error,created_at", { count: "exact" })
+      .order(data.sort, { ascending: data.sortDir === "asc" })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
     if (data.status) q = q.eq("status", data.status);
     if (data.country) q = q.eq("country", data.country.toUpperCase());
+    if (data.q) {
+      const like = `%${data.q.replace(/[%_]/g, (m) => "\\" + m)}%`;
+      q = q.or(`email.ilike.${like},label.ilike.${like},name.ilike.${like}`);
+    }
+    if (data.stuckOnly) {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+      q = q.eq("is_locked", true).lt("locked_at", fiveMinAgo);
+    }
     const { data: rows, count, error } = await q;
     if (error) throw error;
     return { rows: rows ?? [], count: count ?? 0 };
   });
+
+export const getCookiePoolStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data, error } = await supabase
+      .from("cookie_pool")
+      .select("status,is_valid,is_locked,locked_at,total_uses,success_count,fail_count,last_checked_at,created_at");
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    const now = Date.now();
+    const fiveMin = 5 * 60_000;
+    const hourMs = 60 * 60_000;
+    const byStatus: Record<string, number> = { active: 0, free: 0, on_hold: 0, invalid: 0, unknown: 0 };
+    let locked = 0, stuck = 0, checkedLastHour = 0, totalSucc = 0, totalFail = 0, totalUses = 0;
+    let latestUpload = 0, latestCheck = 0;
+    for (const r of rows) {
+      const s = String(r.status ?? "unknown");
+      byStatus[s] = (byStatus[s] ?? 0) + 1;
+      if (r.is_locked) {
+        locked++;
+        const t = r.locked_at ? Date.parse(r.locked_at) : 0;
+        if (t && now - t > fiveMin) stuck++;
+      }
+      totalSucc += r.success_count ?? 0;
+      totalFail += r.fail_count ?? 0;
+      totalUses += r.total_uses ?? 0;
+      const lc = r.last_checked_at ? Date.parse(r.last_checked_at) : 0;
+      if (lc && now - lc < hourMs) checkedLastHour++;
+      if (lc > latestCheck) latestCheck = lc;
+      const cr = r.created_at ? Date.parse(r.created_at) : 0;
+      if (cr > latestUpload) latestUpload = cr;
+    }
+    const attempts = totalSucc + totalFail;
+    const successRate = attempts > 0 ? Math.round((totalSucc / attempts) * 100) : null;
+    return {
+      total: rows.length,
+      byStatus,
+      locked, stuck,
+      checkedLastHour,
+      successRate,
+      totalUses, totalSucc, totalFail,
+      latestUploadAt: latestUpload || null,
+      latestCheckAt: latestCheck || null,
+    };
+  });
+
+export const unlockStuckCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { data, error } = await supabase
+      .from("cookie_pool")
+      .update({ is_locked: false, locked_at: null })
+      .eq("is_locked", true)
+      .lt("locked_at", fiveMinAgo)
+      .select("id");
+    if (error) throw error;
+    return { unlocked: (data ?? []).length };
+  });
+
+export const bulkDeleteCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { data: rows, error } = await supabase
+      .from("cookie_pool")
+      .delete()
+      .in("id", data.ids)
+      .select("id");
+    if (error) throw error;
+    return { deleted: (rows ?? []).length };
+  });
+
 
 export const listCookieCountries = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

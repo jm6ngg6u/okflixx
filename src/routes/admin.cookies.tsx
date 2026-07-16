@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import JSZip from "jszip";
@@ -7,16 +7,16 @@ import {
   uploadCookies, listCookies, listCookieCountries, deleteCookie, checkCookieNow, checkAllCookies,
   deleteAllCookies, deleteInvalidCookies, deleteFreeHoldCookies,
   deleteDuplicateCookies, getCookieDetail,
+  getCookiePoolStats, unlockStuckCookies, bulkDeleteCookies,
 } from "@/lib/pool.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { countryFlag, countryName } from "@/lib/countries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
@@ -31,7 +31,9 @@ import {
   FileUp, CheckCircle2, XCircle, Loader2, Eye, Download, Copy as CopyIcon,
   FlameKindling, Ban, Layers, AlertTriangle, Globe2, Filter, Sparkles,
   ShieldCheck, PauseCircle, HelpCircle, Mail, CreditCard, Tv, Users2,
-  CalendarClock, Fingerprint, Wifi, ChevronDown,
+  CalendarClock, Fingerprint, Wifi, ChevronDown, Search, Lock, Unlock,
+  ArrowUp, ArrowDown, Rows3, Rows2, Zap, Radio, TrendingUp, ListChecks,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,16 +42,42 @@ export const Route = createFileRoute("/admin/cookies")({
   component: CookiePoolPage,
 });
 
-const STATUS_META: Record<string, { label: string; cls: string; Icon: any; dot: string }> = {
-  active:  { label: "Active",  cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", Icon: ShieldCheck,   dot: "bg-emerald-400" },
-  free:    { label: "Free",    cls: "bg-sky-500/15 text-sky-300 border-sky-500/30",              Icon: Sparkles,      dot: "bg-sky-400" },
-  on_hold: { label: "On hold", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",       Icon: PauseCircle,   dot: "bg-amber-400" },
-  invalid: { label: "Invalid", cls: "bg-red-500/15 text-red-300 border-red-500/30",              Icon: XCircle,       dot: "bg-red-400" },
-  unknown: { label: "Unknown", cls: "bg-white/5 text-white/50 border-white/10",                  Icon: HelpCircle,    dot: "bg-white/40" },
+const STATUS_META: Record<string, { label: string; cls: string; Icon: any; dot: string; tone: string }> = {
+  active:  { label: "Active",  cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", Icon: ShieldCheck,   dot: "bg-emerald-400", tone: "emerald" },
+  free:    { label: "Free",    cls: "bg-sky-500/15 text-sky-300 border-sky-500/30",              Icon: Sparkles,      dot: "bg-sky-400",     tone: "sky" },
+  on_hold: { label: "On hold", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30",       Icon: PauseCircle,   dot: "bg-amber-400",   tone: "amber" },
+  invalid: { label: "Invalid", cls: "bg-red-500/15 text-red-300 border-red-500/30",              Icon: XCircle,       dot: "bg-red-400",     tone: "red" },
+  unknown: { label: "Unknown", cls: "bg-white/5 text-white/50 border-white/10",                  Icon: HelpCircle,    dot: "bg-white/40",    tone: "muted" },
 };
 
 type BatchResult = { inserted: number; duplicates: number; invalid: number };
-type BulkKind = "all" | "invalid" | "freehold" | "dupes";
+type BulkKind = "all" | "invalid" | "freehold" | "dupes" | "selection";
+type SortKey = "created_at" | "last_checked_at" | "total_uses" | "success_count" | "fail_count" | "email";
+
+const LIVE_POLL_MS = 4000;   // background poll (realtime handles the fast path)
+const STATS_POLL_MS = 5000;
+
+function fmtRel(iso: string | null | undefined): string {
+  if (!iso) return "never";
+  const t = Date.parse(iso);
+  if (!t) return "never";
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+function freshnessTone(iso: string | null | undefined): { cls: string; label: string } {
+  if (!iso) return { cls: "bg-white/20", label: "no data" };
+  const age = Date.now() - Date.parse(iso);
+  if (age < 5 * 60_000) return { cls: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]", label: "fresh" };
+  if (age < 60 * 60_000) return { cls: "bg-amber-400", label: "aging" };
+  if (age < 24 * 60 * 60_000) return { cls: "bg-orange-400", label: "old" };
+  return { cls: "bg-red-500", label: "stale" };
+}
 
 function CookiePoolPage() {
   const qc = useQueryClient();
@@ -57,6 +85,7 @@ function CookiePoolPage() {
   const list = useServerFn(listCookies);
   const listCountries = useServerFn(listCookieCountries);
   const del = useServerFn(deleteCookie);
+  const bulkDel = useServerFn(bulkDeleteCookies);
   const check = useServerFn(checkCookieNow);
   const checkAll = useServerFn(checkAllCookies);
   const delAll = useServerFn(deleteAllCookies);
@@ -64,24 +93,49 @@ function CookiePoolPage() {
   const delFreeHold = useServerFn(deleteFreeHoldCookies);
   const delDupes = useServerFn(deleteDuplicateCookies);
   const detailFn = useServerFn(getCookieDetail);
+  const statsFn = useServerFn(getCookiePoolStats);
+  const unlockFn = useServerFn(unlockStuckCookies);
 
   const [status, setStatus] = useState<string>("");
   const [country, setCountry] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [qInput, setQInput] = useState("");
+  const [sort, setSort] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [stuckOnly, setStuckOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [confirm, setConfirm] = useState<null | BulkKind>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const [density, setDensity] = useState<"comfy" | "compact">("comfy");
   const [pageCheckProgress, setPageCheckProgress] = useState<{ done: number; total: number } | null>(null);
+  const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
+  const [realtimeUp, setRealtimeUp] = useState(false);
+  const [nextTickIn, setNextTickIn] = useState(LIVE_POLL_MS / 1000);
   const pageSize = 25;
 
   const isAnyChecking = checkingIds.size > 0 || pageCheckProgress !== null;
 
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["cookies", page, status, country],
-    queryFn: () => list({ data: { page, pageSize, status: status || undefined, country: country || undefined } }),
-    // Faster live refresh while any check is in flight
-    refetchInterval: isAnyChecking ? 2_000 : 15_000,
+  const { data, isLoading, isFetching, dataUpdatedAt } = useQuery({
+    queryKey: ["cookies", page, status, country, q, sort, sortDir, stuckOnly],
+    queryFn: () => list({ data: {
+      page, pageSize,
+      status: status || undefined,
+      country: country || undefined,
+      q: q || undefined,
+      sort, sortDir,
+      stuckOnly: stuckOnly || undefined,
+    }}),
+    refetchInterval: isAnyChecking ? 2_000 : LIVE_POLL_MS,
+    placeholderData: (prev) => prev,
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["cookie-stats"],
+    queryFn: () => statsFn({}),
+    refetchInterval: STATS_POLL_MS,
   });
 
   const { data: countries } = useQuery({
@@ -90,13 +144,62 @@ function CookiePoolPage() {
     refetchInterval: 30_000,
   });
 
-  const rows = data?.rows ?? [];
+  const rows: any[] = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
+
+  // -------- Realtime subscription: instant row flashes --------
+  useEffect(() => {
+    const channel = supabase
+      .channel("cookie_pool_admin")
+      .on("postgres_changes", { event: "*", schema: "public", table: "cookie_pool" }, (payload: any) => {
+        const id = payload?.new?.id ?? payload?.old?.id;
+        if (id) {
+          setFlashIds((prev) => { const n = new Set(prev); n.add(id); return n; });
+          setTimeout(() => setFlashIds((prev) => { const n = new Set(prev); n.delete(id); return n; }), 1400);
+        }
+        qc.invalidateQueries({ queryKey: ["cookies"] });
+        qc.invalidateQueries({ queryKey: ["cookie-stats"] });
+      })
+      .subscribe((s) => setRealtimeUp(s === "SUBSCRIBED"));
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
+  // -------- Countdown to next background refresh --------
+  useEffect(() => {
+    const interval = isAnyChecking ? 2000 : LIVE_POLL_MS;
+    setNextTickIn(Math.round(interval / 1000));
+    const id = setInterval(() => setNextTickIn((v) => (v <= 1 ? Math.round(interval / 1000) : v - 1)), 1000);
+    return () => clearInterval(id);
+  }, [dataUpdatedAt, isAnyChecking]);
+
+  // Clear stale selections when rows change
+  useEffect(() => {
+    setSelection((prev) => {
+      const known = new Set(rows.map((r) => r.id));
+      const next = new Set<string>();
+      prev.forEach((id) => { if (known.has(id)) next.add(id); });
+      return next;
+    });
+  }, [rows]);
+
+  function toggleSort(key: SortKey) {
+    if (sort === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSort(key); setSortDir("desc"); }
+    setPage(0);
+  }
+  function toggleSel(id: string) {
+    setSelection((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  function selectAllVisible() {
+    if (selection.size === rows.length) setSelection(new Set());
+    else setSelection(new Set(rows.map((r) => r.id)));
+  }
+  function clearSelection() { setSelection(new Set()); }
 
   async function runOneCheck(id: string) {
     setCheckingIds((s) => { const n = new Set(s); n.add(id); return n; });
     try {
-      const r = await check({ data: { id } });
+      const r: any = await check({ data: { id } });
       const mode = r.proxy_used ? "proxy" : "direct";
       const meta = STATUS_META[r.status] ?? STATUS_META.unknown;
       const detailsBits = [
@@ -110,6 +213,7 @@ function CookiePoolPage() {
       else if (r.status === "invalid") toast.error(line);
       else toast(line);
       qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-stats"] });
       qc.invalidateQueries({ queryKey: ["cookie-countries"] });
       return r;
     } catch (e: any) {
@@ -120,27 +224,28 @@ function CookiePoolPage() {
     }
   }
 
-  async function runPageCheck() {
-    if (rows.length === 0) return;
-    setPageCheckProgress({ done: 0, total: rows.length });
-    const tId = toast.loading(`Checking ${rows.length} cookies on this page…`);
+  async function runBulkCheck(ids: string[], label: string) {
+    if (ids.length === 0) return;
+    setPageCheckProgress({ done: 0, total: ids.length });
+    const tId = toast.loading(`${label} · 0/${ids.length}`);
     const tally = { active: 0, free: 0, on_hold: 0, invalid: 0, unknown: 0 };
     let done = 0;
-    for (const r of rows) {
+    for (const id of ids) {
       try {
-        const out = await check({ data: { id: r.id } });
+        const out: any = await check({ data: { id } });
         tally[out.status as keyof typeof tally] = (tally[out.status as keyof typeof tally] ?? 0) + 1;
       } catch { /* keep going */ }
       done++;
-      setPageCheckProgress({ done, total: rows.length });
-      toast.loading(`Checking cookies… ${done}/${rows.length}`, { id: tId });
-      qc.invalidateQueries({ queryKey: ["cookies"] });
+      setPageCheckProgress({ done, total: ids.length });
+      toast.loading(`${label} · ${done}/${ids.length}`, { id: tId });
     }
     toast.success(
-      `Page rechecked · ${done}/${rows.length}   ✓ ${tally.active} active · ${tally.free} free · ${tally.on_hold} hold · ${tally.invalid} invalid · ${tally.unknown} unknown`,
+      `${label} complete · ✓ ${tally.active} active · ${tally.free} free · ${tally.on_hold} hold · ${tally.invalid} invalid`,
       { id: tId },
     );
     setPageCheckProgress(null);
+    qc.invalidateQueries({ queryKey: ["cookies"] });
+    qc.invalidateQueries({ queryKey: ["cookie-stats"] });
     qc.invalidateQueries({ queryKey: ["cookie-countries"] });
   }
 
@@ -161,6 +266,7 @@ function CookiePoolPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-stats"] });
       qc.invalidateQueries({ queryKey: ["cookie-countries"] });
     },
   });
@@ -170,9 +276,32 @@ function CookiePoolPage() {
     onSuccess: () => {
       toast.success("Cookie deleted");
       qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-stats"] });
       qc.invalidateQueries({ queryKey: ["cookie-countries"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Delete failed"),
+  });
+
+  const bulkDelSelectionMut = useMutation({
+    mutationFn: async (ids: string[]) => bulkDel({ data: { ids } }),
+    onSuccess: (r: any) => {
+      toast.success(`Deleted ${r.deleted} selected cookie${r.deleted === 1 ? "" : "s"}`);
+      clearSelection();
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-stats"] });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Bulk delete failed"),
+  });
+
+  const unlockMut = useMutation({
+    mutationFn: async () => unlockFn({}),
+    onSuccess: (r: any) => {
+      toast.success(`Unlocked ${r.unlocked} stuck cookie${r.unlocked === 1 ? "" : "s"}`);
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-stats"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Unlock failed"),
   });
 
   const bulkMut = useMutation({
@@ -181,6 +310,7 @@ function CookiePoolPage() {
         kind === "all" ? "Deleting all cookies" :
         kind === "invalid" ? "Removing invalid cookies" :
         kind === "freehold" ? "Removing free & on-hold cookies" :
+        kind === "selection" ? "Deleting selected cookies" :
         "Scanning for duplicates";
       const tId = toast.loading(`${label}…`);
       try {
@@ -188,14 +318,17 @@ function CookiePoolPage() {
         if (kind === "all") res = await delAll({});
         else if (kind === "invalid") res = await delInvalid({});
         else if (kind === "freehold") res = await delFreeHold({});
+        else if (kind === "selection") res = await bulkDel({ data: { ids: Array.from(selection) } });
         else res = await delDupes({});
         const deleted = res.deleted ?? 0;
         let line = "";
         if (kind === "all")      line = `🗑️  Wiped ${deleted} cookies from the pool`;
         else if (kind === "invalid")  line = `❌ Removed ${deleted} invalid cookie${deleted === 1 ? "" : "s"}`;
         else if (kind === "freehold") line = `⏸️  Removed ${deleted} · Free: ${res.free ?? 0} · Hold: ${res.on_hold ?? 0}`;
+        else if (kind === "selection") line = `✓ Removed ${deleted} selected cookie${deleted === 1 ? "" : "s"}`;
         else                     line = `🔁 Removed ${deleted} duplicate${deleted === 1 ? "" : "s"} (scanned ${res.scanned ?? 0})`;
         toast.success(line, { id: tId });
+        if (kind === "selection") clearSelection();
         return { kind, ...res };
       } catch (e: any) {
         toast.error(e?.message ?? "Bulk delete failed", { id: tId });
@@ -204,6 +337,7 @@ function CookiePoolPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-stats"] });
       qc.invalidateQueries({ queryKey: ["cookie-countries"] });
       setConfirm(null);
     },
@@ -236,23 +370,31 @@ function CookiePoolPage() {
     const parts: string[] = [];
     if (status) parts.push(STATUS_META[status]?.label ?? status);
     if (country) parts.push(`${countryFlag(country)} ${countryName(country)}`);
+    if (q) parts.push(`"${q}"`);
+    if (stuckOnly) parts.push("stuck-lock");
     return parts;
-  }, [status, country]);
+  }, [status, country, q, stuckOnly]);
+
+  const activeFilterCount = activeFilters.length;
+  function clearAllFilters() {
+    setStatus(""); setCountry(""); setQ(""); setQInput(""); setStuckOnly(false); setPage(0);
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <PageHeader
         title="Cookie pool"
-        subtitle="Upload Netflix session cookies used by the live TV activation flow. Supports single files, bulk .txt uploads, and .zip archives."
+        subtitle="Live Netflix session pool powering TV activation. Realtime status feed, instant recheck, health monitoring."
         icon={Cookie}
         action={
           <div className="flex flex-wrap gap-2">
+            <LiveIndicator realtimeUp={realtimeUp} isFetching={isFetching} isAnyChecking={isAnyChecking} nextTickIn={nextTickIn} />
             <Button variant="outline" onClick={exportCsv} className="border-white/10 bg-white/5 hover:bg-white/10">
               <Download className="w-4 h-4 mr-2" /> Export CSV
             </Button>
             <Button
               variant="outline"
-              onClick={runPageCheck}
+              onClick={() => runBulkCheck(rows.map((r) => r.id), "Checking page")}
               disabled={pageCheckProgress !== null || rows.length === 0}
               className="border-white/10 bg-white/5 hover:bg-white/10"
               title="Recheck the cookies currently visible on this page"
@@ -261,22 +403,55 @@ function CookiePoolPage() {
               {pageCheckProgress ? `Checking ${pageCheckProgress.done}/${pageCheckProgress.total}` : "Check page"}
             </Button>
             <Button onClick={() => checkAllMut.mutate()} disabled={checkAllMut.isPending} className="btn-red">
-              {checkAllMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+              {checkAllMut.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
               {checkAllMut.isPending ? "Rechecking all…" : "Recheck all"}
             </Button>
           </div>
         }
       />
 
+      {/* KPI health strip */}
+      <PoolHealthStrip
+        stats={stats}
+        onFilterStatus={(s) => { setStatus(s); setPage(0); }}
+        onFilterStuck={() => { setStuckOnly(true); setStatus(""); setCountry(""); setPage(0); }}
+      />
+
+      {/* Stuck-lock banner */}
+      {stats && stats.stuck > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent px-4 py-3">
+          <div className="w-9 h-9 rounded-md bg-amber-500/15 border border-amber-500/30 grid place-items-center">
+            <Lock className="w-4 h-4 text-amber-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm text-amber-200 font-medium">
+              {stats.stuck} cookie{stats.stuck === 1 ? "" : "s"} locked longer than 5 minutes
+            </div>
+            <div className="text-[11px] text-amber-200/60">
+              Likely a worker crash mid-check. Unlock to return them to the rotation pool.
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setStuckOnly((v) => !v)}
+            className="border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-100">
+            <Filter className="w-3.5 h-3.5 mr-1.5" /> {stuckOnly ? "Clear filter" : "Show stuck"}
+          </Button>
+          <Button size="sm" onClick={() => unlockMut.mutate()} disabled={unlockMut.isPending} className="btn-red">
+            {unlockMut.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5 mr-1.5" />}
+            Unlock all
+          </Button>
+        </div>
+      )}
+
       <UploadPanel
         onDone={() => {
           qc.invalidateQueries({ queryKey: ["cookies"] });
+          qc.invalidateQueries({ queryKey: ["cookie-stats"] });
           qc.invalidateQueries({ queryKey: ["cookie-countries"] });
         }}
         runUpload={(blobs, label) => upload({ data: { blobs, label } })}
       />
 
-      {/* Bulk cleanup — nested dropdown */}
+      {/* Bulk cleanup dropdown */}
       <div className="glass p-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md bg-[#ff2a3a]/15 border border-[#ff2a3a]/30 flex items-center justify-center">
@@ -297,34 +472,34 @@ function CookiePoolPage() {
               <ChevronDown className="w-3.5 h-3.5 ml-1.5 opacity-60" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 bg-black/95 border-white/10 text-white">
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-white/40">Non-destructive</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setConfirm("dupes")} className="focus:bg-sky-500/10">
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuLabel>Non-destructive</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setConfirm("dupes")}>
               <CopyIcon className="w-3.5 h-3.5 mr-2 text-sky-300" />
               <div className="flex flex-col">
                 <span className="text-sm">Remove duplicates</span>
                 <span className="text-[10px] text-white/40">Keep newest per email / fingerprint</span>
               </div>
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/10" />
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-white/40">Selective purge</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setConfirm("invalid")} className="focus:bg-red-500/10">
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Selective purge</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setConfirm("invalid")}>
               <Ban className="w-3.5 h-3.5 mr-2 text-red-400" />
               <div className="flex flex-col">
                 <span className="text-sm">Remove invalid</span>
                 <span className="text-[10px] text-white/40">Deletes status=invalid or is_valid=false</span>
               </div>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setConfirm("freehold")} className="focus:bg-amber-500/10">
+            <DropdownMenuItem onClick={() => setConfirm("freehold")}>
               <PauseCircle className="w-3.5 h-3.5 mr-2 text-amber-300" />
               <div className="flex flex-col">
                 <span className="text-sm">Remove free / on-hold</span>
                 <span className="text-[10px] text-white/40">Reports free & hold counts separately</span>
               </div>
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/10" />
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-red-300/80">Destructive</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setConfirm("all")} className="focus:bg-red-500/15 text-red-200">
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-red-300/80">Destructive</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setConfirm("all")} className="text-red-200 focus:bg-red-500/15">
               <AlertTriangle className="w-3.5 h-3.5 mr-2 text-red-300" />
               <div className="flex flex-col">
                 <span className="text-sm">Delete ALL cookies</span>
@@ -337,136 +512,239 @@ function CookiePoolPage() {
 
       {/* Pool table */}
       <div className="glass overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 flex-wrap gap-3">
-          <div>
-            <div className="font-display text-lg flex items-center gap-2">
-              Pool <span className="text-white/40 text-sm font-body font-normal">({data?.count ?? 0})</span>
-              {(isFetching || isAnyChecking) && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff2a3a]" />}
+        {/* Toolbar */}
+        <div className="px-5 py-4 border-b border-white/5 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="font-display text-lg flex items-center gap-2">
+                Pool <span className="text-white/40 text-sm font-body font-normal">({data?.count ?? 0}{activeFilterCount > 0 ? ` of ${stats?.total ?? "…"}` : ""})</span>
+                {(isFetching || isAnyChecking) && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff2a3a]" />}
+              </div>
+              <div className="text-xs text-white/50 flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 ${realtimeUp ? "text-emerald-300" : "text-white/40"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${realtimeUp ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)] animate-pulse" : "bg-white/30"}`} />
+                  {realtimeUp ? "Live · realtime" : "Reconnecting…"}
+                </span>
+                <span>·</span>
+                <span>next refresh in {nextTickIn}s</span>
+                {activeFilters.length > 0 && <><span>·</span><span className="text-white/70">filtered: {activeFilters.join(" + ")}</span></>}
+              </div>
             </div>
-            <div className="text-xs text-white/50">
-              Live · auto-refresh every {isAnyChecking ? "2s while checking" : "15s"}
-              {activeFilters.length > 0 && (
-                <span className="ml-2 text-white/70">· filtered: {activeFilters.join(" + ")}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <form onSubmit={(e) => { e.preventDefault(); setQ(qInput.trim()); setPage(0); }}>
+                  <Input
+                    placeholder="Search email · label · name"
+                    value={qInput}
+                    onChange={(e) => setQInput(e.target.value)}
+                    className="w-64 h-9 pl-9 bg-white/5 border-white/10 font-mono"
+                  />
+                </form>
+                {qInput && (
+                  <button type="button"
+                    onClick={() => { setQInput(""); if (q) { setQ(""); setPage(0); } }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <Select value={status || "all"} onValueChange={(v) => { setStatus(v === "all" ? "" : v); setPage(0); }}>
+                <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  {(["active","free","on_hold","invalid","unknown"] as const).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      <span className="inline-flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
+                        {STATUS_META[s].label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={country || "all"} onValueChange={(v) => { setCountry(v === "all" ? "" : v); setPage(0); }}>
+                <SelectTrigger className="w-52 h-9">
+                  <SelectValue placeholder="Country">
+                    {country
+                      ? <span className="inline-flex items-center gap-2"><span className="text-base leading-none">{countryFlag(country)}</span>{countryName(country)}</span>
+                      : "All countries"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="all">🌍 All countries</SelectItem>
+                  {(countries ?? []).map((c: any) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="text-base leading-none">{countryFlag(c.code)}</span>
+                        <span>{countryName(c.code)}</span>
+                        <span className="text-white/40 text-[10px] ml-1">({c.count})</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-0.5 p-0.5 rounded-md border border-white/10 bg-white/5">
+                <button onClick={() => setDensity("comfy")} title="Comfortable rows"
+                  className={`p-1.5 rounded ${density === "comfy" ? "bg-white/10 text-white" : "text-white/40"}`}>
+                  <Rows3 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setDensity("compact")} title="Compact rows"
+                  className={`p-1.5 rounded ${density === "compact" ? "bg-white/10 text-white" : "text-white/40"}`}>
+                  <Rows2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {activeFilterCount > 0 && (
+                <Button size="sm" variant="ghost" onClick={clearAllFilters} className="text-white/60 h-9">
+                  <X className="w-3.5 h-3.5 mr-1" /> Clear ({activeFilterCount})
+                </Button>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-[11px] text-white/45">
-              <Filter className="w-3.5 h-3.5" /> Filters
+          {pageCheckProgress && (
+            <div>
+              <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#b0060f] transition-all"
+                  style={{ width: `${Math.round((pageCheckProgress.done / pageCheckProgress.total) * 100)}%` }} />
+              </div>
+              <div className="text-[11px] text-white/50 font-mono mt-1">
+                Checking {pageCheckProgress.done} / {pageCheckProgress.total} on this page…
+              </div>
             </div>
-            <Select value={status || "all"} onValueChange={(v) => { setStatus(v === "all" ? "" : v); setPage(0); }}>
-              <SelectTrigger className="w-40 bg-white/5 border-white/10 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
-              <SelectContent className="bg-black/95 border-white/10 text-white">
-                <SelectItem value="all">All statuses</SelectItem>
-                {(["active","free","on_hold","invalid","unknown"] as const).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    <span className="inline-flex items-center gap-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
-                      {STATUS_META[s].label}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={country || "all"} onValueChange={(v) => { setCountry(v === "all" ? "" : v); setPage(0); }}>
-              <SelectTrigger className="w-52 bg-white/5 border-white/10 h-9">
-                <SelectValue placeholder="Country">
-                  {country
-                    ? <span className="inline-flex items-center gap-2"><span className="text-base leading-none">{countryFlag(country)}</span>{countryName(country)}</span>
-                    : "All countries"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="bg-black/95 border-white/10 text-white max-h-72">
-                <SelectItem value="all">🌍 All countries</SelectItem>
-                {(countries ?? []).map((c: any) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="text-base leading-none">{countryFlag(c.code)}</span>
-                      <span>{countryName(c.code)}</span>
-                      <span className="text-white/40 text-[10px] ml-1">({c.count})</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          )}
         </div>
-
-        {/* Live progress bar while a page-check is running */}
-        {pageCheckProgress && (
-          <div className="px-5 pt-3">
-            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#b0060f] transition-all"
-                style={{ width: `${Math.round((pageCheckProgress.done / pageCheckProgress.total) * 100)}%` }}
-              />
-            </div>
-            <div className="text-[11px] text-white/50 font-mono mt-1">
-              Checking {pageCheckProgress.done} / {pageCheckProgress.total} on this page…
-            </div>
-          </div>
-        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/5">
+            <thead>
               <tr>
-                <th className="text-left p-3">Email / Label</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Plan</th>
-                <th className="text-left p-3">Country</th>
-                <th className="text-left p-3">Uses</th>
-                <th className="text-left p-3">Last check</th>
-                <th className="text-right p-3">Actions</th>
+                <th className="w-10">
+                  <input type="checkbox"
+                    checked={rows.length > 0 && selection.size === rows.length}
+                    onChange={selectAllVisible}
+                    className="accent-[#ff2a3a] cursor-pointer" />
+                </th>
+                <th>Email / Label</th>
+                <th>Status</th>
+                <th>Plan · Country</th>
+                <SortableTh label="Uses" active={sort === "total_uses"} dir={sortDir} onClick={() => toggleSort("total_uses")} />
+                <SortableTh label="Success" active={sort === "success_count"} dir={sortDir} onClick={() => toggleSort("success_count")} />
+                <SortableTh label="Last check" active={sort === "last_checked_at"} dir={sortDir} onClick={() => toggleSort("last_checked_at")} />
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading && <tr><td colSpan={7} className="p-8 text-center text-white/40">Loading…</td></tr>}
-              {!isLoading && rows.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-white/40">Pool is empty for the current filters.</td></tr>}
-              {rows.map((r: any) => {
+              {isLoading && Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}><td colSpan={8} className="p-0"><div className="skeleton-row" /></td></tr>
+              ))}
+              {!isLoading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={8}>
+                    <div className="state-block">
+                      <div className="state-icon"><Cookie className="w-5 h-5" /></div>
+                      <div className="state-title">No cookies match these filters</div>
+                      <div className="state-sub">
+                        {activeFilterCount > 0
+                          ? "Try clearing filters, or upload fresh Netflix session cookies below."
+                          : "The pool is empty. Upload cookies to start activating TV codes."}
+                      </div>
+                      {activeFilterCount > 0 && (
+                        <Button size="sm" variant="outline" onClick={clearAllFilters} className="mt-1 border-white/10 bg-white/5">
+                          Clear filters
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!isLoading && rows.map((r: any) => {
                 const meta = STATUS_META[r.status] ?? STATUS_META.unknown;
                 const StatusIcon = meta.Icon;
                 const rowChecking = checkingIds.has(r.id);
+                const flashing = flashIds.has(r.id);
+                const selected = selection.has(r.id);
+                const fresh = freshnessTone(r.last_checked_at);
+                const succRate = (r.success_count + r.fail_count) > 0
+                  ? Math.round((r.success_count / (r.success_count + r.fail_count)) * 100)
+                  : null;
+                const succCls = succRate == null ? "text-white/40"
+                  : succRate >= 80 ? "text-emerald-300"
+                  : succRate >= 50 ? "text-amber-300"
+                  : "text-red-300";
+                const isStuckLock = r.is_locked && r.locked_at && Date.now() - Date.parse(r.locked_at) > 5 * 60_000;
                 return (
-                  <tr key={r.id} className={`border-b border-white/5 transition ${rowChecking ? "bg-[#ff2a3a]/[0.04]" : "hover:bg-white/[0.03]"}`}>
-                    <td className="p-3">
-                      <div className="font-medium truncate max-w-[260px]">{r.email ?? r.label ?? "—"}</div>
-                      {r.label && r.email && <div className="text-[10px] text-white/35 truncate max-w-[260px]">{r.label}</div>}
+                  <tr
+                    key={r.id}
+                    data-selected={selected}
+                    className={`
+                      ${density === "compact" ? "[&>td]:!py-2" : ""}
+                      ${flashing ? "animate-[flash-row_1.2s_ease-out]" : ""}
+                      ${rowChecking ? "!bg-[#ff2a3a]/[0.05]" : ""}
+                    `}
+                  >
+                    <td>
+                      <input type="checkbox" checked={selected} onChange={() => toggleSel(r.id)}
+                        className="accent-[#ff2a3a] cursor-pointer" />
                     </td>
-                    <td className="p-3">
-                      <Badge variant="outline" className={`${meta.cls} gap-1.5`}>
-                        <StatusIcon className="w-3 h-3" />
-                        {meta.label}
-                      </Badge>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${fresh.cls}`} title={`Freshness: ${fresh.label}`} />
+                        <div className="min-w-0">
+                          <div className="font-medium truncate max-w-[240px]">{r.email ?? r.label ?? "—"}</div>
+                          {r.label && r.email && <div className="text-[10px] text-white/35 truncate max-w-[240px]">{r.label}</div>}
+                        </div>
+                      </div>
                     </td>
-                    <td className="p-3 text-white/70 text-xs">
-                      <div>{r.plan_name ?? "—"}{r.video_quality ? ` · ${r.video_quality}` : ""}</div>
-                      {r.max_streams ? <div className="text-[10px] text-white/40">{r.max_streams} stream{r.max_streams === 1 ? "" : "s"}</div> : null}
+                    <td>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className={`${meta.cls} gap-1.5`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {meta.label}
+                        </Badge>
+                        {r.is_locked && (
+                          <Badge variant="outline" className={isStuckLock
+                            ? "bg-amber-500/15 text-amber-300 border-amber-500/30 gap-1"
+                            : "bg-white/5 text-white/60 border-white/15 gap-1"}>
+                            <Lock className="w-2.5 h-2.5" />
+                            {isStuckLock ? "stuck" : "in use"}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
-                    <td className="p-3 text-white/75 text-xs">
-                      {r.country ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="text-base leading-none">{countryFlag(r.country)}</span>
-                          <span className="truncate max-w-[140px]">{countryName(r.country)}</span>
-                        </span>
-                      ) : <span className="text-white/40">—</span>}
+                    <td className="text-white/70 text-xs">
+                      <div className="truncate max-w-[200px]">{r.plan_name ?? "—"}{r.video_quality ? ` · ${r.video_quality}` : ""}</div>
+                      <div className="text-[10px] text-white/45 flex items-center gap-1 mt-0.5">
+                        {r.country ? <>
+                          <span className="text-sm leading-none">{countryFlag(r.country)}</span>
+                          <span>{countryName(r.country)}</span>
+                        </> : "no country"}
+                        {r.max_streams ? <span className="ml-1">· {r.max_streams} stream{r.max_streams === 1 ? "" : "s"}</span> : null}
+                      </div>
                     </td>
-                    <td className="p-3 text-white/70 text-xs">
-                      {r.total_uses ?? 0} <span className="text-emerald-400">✓{r.success_count ?? 0}</span> <span className="text-red-400">✗{r.fail_count ?? 0}</span>
+                    <td className="font-mono text-xs tabular-nums text-white/75">{r.total_uses ?? 0}</td>
+                    <td className="font-mono text-xs tabular-nums">
+                      <span className={succCls}>{succRate == null ? "—" : `${succRate}%`}</span>
+                      <div className="text-[10px] text-white/40">
+                        <span className="text-emerald-400/80">{r.success_count ?? 0}</span>
+                        {" / "}
+                        <span className="text-red-400/80">{r.fail_count ?? 0}</span>
+                      </div>
                     </td>
-                    <td className="p-3 text-white/55 text-xs">
-                      <div>{r.last_checked_at ? new Date(r.last_checked_at).toLocaleString() : "never"}</div>
-                      <div className="mt-1 flex flex-wrap gap-1 items-center">
+                    <td className="text-white/60 text-xs">
+                      <div className="font-mono">{fmtRel(r.last_checked_at)}</div>
+                      <div className="mt-0.5 flex flex-wrap gap-1 items-center">
                         {rowChecking && (
                           <span className="inline-flex items-center gap-1 text-[10px] text-[#ff2a3a]">
                             <Loader2 className="w-3 h-3 animate-spin" /> checking…
                           </span>
                         )}
-                        {!rowChecking && r.last_checked_mode && <Badge variant="outline" className="border-white/10 bg-white/5 text-[10px] text-white/50">{r.last_checked_mode}</Badge>}
-                        {r.last_error && <span className="max-w-[220px] truncate text-[10px] text-red-300/80" title={r.last_error}>{r.last_error}</span>}
+                        {!rowChecking && r.last_checked_mode && (
+                          <span className="text-[10px] text-white/40 font-mono">via {r.last_checked_mode}</span>
+                        )}
+                        {r.last_error && <span className="max-w-[220px] truncate text-[10px] text-red-300/80" title={r.last_error}>· {r.last_error}</span>}
                       </div>
                     </td>
-                    <td className="p-3 text-right space-x-1 whitespace-nowrap">
+                    <td className="text-right space-x-1 whitespace-nowrap">
                       <Button size="sm" variant="ghost" onClick={() => openDetails(r.id)} className="hover:bg-white/10" title="View full details">
                         <Eye className="w-3.5 h-3.5 text-white/70" />
                       </Button>
@@ -484,13 +762,33 @@ function CookiePoolPage() {
           </table>
         </div>
         <div className="flex items-center justify-between px-5 py-3 border-t border-white/5 text-xs text-white/50">
-          <span>Page {page + 1} of {totalPages}</span>
+          <span>Page {page + 1} of {totalPages} · showing {rows.length} row{rows.length === 1 ? "" : "s"}</span>
           <div className="space-x-2">
             <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)} className="border-white/10">Prev</Button>
             <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)} className="border-white/10">Next</Button>
           </div>
         </div>
       </div>
+
+      {/* Sticky selection action bar */}
+      {selection.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-black/90 backdrop-blur-xl border border-white/15 rounded-full pl-4 pr-2 py-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)]">
+          <ListChecks className="w-4 h-4 text-[#ff2a3a]" />
+          <span className="text-sm font-medium">{selection.size} selected</span>
+          <span className="text-white/30">·</span>
+          <Button size="sm" variant="outline" onClick={() => runBulkCheck(Array.from(selection), "Checking selection")}
+            disabled={pageCheckProgress !== null}
+            className="border-white/15 bg-white/5 hover:bg-white/10 rounded-full">
+            <PlayCircle className="w-3.5 h-3.5 mr-1.5" /> Recheck
+          </Button>
+          <Button size="sm" onClick={() => setConfirm("selection")} className="btn-red rounded-full">
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+          </Button>
+          <button onClick={clearSelection} className="ml-1 w-7 h-7 rounded-full hover:bg-white/10 grid place-items-center">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Bulk confirm */}
       <AlertDialog open={confirm !== null} onOpenChange={(v) => !v && setConfirm(null)}>
@@ -501,12 +799,14 @@ function CookiePoolPage() {
               {confirm === "invalid" && "Delete all invalid cookies?"}
               {confirm === "freehold" && "Delete all free & on-hold cookies?"}
               {confirm === "dupes" && "Remove duplicate cookies?"}
+              {confirm === "selection" && `Delete ${selection.size} selected cookie${selection.size === 1 ? "" : "s"}?`}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-white/60">
               {confirm === "all" && "This wipes the entire cookie pool. There is no undo."}
               {confirm === "invalid" && "Removes every row where status is invalid or is_valid=false. Frees pool space."}
               {confirm === "freehold" && "Removes cookies that came back free or on-hold from the last check. You'll get separate counts."}
               {confirm === "dupes" && "Keeps the newest cookie per email/fingerprint and deletes the rest."}
+              {confirm === "selection" && "Removes only the rows you selected. Cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -518,7 +818,7 @@ function CookiePoolPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Detail modal — restructured */}
+      {/* Detail modal */}
       <Dialog open={detailId !== null} onOpenChange={(v) => { if (!v) { setDetailId(null); setDetail(null); } }}>
         <DialogContent className="bg-black/95 border-white/10 text-white max-w-3xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
@@ -533,6 +833,75 @@ function CookiePoolPage() {
     </div>
   );
 }
+
+// -------------------- Support components --------------------
+
+function SortableTh({ label, active, dir, onClick }: { label: string; active: boolean; dir: "asc" | "desc"; onClick: () => void }) {
+  return (
+    <th>
+      <button onClick={onClick}
+        className={`inline-flex items-center gap-1 hover:text-white transition ${active ? "text-white" : ""}`}>
+        {label}
+        {active
+          ? (dir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)
+          : <ArrowDown className="w-3 h-3 opacity-20" />}
+      </button>
+    </th>
+  );
+}
+
+function LiveIndicator({ realtimeUp, isFetching, isAnyChecking, nextTickIn }: { realtimeUp: boolean; isFetching: boolean; isAnyChecking: boolean; nextTickIn: number }) {
+  return (
+    <div className="hidden md:flex items-center gap-2 h-9 px-3 rounded-md border border-white/10 bg-white/[0.03] text-[11px] font-mono">
+      <Radio className={`w-3.5 h-3.5 ${realtimeUp ? "text-emerald-300" : "text-white/40"}`} />
+      <span className={realtimeUp ? "text-emerald-300" : "text-white/50"}>
+        {realtimeUp ? "LIVE" : "…"}
+      </span>
+      <span className="text-white/25">|</span>
+      <span className="text-white/60">
+        {isAnyChecking ? "checking" : isFetching ? "syncing" : `t-${nextTickIn}s`}
+      </span>
+    </div>
+  );
+}
+
+function PoolHealthStrip({ stats, onFilterStatus, onFilterStuck }: {
+  stats: any;
+  onFilterStatus: (s: string) => void;
+  onFilterStuck: () => void;
+}) {
+  const s = stats ?? { byStatus: {}, total: 0, locked: 0, stuck: 0, successRate: null, checkedLastHour: 0 };
+  const tiles: { key: string; label: string; value: string; sub?: string; tone: string; Icon: any; onClick?: () => void }[] = [
+    { key: "total",    label: "Total",       value: fmt(s.total),                Icon: Cookie,      tone: "muted" },
+    { key: "active",   label: "Active",      value: fmt(s.byStatus?.active),     Icon: ShieldCheck, tone: "emerald", onClick: () => onFilterStatus("active") },
+    { key: "free",     label: "Free",        value: fmt(s.byStatus?.free),       Icon: Sparkles,    tone: "sky",     onClick: () => onFilterStatus("free") },
+    { key: "on_hold",  label: "On hold",     value: fmt(s.byStatus?.on_hold),    Icon: PauseCircle, tone: "amber",   onClick: () => onFilterStatus("on_hold") },
+    { key: "invalid",  label: "Invalid",     value: fmt(s.byStatus?.invalid),    Icon: XCircle,     tone: "red",     onClick: () => onFilterStatus("invalid") },
+    { key: "success",  label: "Success rate",value: s.successRate == null ? "—" : `${s.successRate}%`, sub: `${fmt(s.totalSucc)} ✓ / ${fmt(s.totalFail)} ✗`, Icon: TrendingUp, tone: "emerald" },
+    { key: "locked",   label: "Locked now",  value: fmt(s.locked), sub: s.stuck > 0 ? `${s.stuck} stuck` : "healthy", Icon: Lock, tone: s.stuck > 0 ? "amber" : "muted", onClick: s.stuck > 0 ? onFilterStuck : undefined },
+    { key: "check1h",  label: "Checks 1h",   value: fmt(s.checkedLastHour), Icon: Zap, tone: "sky" },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+      {tiles.map((t) => (
+        <button key={t.key}
+          onClick={t.onClick}
+          disabled={!t.onClick}
+          className={`kpi-tile kpi-tone-${t.tone} ${t.onClick ? "kpi-clickable" : ""}`}>
+          <div className="flex items-center gap-1.5">
+            <t.Icon className="w-3.5 h-3.5 opacity-70" />
+            <span className="kpi-label">{t.label}</span>
+          </div>
+          <div className="kpi-value">{t.value}</div>
+          {t.sub && <div className="kpi-sub">{t.sub}</div>}
+        </button>
+      ))}
+    </div>
+  );
+}
+function fmt(n: any): string { if (n == null) return "0"; return Number(n).toLocaleString(); }
+
+
 
 // -------------------- Detail view --------------------
 
