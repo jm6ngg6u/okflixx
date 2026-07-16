@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { getLevels } from "@/lib/audio-reactive";
 
 /**
  * Florzin-style light beam background.
@@ -34,6 +35,9 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
     const mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, active: false };
     const scroll = { y: 0, ty: 0, vel: 0 };
     const pulse = { v: 0, x: 0, y: 0 };
+    // Smoothed audio-reactive values (0..1). Zero when no song / reactive off.
+    let audioLevel = 0;
+    let audioBeat = 0;
 
     type Beam = {
       bandY: number;
@@ -206,10 +210,12 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       }
       const y1 = b.bandY + b.yOffset + bob - parallax + scroll.vel * 0.25 + endDrift;
 
-      // Control point creates the arcing wave; animated for live motion
+      // Control point creates the arcing wave; animated for live motion.
+      // Audio adds extra swell to bob amplitude when a song is reactive.
+      const audioBob = 1 + audioLevel * 1.6;
       const cx = x0 + (x1 - x0) * (0.35 + 0.1 * Math.sin(tGlobal * 0.3 + b.phase));
       let cy = (y0 + y1) / 2 + b.curve
-        + Math.sin(tGlobal * (b.bobSpeed + 0.2) + b.phase * 1.5) * (b.bobAmp * 0.9 + 20);
+        + Math.sin(tGlobal * (b.bobSpeed + 0.2) + b.phase * 1.5) * (b.bobAmp * 0.9 + 20) * audioBob;
 
       // tap pulse — push beams radially outward from tap point
       if (pulse.v > 0.01) {
@@ -239,7 +245,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
         { w: b.thickness * 2,  a: 0.10 },
         { w: b.thickness * 0.6, a: 0.35 },
       ];
-      const aMul = b.alpha * inten * (1 + pulse.v * 0.35);
+      const aMul = b.alpha * inten * (1 + pulse.v * 0.35) * (1 + audioLevel * 0.7 + audioBeat * 0.5);
 
       // Emitter glow removed — was showing as a bright red ball around the logo.
 
@@ -270,6 +276,16 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       scroll.vel = scroll.vel * 0.85 + (scroll.y - prevY) * 0.2;
       pulse.v *= 0.93;
       trackOrigin();
+
+      // Audio reactivity — cheap when disabled (getLevels returns zeros).
+      const lv = getLevels();
+      audioLevel = audioLevel * 0.75 + lv.level * 0.25;
+      audioBeat = audioBeat * 0.7 + lv.beat * 0.3;
+      if (lv.beat > 0.05) {
+        pulse.v = Math.max(pulse.v, lv.beat * 0.9);
+        pulse.x = w * 0.5 + Math.sin(tGlobal * 0.7) * w * 0.15;
+        pulse.y = h * 0.35 + Math.cos(tGlobal * 0.9) * 40;
+      }
 
       ctx.globalCompositeOperation = "source-over";
       if (trailAmt <= 0) {

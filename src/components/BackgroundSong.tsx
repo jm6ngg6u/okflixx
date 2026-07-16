@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getBackgroundSong } from "@/lib/background-song.functions";
+import { attachAudio, setReactiveEnabled } from "@/lib/audio-reactive";
 import { Volume2, VolumeX } from "lucide-react";
 
 /**
@@ -23,8 +24,13 @@ export function BackgroundSong() {
 
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !q.data?.enabled || !q.data.url) return;
+    if (!el || !q.data?.enabled || !q.data.url) {
+      setReactiveEnabled(false);
+      return;
+    }
     el.volume = 0.55;
+    setReactiveEnabled(!!q.data.reactive);
+    if (q.data.reactive) attachAudio(el);
     const tryPlay = async () => {
       try {
         el.muted = false;
@@ -63,7 +69,7 @@ export function BackgroundSong() {
       window.removeEventListener("pointerdown", onFirstGesture);
       window.removeEventListener("keydown", onFirstGesture);
     };
-  }, [q.data?.enabled, q.data?.url]);
+  }, [q.data?.enabled, q.data?.url, q.data?.reactive]);
 
   if (!q.data?.enabled || !q.data.url) return null;
 
@@ -74,6 +80,7 @@ export function BackgroundSong() {
       el.muted = false;
       el.play().catch(() => {});
       setMuted(false);
+      if (q.data?.reactive) attachAudio(el);
     } else {
       const next = !el.muted;
       el.muted = next;

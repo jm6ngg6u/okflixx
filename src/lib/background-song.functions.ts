@@ -11,11 +11,18 @@ export const getBackgroundSong = createServerFn({ method: "GET" }).handler(async
   const { data } = await supabaseAdmin
     .from("app_settings")
     .select("key,value")
-    .in("key", ["background_song_enabled", "background_song_path", "background_song_name", "background_song_updated_at"]);
+    .in("key", [
+      "background_song_enabled",
+      "background_song_path",
+      "background_song_name",
+      "background_song_updated_at",
+      "background_song_reactive",
+    ]);
   const map: Record<string, string> = {};
   for (const r of data ?? []) map[r.key] = r.value;
 
   const enabled = map.background_song_enabled === "true";
+  const reactive = map.background_song_reactive !== "false"; // default ON
   const path = map.background_song_path || "";
   const name = map.background_song_name || path;
   const updatedAt = map.background_song_updated_at || "";
@@ -27,7 +34,7 @@ export const getBackgroundSong = createServerFn({ method: "GET" }).handler(async
       .createSignedUrl(path, 60 * 60 * 6); // 6h
     url = signed?.signedUrl ?? null;
   }
-  return { enabled, url, name, path, updatedAt };
+  return { enabled, reactive, url, name, path, updatedAt };
 });
 
 /** Admin: full detail including size + list of stored objects. */
@@ -41,7 +48,13 @@ export const getBackgroundSongAdmin = createServerFn({ method: "GET" })
     const { data } = await supabaseAdmin
       .from("app_settings")
       .select("key,value")
-      .in("key", ["background_song_enabled", "background_song_path", "background_song_name", "background_song_updated_at"]);
+      .in("key", [
+        "background_song_enabled",
+        "background_song_path",
+        "background_song_name",
+        "background_song_updated_at",
+        "background_song_reactive",
+      ]);
     const map: Record<string, string> = {};
     for (const r of data ?? []) map[r.key] = r.value;
 
@@ -58,6 +71,7 @@ export const getBackgroundSongAdmin = createServerFn({ method: "GET" })
 
     return {
       enabled: map.background_song_enabled === "true",
+      reactive: map.background_song_reactive !== "false",
       path,
       name: map.background_song_name || path,
       updatedAt: map.background_song_updated_at || "",
@@ -118,4 +132,27 @@ export const removeBackgroundSong = createServerFn({ method: "POST" })
       details: { path },
     });
     return { ok: true };
+  });
+
+/** Admin: toggle audio-reactive live background animation. */
+export const setBackgroundSongReactive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ reactive: z.boolean() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("app_settings").upsert({
+      key: "background_song_reactive",
+      value: data.reactive ? "true" : "false",
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    });
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "background_song.reactive_toggle",
+      details: { reactive: data.reactive },
+    });
+    return { ok: true, reactive: data.reactive };
   });
