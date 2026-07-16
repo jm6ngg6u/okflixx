@@ -8,9 +8,10 @@ export const Route = createFileRoute("/api/public/hooks/cookies-autocheck")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { verifyCronRequest, recordJobStart, recordJobFinish } = await import(
+        const { verifyCronRequest, recordJobStart, recordJobFinish, recordJobProgress } = await import(
           "@/lib/cron.server"
         );
+
         if (!verifyCronRequest(request))
           return new Response("Unauthorized", { status: 401 });
         const jobId = await recordJobStart("cookies-autocheck");
