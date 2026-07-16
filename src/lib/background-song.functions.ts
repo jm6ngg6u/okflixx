@@ -72,11 +72,9 @@ export const getBackgroundSong = createServerFn({ method: "GET" }).handler(async
   const name = map.background_song_name || path;
   const updatedAt = map.background_song_updated_at || "";
 
-  let url: string | null = null;
-  if (enabled && path) {
-    const { data: signed } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 6);
-    url = signed?.signedUrl ?? null;
-  }
+  const url = enabled && path
+    ? `/api/public/background-song-audio?v=${encodeURIComponent(updatedAt || path)}`
+    : null;
   return {
     enabled,
     reactive,
