@@ -176,6 +176,7 @@ type ProxyRunResult = {
   ok_count?: number;
   dead?: number;
   removed_invalid?: number;
+  reasons?: Record<string, number>;
   error?: string;
 };
 
@@ -187,12 +188,22 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
   try {
     const { data: settings } = await supabaseAdmin
       .from("app_settings").select("key,value")
-      .in("key", ["proxy_auto_check_enabled", "proxy_autocheck_cleanup"]);
+      .in("key", ["proxy_auto_check_enabled", "proxy_autocheck_cleanup", "proxies_autocheck_interval_hours", "proxies_last_run_at"]);
     const map: Record<string, string> = {};
     for (const s of settings ?? []) map[s.key] = s.value;
     if (!force && map.proxy_auto_check_enabled === "0") {
       await recordJobFinish(jobId, true, { skipped: "proxy_auto_check_enabled=0" });
       return { ok: true, skipped: "proxy_auto_check_enabled=0" };
+    }
+    const intervalHours = Math.max(1, parseInt(map.proxies_autocheck_interval_hours ?? "20", 10) || 20);
+    if (!force && map.proxies_last_run_at) {
+      const last = new Date(map.proxies_last_run_at).getTime();
+      const nextDue = last + intervalHours * 3600 * 1000;
+      if (Date.now() < nextDue) {
+        const skip = `interval_not_elapsed (next in ${Math.ceil((nextDue - Date.now()) / 60000)}m)`;
+        await recordJobFinish(jobId, true, { skipped: skip });
+        return { ok: true, skipped: skip };
+      }
     }
     const { data: rows } = await supabaseAdmin
       .from("proxy_pool")
@@ -201,6 +212,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       .limit(500);
 
     let ok = 0, dead = 0;
+    const reasons: Record<string, number> = {};
     for (const p of rows ?? []) {
       const res = await checkProxyViaWorker({
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
@@ -213,16 +225,16 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
         last_checked_at: new Date().toISOString(),
       }).eq("id", p.id);
       if (res.ok) ok++;
-      else dead++;
+      else { dead++; const b = bucketReason(res.error); reasons[b] = (reasons[b] ?? 0) + 1; }
       const done = ok + dead;
       if (done % 5 === 0 || done === (rows?.length ?? 0)) {
         await recordJobProgress(jobId, {
-          phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead,
+          phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, reasons,
         });
       }
     }
     await recordJobProgress(jobId, {
-      phase: "cleanup", total: rows?.length ?? 0, checked: (rows ?? []).length, ok_count: ok, dead,
+      phase: "cleanup", total: rows?.length ?? 0, checked: (rows ?? []).length, ok_count: ok, dead, reasons,
     });
 
     let removed_invalid = 0;
@@ -232,8 +244,11 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       await supabaseAdmin.from("proxy_pool").delete().eq("is_valid", false);
       removed_invalid = c ?? 0;
     }
-    const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid };
+    const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid, reasons };
     await recordJobFinish(jobId, true, summary);
+    await supabaseAdmin.from("app_settings").upsert({
+      key: "proxies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
     return { ok: true, ...summary };
   } catch (e: any) {
     await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
