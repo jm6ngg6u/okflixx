@@ -65,6 +65,16 @@ function proxySummaryLine(s: any) {
   if (s.removed_invalid) parts.push(`${s.removed_invalid} removed`);
   return parts.join(" · ");
 }
+function reasonsLine(s: any): string {
+  const r = s?.reasons;
+  if (!r || typeof r !== "object") return "";
+  const entries = Object.entries(r as Record<string, number>)
+    .filter(([, n]) => (n as number) > 0)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
+    .slice(0, 4);
+  if (!entries.length) return "";
+  return "Reasons: " + entries.map(([k, n]) => `${k.replace(/_/g, " ")} ×${n}`).join(", ");
+}
 function cleanupSummaryLine(s: any) {
   if (!s) return "";
   const parts: string[] = [];
@@ -128,12 +138,13 @@ export function LiveJobsPanel() {
       const meta = JOB_META[r.job] ?? { label: r.job };
       const dur = fmtDuration(r.started_at, r.finished_at);
       let desc = "";
+      const rl = reasonsLine(r.summary);
       if (r.job === "cookies-autocheck") {
         const a = cookieSummaryLine(r.summary);
         const b = cookieCleanupLine(r.summary);
-        desc = [a, b].filter(Boolean).join(" • ") + ` • ${dur}`;
+        desc = [a, b, rl].filter(Boolean).join(" • ") + ` • ${dur}`;
       } else if (r.job === "proxies-autocheck") {
-        desc = `${proxySummaryLine(r.summary)} • ${dur}`;
+        desc = [proxySummaryLine(r.summary), rl].filter(Boolean).join(" • ") + ` • ${dur}`;
       } else if (r.job === "auto-cleanup") {
         desc = `${cleanupSummaryLine(r.summary)} • ${dur}`;
       } else {
@@ -260,6 +271,7 @@ function HistoryRow({ row }: { row: JobRow }) {
         </div>
         {a && <div className="text-xs text-white/60 mt-0.5 font-mono">{a}</div>}
         {b && <div className="text-xs text-emerald-300/80 mt-0.5 font-mono">{b}</div>}
+        {(() => { const rl = reasonsLine(row.summary); return rl ? <div className="text-[11px] text-amber-300/80 mt-0.5 font-mono truncate" title={rl}>{rl}</div> : null; })()}
         {!ok && row.error && <div className="text-xs text-red-300 mt-0.5 font-mono truncate">{row.error}</div>}
       </div>
     </div>

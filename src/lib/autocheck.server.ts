@@ -17,8 +17,25 @@ type CookieRunResult = {
   removed_on_hold?: number;
   removed_duplicates?: number;
   proxy_mode?: boolean;
+  reasons?: Record<string, number>;
   error?: string;
 };
+
+function bucketReason(msg: string | null | undefined): string {
+  const s = String(msg ?? "").toLowerCase().trim();
+  if (!s) return "unknown";
+  if (s.includes("timeout") || s.includes("timed out")) return "timeout";
+  if (s.includes("proxy")) return "proxy_error";
+  if (s.includes("network") || s.includes("econn") || s.includes("fetch")) return "network";
+  if (s.includes("expired") || s.includes("session")) return "session_expired";
+  if (s.includes("captcha") || s.includes("challenge")) return "captcha";
+  if (s.includes("forbidden") || s.includes("403")) return "forbidden";
+  if (s.includes("unauth") || s.includes("401") || s.includes("login")) return "auth_failed";
+  if (s.includes("hold")) return "on_hold";
+  if (s.includes("free")) return "free_account";
+  if (s.includes("invalid") || s.includes("cookie")) return "invalid_cookie";
+  return s.slice(0, 40);
+}
 
 /** Run the cookie auto-check. When `force=true`, ignores the enabled flag. */
 export async function runCookiesAutocheck(force = false): Promise<CookieRunResult> {
@@ -30,16 +47,26 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     const { data: settings } = await supabaseAdmin
       .from("app_settings")
       .select("key,value")
-      .in("key", ["proxy_mode", "auto_check_enabled", "autocheck_cleanup"]);
+      .in("key", ["proxy_mode", "auto_check_enabled", "autocheck_cleanup", "cookies_autocheck_interval_hours", "cookies_last_run_at"]);
     const map: Record<string, string> = {};
     for (const s of settings ?? []) map[s.key] = s.value;
     if (!force && map.auto_check_enabled !== "1") {
       await recordJobFinish(jobId, true, { skipped: "auto_check_enabled=0" });
       return { ok: true, skipped: "auto_check_enabled=0" };
     }
+    const intervalHours = Math.max(1, parseInt(map.cookies_autocheck_interval_hours ?? "24", 10) || 24);
+    if (!force && map.cookies_last_run_at) {
+      const last = new Date(map.cookies_last_run_at).getTime();
+      const nextDue = last + intervalHours * 3600 * 1000;
+      if (Date.now() < nextDue) {
+        const skip = `interval_not_elapsed (next in ${Math.ceil((nextDue - Date.now()) / 60000)}m)`;
+        await recordJobFinish(jobId, true, { skipped: skip });
+        return { ok: true, skipped: skip };
+      }
+    }
     const proxyMode = map.proxy_mode === "1";
 
-    const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - intervalHours * 3600 * 1000).toISOString();
     const query = supabaseAdmin
       .from("cookie_pool")
       .select("id, cookies_json")
@@ -50,6 +77,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       : await query.or(`last_checked_at.is.null,last_checked_at.lt.${cutoff}`);
 
     let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, deleted = 0;
+    const reasons: Record<string, number> = {};
 
     for (const r of rows ?? []) {
       let proxyPayload: any = null;
@@ -79,19 +107,19 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       }).eq("id", r.id);
       checked++;
       if (out.status === "active") active++;
-      else if (out.status === "invalid") invalid++;
-      else if (out.status === "on_hold") on_hold++;
+      else if (out.status === "invalid") { invalid++; const b = bucketReason(out.error); reasons[b] = (reasons[b] ?? 0) + 1; }
+      else if (out.status === "on_hold") { on_hold++; const b = out.error ? bucketReason(out.error) : "on_hold"; reasons[b] = (reasons[b] ?? 0) + 1; }
       else if (out.status === "free") free++;
       if (checked % 5 === 0 || checked === (rows?.length ?? 0)) {
         await recordJobProgress(jobId, {
           phase: "checking", total: rows?.length ?? 0,
-          checked, active, invalid, on_hold, free, proxy_mode: proxyMode,
+          checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
         });
       }
     }
     await recordJobProgress(jobId, {
       phase: "cleanup", total: rows?.length ?? 0,
-      checked, active, invalid, on_hold, free, proxy_mode: proxyMode,
+      checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
     });
 
     const cleanupOn = map.autocheck_cleanup !== "0";
@@ -129,8 +157,11 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       deleted = removed_invalid + removed_free + removed_on_hold + removed_duplicates;
     }
 
-    const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode };
+    const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode, reasons };
     await recordJobFinish(jobId, true, summary);
+    await supabaseAdmin.from("app_settings").upsert({
+      key: "cookies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
     return { ok: true, ...summary };
   } catch (e: any) {
     await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
@@ -145,6 +176,7 @@ type ProxyRunResult = {
   ok_count?: number;
   dead?: number;
   removed_invalid?: number;
+  reasons?: Record<string, number>;
   error?: string;
 };
 
@@ -156,12 +188,22 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
   try {
     const { data: settings } = await supabaseAdmin
       .from("app_settings").select("key,value")
-      .in("key", ["proxy_auto_check_enabled", "proxy_autocheck_cleanup"]);
+      .in("key", ["proxy_auto_check_enabled", "proxy_autocheck_cleanup", "proxies_autocheck_interval_hours", "proxies_last_run_at"]);
     const map: Record<string, string> = {};
     for (const s of settings ?? []) map[s.key] = s.value;
     if (!force && map.proxy_auto_check_enabled === "0") {
       await recordJobFinish(jobId, true, { skipped: "proxy_auto_check_enabled=0" });
       return { ok: true, skipped: "proxy_auto_check_enabled=0" };
+    }
+    const intervalHours = Math.max(1, parseInt(map.proxies_autocheck_interval_hours ?? "20", 10) || 20);
+    if (!force && map.proxies_last_run_at) {
+      const last = new Date(map.proxies_last_run_at).getTime();
+      const nextDue = last + intervalHours * 3600 * 1000;
+      if (Date.now() < nextDue) {
+        const skip = `interval_not_elapsed (next in ${Math.ceil((nextDue - Date.now()) / 60000)}m)`;
+        await recordJobFinish(jobId, true, { skipped: skip });
+        return { ok: true, skipped: skip };
+      }
     }
     const { data: rows } = await supabaseAdmin
       .from("proxy_pool")
@@ -170,6 +212,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       .limit(500);
 
     let ok = 0, dead = 0;
+    const reasons: Record<string, number> = {};
     for (const p of rows ?? []) {
       const res = await checkProxyViaWorker({
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
@@ -182,16 +225,16 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
         last_checked_at: new Date().toISOString(),
       }).eq("id", p.id);
       if (res.ok) ok++;
-      else dead++;
+      else { dead++; const b = bucketReason(res.error); reasons[b] = (reasons[b] ?? 0) + 1; }
       const done = ok + dead;
       if (done % 5 === 0 || done === (rows?.length ?? 0)) {
         await recordJobProgress(jobId, {
-          phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead,
+          phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, reasons,
         });
       }
     }
     await recordJobProgress(jobId, {
-      phase: "cleanup", total: rows?.length ?? 0, checked: (rows ?? []).length, ok_count: ok, dead,
+      phase: "cleanup", total: rows?.length ?? 0, checked: (rows ?? []).length, ok_count: ok, dead, reasons,
     });
 
     let removed_invalid = 0;
@@ -201,8 +244,11 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       await supabaseAdmin.from("proxy_pool").delete().eq("is_valid", false);
       removed_invalid = c ?? 0;
     }
-    const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid };
+    const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid, reasons };
     await recordJobFinish(jobId, true, summary);
+    await supabaseAdmin.from("app_settings").upsert({
+      key: "proxies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
     return { ok: true, ...summary };
   } catch (e: any) {
     await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
