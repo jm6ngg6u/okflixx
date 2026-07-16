@@ -1,7 +1,7 @@
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { listRecentJobRuns } from "@/lib/settings.functions";
+import { listRecentJobRuns, listSettings } from "@/lib/settings.functions";
 import { Badge } from "@/components/ui/badge";
 import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
