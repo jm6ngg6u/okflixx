@@ -35,13 +35,24 @@ function SettingsPage() {
   const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
   const [local, setLocal] = useState<Record<string, string>>({});
 
+  const fetchRuns = useServerFn(listRecentJobRuns);
+
+  const reasonsDesc = (r: any) => {
+    const rr = r?.reasons;
+    if (!rr) return "";
+    const es = Object.entries(rr as Record<string, number>)
+      .filter(([, n]) => (n as number) > 0)
+      .sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 4);
+    return es.length ? ` · Reasons: ${es.map(([k, n]) => `${k.replace(/_/g, " ")} ×${n}`).join(", ")}` : "";
+  };
+
   const runCookiesMut = useMutation({
     mutationFn: () => doRunCookies(),
     onSuccess: (r: any) => {
       toast.success("Cookie check finished", {
         description: r?.skipped
           ? `Skipped (${r.skipped})`
-          : `${r.checked ?? 0} checked · ${r.active ?? 0} active · ${r.invalid ?? 0} invalid · ${r.on_hold ?? 0} on-hold · ${r.free ?? 0} free`,
+          : `${r.checked ?? 0} checked · ${r.active ?? 0} active · ${r.invalid ?? 0} invalid · ${r.on_hold ?? 0} on-hold · ${r.free ?? 0} free${reasonsDesc(r)}`,
       });
       qc.invalidateQueries({ queryKey: ["cookies"] });
       qc.invalidateQueries({ queryKey: ["cookie-countries"] });
@@ -55,13 +66,77 @@ function SettingsPage() {
       toast.success("Proxy check finished", {
         description: r?.skipped
           ? `Skipped (${r.skipped})`
-          : `${r.checked ?? 0} checked · ${r.ok_count ?? 0} valid · ${r.dead ?? 0} invalid${r.removed_invalid ? ` · ${r.removed_invalid} removed` : ""}`,
+          : `${r.checked ?? 0} checked · ${r.ok_count ?? 0} valid · ${r.dead ?? 0} invalid${r.removed_invalid ? ` · ${r.removed_invalid} removed` : ""}${reasonsDesc(r)}`,
       });
       qc.invalidateQueries({ queryKey: ["proxies"] });
       qc.invalidateQueries({ queryKey: ["job-runs"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Run failed"),
   });
+
+  const exportRunsCSV = async () => {
+    try {
+      const res = await fetchRuns();
+      const rows = res.rows ?? [];
+      const cols = ["job", "started_at", "finished_at", "ok", "duration_s", "checked", "active", "invalid", "on_hold", "free", "ok_count", "dead", "removed_invalid", "removed_free", "removed_on_hold", "removed_duplicates", "reasons", "error"];
+      const esc = (v: any) => {
+        const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const body = rows.map((r: any) => {
+        const s = r.summary ?? {};
+        const dur = r.finished_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()) / 1000) : "";
+        return [r.job, r.started_at, r.finished_at ?? "", r.ok ?? "", dur, s.checked ?? "", s.active ?? "", s.invalid ?? "", s.on_hold ?? "", s.free ?? "", s.ok_count ?? "", s.dead ?? "", s.removed_invalid ?? "", s.removed_free ?? "", s.removed_on_hold ?? "", s.removed_duplicates ?? "", s.reasons ? JSON.stringify(s.reasons) : "", r.error ?? ""].map(esc).join(",");
+      });
+      const csv = [cols.join(","), ...body].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `job-runs-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${rows.length} runs to CSV`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed");
+    }
+  };
+
+  const exportRunsPDF = async () => {
+    try {
+      const res = await fetchRuns();
+      const rows = res.rows ?? [];
+      const w = window.open("", "_blank");
+      if (!w) { toast.error("Popup blocked — allow popups to export PDF"); return; }
+      const fmt = (v: any) => v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+      const style = `<style>body{font-family:ui-sans-serif,system-ui,sans-serif;color:#111;padding:24px}h1{font-size:18px;margin:0 0 4px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:16px;font-size:11px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f4f4f5}tr.bad td{background:#fef2f2}code{font-family:ui-monospace,monospace;font-size:10px;color:#374151}</style>`;
+      const body = rows.map((r: any) => {
+        const s = r.summary ?? {};
+        const dur = r.finished_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()) / 1000) + "s" : "—";
+        const parts: string[] = [];
+        if (r.job === "cookies-autocheck") {
+          if (s.skipped) parts.push(`Skipped: ${s.skipped}`);
+          else parts.push(`${s.checked ?? 0} checked, ${s.active ?? 0} active, ${s.invalid ?? 0} invalid, ${s.on_hold ?? 0} on-hold, ${s.free ?? 0} free`);
+          if (s.removed_invalid || s.removed_free || s.removed_on_hold || s.removed_duplicates)
+            parts.push(`Removed: ${s.removed_invalid ?? 0} invalid, ${s.removed_free ?? 0} free, ${s.removed_on_hold ?? 0} on-hold, ${s.removed_duplicates ?? 0} duplicates`);
+        } else if (r.job === "proxies-autocheck") {
+          if (s.skipped) parts.push(`Skipped: ${s.skipped}`);
+          else parts.push(`${s.checked ?? 0} checked, ${s.ok_count ?? 0} valid, ${s.dead ?? 0} invalid`);
+          if (s.removed_invalid) parts.push(`Removed: ${s.removed_invalid} invalid`);
+        } else {
+          parts.push(fmt(s));
+        }
+        const reasons = s.reasons ? `<div><code>Reasons: ${fmt(s.reasons)}</code></div>` : "";
+        const err = r.error ? `<div style="color:#b91c1c"><code>${fmt(r.error)}</code></div>` : "";
+        return `<tr class="${r.ok === false ? "bad" : ""}"><td>${r.job}</td><td>${new Date(r.started_at).toLocaleString()}</td><td>${r.finished_at ? new Date(r.finished_at).toLocaleString() : "—"}</td><td>${dur}</td><td>${r.ok === false ? "FAIL" : r.ok === true ? "OK" : "…"}</td><td>${parts.join("<br/>")}${reasons}${err}</td></tr>`;
+      }).join("");
+      w.document.write(`<!doctype html><html><head><title>Job runs report</title>${style}</head><body><h1>Job runs report</h1><small>Generated ${new Date().toLocaleString()} · ${rows.length} runs</small><table><thead><tr><th>Job</th><th>Started</th><th>Finished</th><th>Duration</th><th>Status</th><th>Summary</th></tr></thead><tbody>${body}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`);
+      w.document.close();
+      toast.success(`Prepared ${rows.length} runs for print/PDF`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed");
+    }
+  };
 
   useEffect(() => {
     if (q.data?.settings) setLocal(q.data.settings);
