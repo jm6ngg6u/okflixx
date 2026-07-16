@@ -54,9 +54,17 @@ export const Route = createFileRoute("/api/public/hooks/proxies-autocheck")({
             if (res.ok) ok++;
             else dead++;
           }
-          const summary = { checked: (rows ?? []).length, ok_count: ok, dead };
+          let removed_invalid = 0;
+          if (map.proxy_autocheck_cleanup !== "0") {
+            const { count: c } = await supabaseAdmin
+              .from("proxy_pool").select("id", { count: "exact", head: true }).eq("is_valid", false);
+            await supabaseAdmin.from("proxy_pool").delete().eq("is_valid", false);
+            removed_invalid = c ?? 0;
+          }
+          const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid };
           await recordJobFinish(jobId, true, summary);
           return Response.json({ ok: true, ...summary });
+
         } catch (e: any) {
 
           await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
