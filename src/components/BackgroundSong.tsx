@@ -69,7 +69,7 @@ export function BackgroundSong() {
       window.removeEventListener("pointerdown", onFirstGesture);
       window.removeEventListener("keydown", onFirstGesture);
     };
-  }, [q.data?.enabled, q.data?.url]);
+  }, [q.data?.enabled, q.data?.url, q.data?.reactive]);
 
   if (!q.data?.enabled || !q.data.url) return null;
 
