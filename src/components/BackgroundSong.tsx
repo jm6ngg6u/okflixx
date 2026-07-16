@@ -305,11 +305,17 @@ export function BackgroundSong() {
   const restartLoop = (el: HTMLAudioElement) => {
     if (loopResettingRef.current) return;
     loopResettingRef.current = true;
+    const shouldResume = !needsGesture;
+    const resume = () => {
+      if (shouldResume) void el.play().catch(() => setNeedsGesture(true));
+    };
     try {
       el.currentTime = 0.001;
-      if (!el.paused) void el.play().catch(() => {});
+      resume();
     } catch { /* ignore */ }
-    window.setTimeout(() => { loopResettingRef.current = false; }, 350);
+    window.setTimeout(resume, 40);
+    window.setTimeout(resume, 180);
+    window.setTimeout(() => { loopResettingRef.current = false; }, 500);
   };
 
   return (
