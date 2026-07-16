@@ -227,10 +227,11 @@ export function BackgroundSong() {
     return () => mq.removeEventListener?.("change", h);
   }, []);
 
-  // Silence-detected subscription — warn once + force STATIC.
+  // Silence-detected subscription — warn once + force STATIC + try recovery.
   useEffect(() => {
     const off = onSilenceChange((v) => {
       setAnalyserSilent(v);
+      updateBgsHealth({ silent: v });
       if (v && !fired.current.silence) {
         fired.current.silence = true;
         sendEvent("silence_detected");
@@ -238,6 +239,7 @@ export function BackgroundSong() {
           description: "Analyser returned silence for 3s — reactive background switched to STATIC. Check CORS or unmute the song.",
         });
         setReactiveEnabled(false);
+        attemptRecovery("silence");
       }
     });
     return off;
