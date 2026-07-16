@@ -40,3 +40,9 @@ export async function recordJobFinish(
     })
     .eq("id", id);
 }
+
+export async function recordJobProgress(id: string | null, progress: Record<string, any>) {
+  if (!id) return;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin.from("job_runs").update({ progress }).eq("id", id);
+}

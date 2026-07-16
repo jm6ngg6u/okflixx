@@ -1,0 +1,1 @@
+ALTER TABLE public.job_runs ADD COLUMN IF NOT EXISTS progress JSONB;

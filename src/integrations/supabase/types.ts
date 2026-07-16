@@ -285,6 +285,7 @@ export type Database = {
           id: string
           job: string
           ok: boolean | null
+          progress: Json | null
           started_at: string
           summary: Json | null
         }
@@ -294,6 +295,7 @@ export type Database = {
           id?: string
           job: string
           ok?: boolean | null
+          progress?: Json | null
           started_at?: string
           summary?: Json | null
         }
@@ -303,6 +305,7 @@ export type Database = {
           id?: string
           job?: string
           ok?: boolean | null
+          progress?: Json | null
           started_at?: string
           summary?: Json | null
         }

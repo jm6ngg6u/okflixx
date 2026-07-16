@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { toast } from "sonner";
+import { LiveJobsPanel } from "@/components/LiveJobsPanel";
+
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Dashboard — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
@@ -157,7 +159,10 @@ function DashboardPage() {
         <Kpi icon={XCircle} label="Invalid" value={kpi.invalid_code} tone="muted" />
       </div>
 
+      <LiveJobsPanel />
+
       {/* Pool health + chart */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <PoolCard
           icon={Cookie}
