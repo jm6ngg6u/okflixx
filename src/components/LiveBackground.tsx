@@ -245,7 +245,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
         { w: b.thickness * 2,  a: 0.10 },
         { w: b.thickness * 0.6, a: 0.35 },
       ];
-      const aMul = b.alpha * inten * (1 + pulse.v * 0.35) * (1 + audioLevel * 0.7);
+      const aMul = b.alpha * inten * (1 + pulse.v * 0.35) * (1 + audioLevel * 0.7 + audioBeat * 0.5);
 
       // Emitter glow removed — was showing as a bright red ball around the logo.
 
