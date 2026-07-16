@@ -460,3 +460,35 @@ export const getCookieDetail = createServerFn({ method: "POST" })
     if (error || !row) throw new Error("Not found");
     return row;
   });
+
+// -------------------- Bulk proxy ops (admin-only) --------------------
+
+export const deleteAllProxies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin.from("proxy_pool").select("id", { count: "exact", head: true });
+    const { error } = await supabaseAdmin.from("proxy_pool").delete().not("id", "is", null);
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "proxy.delete_all", details: { deleted: count ?? 0 },
+    });
+    return { deleted: count ?? 0 };
+  });
+
+export const deleteInvalidProxies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin.from("proxy_pool").select("id", { count: "exact", head: true }).eq("is_valid", false);
+    const { error } = await supabaseAdmin.from("proxy_pool").delete().eq("is_valid", false);
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "proxy.delete_invalid", details: { deleted: count ?? 0 },
+    });
+    return { deleted: count ?? 0 };
+  });
