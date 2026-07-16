@@ -24,8 +24,13 @@ export function BackgroundSong() {
 
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !q.data?.enabled || !q.data.url) return;
+    if (!el || !q.data?.enabled || !q.data.url) {
+      setReactiveEnabled(false);
+      return;
+    }
     el.volume = 0.55;
+    setReactiveEnabled(!!q.data.reactive);
+    if (q.data.reactive) attachAudio(el);
     const tryPlay = async () => {
       try {
         el.muted = false;
