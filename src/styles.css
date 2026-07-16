@@ -202,6 +202,62 @@
   100% { background-position: -200% 0; }
 }
 
+/* ==== KPI tiles (admin health strips) ==== */
+.kpi-tile {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  min-height: 78px;
+}
+.kpi-tile .kpi-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+}
+.kpi-tile .kpi-value {
+  font-family: "Sora", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-tile .kpi-sub {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.5);
+  font-family: "JetBrains Mono", monospace;
+}
+.kpi-tile.kpi-clickable:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.18);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  cursor: pointer;
+}
+.kpi-tone-emerald .kpi-value { color: #6ee7b7; }
+.kpi-tone-emerald { border-color: rgba(52,211,153,0.18); background: linear-gradient(180deg, rgba(16,185,129,0.10), rgba(16,185,129,0.02)); }
+.kpi-tone-sky     .kpi-value { color: #7dd3fc; }
+.kpi-tone-sky     { border-color: rgba(56,189,248,0.18); background: linear-gradient(180deg, rgba(14,165,233,0.10), rgba(14,165,233,0.02)); }
+.kpi-tone-amber   .kpi-value { color: #fcd34d; }
+.kpi-tone-amber   { border-color: rgba(251,191,36,0.22); background: linear-gradient(180deg, rgba(251,191,36,0.10), rgba(251,191,36,0.02)); }
+.kpi-tone-red     .kpi-value { color: #fca5a5; }
+.kpi-tone-red     { border-color: rgba(239,68,68,0.22); background: linear-gradient(180deg, rgba(239,68,68,0.10), rgba(239,68,68,0.02)); }
+.kpi-tone-muted   .kpi-value { color: #f5f5f5; }
+
+/* ==== Row flash animation for realtime updates ==== */
+@keyframes flash-row {
+  0%   { background: rgba(255, 42, 58, 0.28); box-shadow: inset 3px 0 0 #ff2a3a; }
+  60%  { background: rgba(255, 42, 58, 0.10); }
+  100% { background: transparent; }
+}
+
+
+
 
 /* Hide the Lovable badge on published deployments without affecting layout */
 #lovable-badge,
