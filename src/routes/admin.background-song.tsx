@@ -29,6 +29,7 @@ function BackgroundSongPage() {
   const fetchInfo = useServerFn(getBackgroundSongAdmin);
   const doToggle = useServerFn(setBackgroundSongEnabled);
   const doRemove = useServerFn(removeBackgroundSong);
+  const doReactive = useServerFn(setBackgroundSongReactive);
   const qc = useQueryClient();
 
   const info = useQuery({ queryKey: ["bg-song-admin"], queryFn: () => fetchInfo() });
