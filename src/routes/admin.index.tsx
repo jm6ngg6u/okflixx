@@ -22,10 +22,14 @@ import {
   Cookie, Globe2, Server, RefreshCw, Users, ScrollText, Sparkles, ArrowUpRight,
   Pause, Play, Radio, Gauge, Timer, Flame, ArrowUp, ArrowDown, Minus,
   Download, FileText, Bell, BellOff, AlertTriangle, X, Copy, Printer, Settings2,
+  Layers, GitCompare,
 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Line, ComposedChart } from "recharts";
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
+import { AnomalyBanner } from "@/components/AnomalyBanner";
+import { SLOPanel } from "@/components/SLOPanel";
+import { ActivationPipelines } from "@/components/ActivationPipelines";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Dashboard — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
@@ -97,6 +101,8 @@ function DashboardPage() {
   const [rtStatus, setRtStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [thresholds, setThresholds] = useState<Thresholds>(() => loadThresholds());
   const [activeAlerts, setActiveAlerts] = useState<{ id: string; kind: "failure" | "runway"; msg: string; at: number }[]>([]);
+  const [clusterFailures, setClusterFailures] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
 
   const fetchStats = useServerFn(getDashboardStats);
   const fetchPool = useServerFn(getPoolSummary);
@@ -191,11 +197,35 @@ function DashboardPage() {
   const burntPerHour = ((pool.data?.cookies.invalid ?? 0) + (pool.data?.cookies.on_hold ?? 0)) / Math.max(1, hours);
   const runwayHours = burntPerHour > 0.05 ? activeCookies / burntPerHour : Infinity;
 
-  const series = (stats.data?.series ?? []).map((s) => ({
-    t: new Date(s.t).toLocaleString(undefined, hours <= 48 ? { hour: "2-digit", day: "2-digit", month: "short" } : { day: "2-digit", month: "short" }),
-    Total: s.total,
-    Success: s.success,
-  }));
+  // Raw numeric series (for anomaly detection — needs actual timestamps + counts)
+  const rawSeries = stats.data?.series ?? [];
+
+  // Compare overlay: prevStats fetches window*2, so buckets whose timestamp is
+  // older than (now - hours) belong to the previous window. Shift them forward
+  // by exactly `hours` so they align on the same X-axis as the current series.
+  const compareSeries = useMemo(() => {
+    if (!compareMode) return null;
+    const prevAll = prevStats.data?.series ?? [];
+    if (!prevAll.length) return null;
+    const cutoff = Date.now() - hours * 3600_000;
+    const shifted = new Map<number, { total: number; success: number }>();
+    for (const s of prevAll) {
+      if (s.t >= cutoff) continue; // this bucket is in the current window
+      const shiftedT = s.t + hours * 3600_000;
+      shifted.set(shiftedT, { total: s.total, success: s.success });
+    }
+    return shifted;
+  }, [compareMode, prevStats.data, hours]);
+
+  const series = rawSeries.map((s) => {
+    const prev = compareSeries?.get(s.t);
+    return {
+      t: new Date(s.t).toLocaleString(undefined, hours <= 48 ? { hour: "2-digit", day: "2-digit", month: "short" } : { day: "2-digit", month: "short" }),
+      Total: s.total,
+      Success: s.success,
+      PrevTotal: prev?.total ?? null,
+    };
+  });
 
   const c = pool.data?.cookies ?? { active: 0, on_hold: 0, free: 0, invalid: 0, unknown: 0, total: 0 };
   const p = pool.data?.proxies ?? { valid: 0, invalid: 0, total: 0 };
@@ -210,6 +240,36 @@ function DashboardPage() {
   const anyFetching = stats.isFetching || pool.isFetching || health.isFetching;
 
   const [pulseKey, setPulseKey] = useState(0);
+
+  // Failure clustering: collapse repeat failures from the same IP+result into
+  // one row (with count) to keep the ticker readable during abuse waves.
+  type TickerItem = { kind: "row"; row: Attempt } | { kind: "cluster"; rows: Attempt[]; ip: string; result: string };
+  const tickerItems: TickerItem[] = useMemo(() => {
+    if (!clusterFailures) return liveRows.map((row) => ({ kind: "row", row }));
+    const CLUSTER_WINDOW_MS = 10 * 60_000;
+    const out: TickerItem[] = [];
+    const openClusters = new Map<string, { rows: Attempt[]; lastTs: number }>();
+    for (const r of liveRows) {
+      const isFail = r.result && r.result !== "success" && r.result !== "invalid_code";
+      if (!isFail || !r.ip_hash || !r.result) {
+        out.push({ kind: "row", row: r });
+        continue;
+      }
+      const key = `${r.ip_hash}::${r.result}`;
+      const ts = new Date(r.created_at).getTime();
+      const existing = openClusters.get(key);
+      if (existing && Math.abs(existing.lastTs - ts) <= CLUSTER_WINDOW_MS) {
+        existing.rows.push(r);
+        existing.lastTs = ts;
+      } else {
+        const bag = { rows: [r], lastTs: ts };
+        openClusters.set(key, bag);
+        out.push({ kind: "cluster", rows: bag.rows, ip: r.ip_hash, result: r.result });
+      }
+    }
+    // Drop clusters of 1 back down to a plain row.
+    return out.map((it) => (it.kind === "cluster" && it.rows.length === 1 ? { kind: "row", row: it.rows[0] } : it));
+  }, [liveRows, clusterFailures]);
 
   // Failure share (from aggregate window)
   const failures = [
@@ -355,7 +415,10 @@ function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 font-ops">
+      {/* Adaptive anomaly banner (rolling z-score on failure rate) */}
+      <AnomalyBanner series={rawSeries} />
+
       {/* Alert banner */}
       {activeAlerts.length > 0 && (
         <div className="space-y-2">
@@ -419,6 +482,17 @@ function DashboardPage() {
             <Printer className="w-3.5 h-3.5" /> PDF
           </button>
           <AlertsSettings thresholds={thresholds} onChange={(t) => { setThresholds(t); saveThresholds(t); }} />
+          <button
+            onClick={() => setCompareMode((v) => !v)}
+            title={compareMode ? "Hide previous-window overlay" : "Compare with previous window"}
+            className={`h-9 px-3 rounded-full border text-xs font-mono uppercase tracking-widest inline-flex items-center gap-1.5 transition ${
+              compareMode
+                ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.08] text-[#ff8a90]"
+                : "border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.06]"
+            }`}
+          >
+            <GitCompare className="w-3.5 h-3.5" /> Compare
+          </button>
           <button
             onClick={() => setPaused((v) => !v)}
             title={paused ? "Resume auto-refresh" : "Pause auto-refresh"}
@@ -523,10 +597,13 @@ function DashboardPage() {
 
       <LiveJobsPanel />
 
-      {/* Live ticker + Failure breakdown */}
+      {/* Live activation pipelines — queue → cookie → proxy → worker → result */}
+      <ActivationPipelines />
+
+      {/* SLO · Live ticker · Failure breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="glass p-5 lg:col-span-2 relative overflow-hidden">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Radio className="w-4 h-4 text-[#ff2a3a]" />
@@ -537,72 +614,115 @@ function DashboardPage() {
                 <div className="font-display text-lg">Latest activations</div>
               </div>
             </div>
-            <Link to="/admin/attempts" className="text-xs font-mono text-white/40 hover:text-white inline-flex items-center gap-1">
-              Open log <ArrowUpRight className="w-3 h-3" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setClusterFailures((v) => !v)}
+                title={clusterFailures ? "Show all rows" : "Group repeat failures by IP + reason"}
+                className={`h-7 px-2.5 rounded-md border text-[10px] font-mono uppercase tracking-widest inline-flex items-center gap-1 transition ${
+                  clusterFailures
+                    ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
+                    : "border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.06]"
+                }`}
+              >
+                <Layers className="w-3 h-3" /> Cluster
+              </button>
+              <Link to="/admin/attempts" className="text-xs font-mono text-white/40 hover:text-white inline-flex items-center gap-1">
+                Open log <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
           <div className="space-y-1.5">
-            {liveRows.length === 0 ? (
+            {tickerItems.length === 0 ? (
               <div className="text-sm text-white/40 font-mono py-6 text-center">
                 {initialAttempts.isLoading ? "Warming up…" : "No activations yet"}
               </div>
             ) : (
-              liveRows.map((r, idx) => (
-                <button
-                  type="button"
-                  key={r.id}
-                  onClick={() => setModalAttempt(r)}
-                  className={`w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border border-transparent transition text-left ${
-                    idx === 0 ? "bg-[#ff2a3a]/5 border-[#ff2a3a]/20" : "hover:bg-white/[0.04] hover:border-white/10"
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    r.result === "success" ? "bg-emerald-400" :
-                    r.result === "rate_limited" ? "bg-amber-400" :
-                    r.result === "bot_detected" ? "bg-[#ff2a3a]" : "bg-white/30"
-                  }`} />
-                  <span className="text-[#ff8a90] truncate">{r.code}</span>
-                  <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/40 border-white/10"}`}>
-                    {(r.result ?? "unknown").replace("_", " ")}
-                  </span>
-                  <span className="text-white/50 w-8 text-right">{r.country ?? "—"}</span>
-                  <span className="text-white/30 w-14 text-right">{relTime(r.created_at, nowTick)}</span>
-                </button>
-              ))
+              tickerItems.map((it, idx) => {
+                if (it.kind === "cluster") {
+                  const rep = it.rows[0];
+                  return (
+                    <button
+                      type="button"
+                      key={`c-${it.ip}-${it.result}-${rep.id}`}
+                      onClick={() => setModalAttempt(rep)}
+                      className="row-slide-in w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border border-amber-500/20 bg-amber-500/[0.04] hover:bg-amber-500/[0.08] transition text-left tabular-nums"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="text-amber-200 truncate inline-flex items-center gap-1.5">
+                        <Layers className="w-3 h-3" />
+                        <span>{it.rows.length}× repeats · IP {it.ip.slice(0, 10)}…</span>
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[it.result] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                        {it.result.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-white/50 w-8 text-right">{rep.country ?? "—"}</span>
+                      <span className="text-white/30 w-14 text-right">{relTime(rep.created_at, nowTick)}</span>
+                    </button>
+                  );
+                }
+                const r = it.row;
+                return (
+                  <button
+                    type="button"
+                    key={r.id}
+                    onClick={() => setModalAttempt(r)}
+                    className={`row-slide-in w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border transition text-left tabular-nums ${
+                      idx === 0 ? "bg-[#ff2a3a]/5 border-[#ff2a3a]/20" : "border-transparent hover:bg-white/[0.04] hover:border-white/10"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      r.result === "success" ? "bg-emerald-400" :
+                      r.result === "rate_limited" ? "bg-amber-400" :
+                      r.result === "bot_detected" ? "bg-[#ff2a3a]" : "bg-white/30"
+                    }`} />
+                    <span className="text-[#ff8a90] truncate">{r.code}</span>
+                    <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                      {(r.result ?? "unknown").replace(/_/g, " ")}
+                    </span>
+                    <span className="text-white/50 w-8 text-right">{r.country ?? "—"}</span>
+                    <span className="text-white/30 w-14 text-right">{relTime(r.created_at, nowTick)}</span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
 
-        <div className="glass p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <XCircle className="w-4 h-4 text-[#ff2a3a]" />
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Breakdown</div>
-              <div className="font-display text-lg">Failure share</div>
+        <div className="space-y-4">
+          <SLOPanel successCount={kpi.success} totalCount={kpi.total} windowHours={hours} />
+
+          <div className="glass p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <XCircle className="w-4 h-4 text-[#ff2a3a]" />
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Breakdown</div>
+                <div className="font-display text-lg">Failure share</div>
+              </div>
             </div>
+            {failTotal === 0 ? (
+              <div className="text-sm text-white/40 font-mono py-6 text-center">Zero failures 🎉</div>
+            ) : (
+              <div className="space-y-3">
+                {failures.map((f) => {
+                  const pct = failTotal ? (f.value / failTotal) * 100 : 0;
+                  return (
+                    <div key={f.key}>
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="text-white/70">{f.label}</span>
+                        <span className="font-mono text-white/50 tabular-nums">{f.value} · {pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: f.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {failTotal === 0 ? (
-            <div className="text-sm text-white/40 font-mono py-6 text-center">Zero failures 🎉</div>
-          ) : (
-            <div className="space-y-3">
-              {failures.map((f) => {
-                const pct = failTotal ? (f.value / failTotal) * 100 : 0;
-                return (
-                  <div key={f.key}>
-                    <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="text-white/70">{f.label}</span>
-                      <span className="font-mono text-white/50">{f.value} · {pct.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: f.color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
+
 
       {/* Pool + quick actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -654,7 +774,14 @@ function DashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Timeline</div>
-            <div className="font-display text-xl mt-1">Attempts over time</div>
+            <div className="font-display text-xl mt-1">
+              Attempts over time
+              {compareMode && (
+                <span className="ml-3 align-middle text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded border border-[#ff2a3a]/30 bg-[#ff2a3a]/10 text-[#ff8a90]">
+                  vs previous {hours}h
+                </span>
+              )}
+            </div>
           </div>
           <div className="text-xs font-mono text-white/40 inline-flex items-center gap-2">
             <Timer className="w-3.5 h-3.5" /> {stats.isFetching ? "syncing…" : `refreshed ${secSinceSync}s ago`}
@@ -665,7 +792,7 @@ function DashboardPage() {
             <div className="h-full flex items-center justify-center text-sm text-white/40 font-mono">No data in this window</div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <ComposedChart data={series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#ff2a3a" stopOpacity={0.5} />
@@ -682,7 +809,19 @@ function DashboardPage() {
                 <Tooltip contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,42,58,0.4)", borderRadius: 12, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }} />
                 <Area type="monotone" dataKey="Total" stroke="#ff2a3a" fill="url(#gTotal)" strokeWidth={2} />
                 <Area type="monotone" dataKey="Success" stroke="#22c55e" fill="url(#gSuccess)" strokeWidth={2} />
-              </AreaChart>
+                {compareMode && (
+                  <Line
+                    type="monotone"
+                    dataKey="PrevTotal"
+                    name={`Prev ${hours}h`}
+                    stroke="#ff8a90"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           )}
         </div>
