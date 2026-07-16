@@ -93,7 +93,7 @@ export function BackgroundSong() {
     } else if (path && !stableUrl && url) {
       setStableUrl(url);
     }
-  });
+  }, [q.data?.path, q.data?.url, stableUrl]);
   const [showVolume, setShowVolume] = useState(false);
   const [nowMinute, setNowMinute] = useState(currentMinuteOfDay());
   const [prefersReducedMotion, setPRM] = useState(false);
