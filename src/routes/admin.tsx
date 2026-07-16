@@ -140,7 +140,7 @@ function AdminLayout() {
   const visibleNav = nav.filter((n) => !n.adminOnly || role.data?.isAdmin);
 
   return (
-    <div className="min-h-screen relative text-white">
+    <div className="admin-shell min-h-screen relative text-white font-ops">
       <LiveBackground />
       <ClickRipple />
 
