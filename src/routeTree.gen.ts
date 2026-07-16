@@ -24,6 +24,7 @@ import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminBackgroundSongRouteImport } from './routes/admin.background-song'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
+import { Route as ApiPublicBackgroundSongAudioRouteImport } from './routes/api/public/background-song-audio'
 import { Route as ApiAdminUploadBackgroundSongRouteImport } from './routes/api/admin/upload-background-song'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
 import { Route as ApiPublicHooksPoolAlertRouteImport } from './routes/api/public/hooks/pool-alert'
@@ -105,6 +106,12 @@ const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
   path: '/attempts',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicBackgroundSongAudioRoute =
+  ApiPublicBackgroundSongAudioRouteImport.update({
+    id: '/api/public/background-song-audio',
+    path: '/api/public/background-song-audio',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminUploadBackgroundSongRoute =
   ApiAdminUploadBackgroundSongRouteImport.update({
     id: '/api/admin/upload-background-song',
@@ -152,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
   '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
+  '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/bg-preview': typeof BgPreviewIndexRoute
   '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
+  '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
@@ -196,6 +205,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/bg-preview/': typeof BgPreviewIndexRoute
   '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
+  '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/bg-preview/'
     | '/api/admin/upload-background-song'
+    | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-alert'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/bg-preview'
     | '/api/admin/upload-background-song'
+    | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-alert'
@@ -263,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/bg-preview/'
     | '/api/admin/upload-background-song'
+    | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/pool-alert'
@@ -278,6 +291,7 @@ export interface RootRouteChildren {
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
   BgPreviewIndexRoute: typeof BgPreviewIndexRoute
   ApiAdminUploadBackgroundSongRoute: typeof ApiAdminUploadBackgroundSongRoute
+  ApiPublicBackgroundSongAudioRoute: typeof ApiPublicBackgroundSongAudioRoute
   ApiPublicHooksAutoCleanupRoute: typeof ApiPublicHooksAutoCleanupRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
   ApiPublicHooksPoolAlertRoute: typeof ApiPublicHooksPoolAlertRoute
@@ -391,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAttemptsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/background-song-audio': {
+      id: '/api/public/background-song-audio'
+      path: '/api/public/background-song-audio'
+      fullPath: '/api/public/background-song-audio'
+      preLoaderRoute: typeof ApiPublicBackgroundSongAudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/upload-background-song': {
       id: '/api/admin/upload-background-song'
       path: '/api/admin/upload-background-song'
@@ -462,6 +483,7 @@ const rootRouteChildren: RootRouteChildren = {
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
   BgPreviewIndexRoute: BgPreviewIndexRoute,
   ApiAdminUploadBackgroundSongRoute: ApiAdminUploadBackgroundSongRoute,
+  ApiPublicBackgroundSongAudioRoute: ApiPublicBackgroundSongAudioRoute,
   ApiPublicHooksAutoCleanupRoute: ApiPublicHooksAutoCleanupRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
   ApiPublicHooksPoolAlertRoute: ApiPublicHooksPoolAlertRoute,
@@ -470,3 +492,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
