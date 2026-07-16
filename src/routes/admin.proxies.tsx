@@ -35,8 +35,9 @@ function ProxiesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["proxies", page],
     queryFn: () => list({ data: { page, pageSize } }),
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
+
 
   const uploadMut = useMutation({
     mutationFn: async () => upload({ data: { text } }),
