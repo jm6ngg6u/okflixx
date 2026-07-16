@@ -11,9 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2 } from "lucide-react";
+import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
+import { listRecentJobRuns } from "@/lib/settings.functions";
 
 
 export const Route = createFileRoute("/admin/settings")({
