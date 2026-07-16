@@ -69,6 +69,8 @@ export function BackgroundSong() {
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const loopAudioRef = useRef<HTMLAudioElement | null>(null);
+  const activeAudioIndexRef = useRef(0);
   const [muted, setMuted] = useState(false);
   const [needsGesture, setNeedsGesture] = useState(false);
   const [volume, setVolumeState] = useState<number>(() => {
@@ -81,8 +83,43 @@ export function BackgroundSong() {
   // <audio> element reloads every 20s and playback aborts mid-song.
   const [stableUrl, setStableUrl] = useState<string | null>(null);
   const lastTrackKeyRef = useRef<string>("");
-  const loopResettingRef = useRef(false);
+  const loopSwitchingRef = useRef(false);
   const lastProgressRef = useRef({ time: 0, at: 0 });
+  const getAudioPair = () => [audioRef.current, loopAudioRef.current] as const;
+  const getActiveAudio = () => getAudioPair()[activeAudioIndexRef.current] ?? audioRef.current ?? loopAudioRef.current;
+  const getStandbyAudio = () => getAudioPair()[activeAudioIndexRef.current === 0 ? 1 : 0] ?? null;
+  const applyToBothAudio = (fn: (el: HTMLAudioElement) => void) => {
+    for (const el of getAudioPair()) if (el) fn(el);
+  };
+
+  const switchSeamlessLoop = () => {
+    if (loopSwitchingRef.current || needsGesture) return;
+    const active = getActiveAudio();
+    const standby = getStandbyAudio();
+    if (!active || !standby || active.paused || !Number.isFinite(active.duration)) return;
+    loopSwitchingRef.current = true;
+    try {
+      standby.currentTime = 0.001;
+      standby.volume = volume;
+      standby.muted = active.muted;
+      void standby.play().then(() => {
+        window.setTimeout(() => {
+          try {
+            active.pause();
+            active.currentTime = 0.001;
+          } catch { /* ignore */ }
+          activeAudioIndexRef.current = activeAudioIndexRef.current === 0 ? 1 : 0;
+          attachAudio(standby);
+          lastProgressRef.current = { time: standby.currentTime, at: performance.now() };
+          setMuted(standby.muted);
+          loopSwitchingRef.current = false;
+        }, 160);
+      }).catch(() => { loopSwitchingRef.current = false; });
+    } catch {
+      loopSwitchingRef.current = false;
+    }
+  };
+
   useEffect(() => {
     const path = q.data?.path ?? "";
     const updatedAt = q.data?.updatedAt ?? "";
@@ -90,6 +127,8 @@ export function BackgroundSong() {
     const trackKey = path ? `${path}|${updatedAt}` : "";
     if (trackKey && trackKey !== lastTrackKeyRef.current) {
       lastTrackKeyRef.current = trackKey;
+      activeAudioIndexRef.current = 0;
+      loopSwitchingRef.current = false;
       setStableUrl(url);
     } else if (!trackKey && lastTrackKeyRef.current) {
       lastTrackKeyRef.current = "";
@@ -178,19 +217,19 @@ export function BackgroundSong() {
 
   // Play / attach / react to config changes.
   useEffect(() => {
-    const el = audioRef.current;
+    const el = getActiveAudio();
     if (!el || !q.data?.enabled || !stableUrl) {
       setReactiveEnabled(false);
       return;
     }
     // Schedule: outside window → pause silently, don't attach reactive.
     if (q.data.scheduleEnabled && !inWindow) {
-      try { el.pause(); } catch { /* ignore */ }
+      applyToBothAudio((a) => { try { a.pause(); } catch { /* ignore */ } });
       setReactiveEnabled(false);
       return;
     }
 
-    el.volume = volume;
+    applyToBothAudio((a) => { a.volume = volume; });
     attachAudio(el);
     // Reduced motion / silence → keep reactive OFF regardless of admin flag.
     const wantReactive = !!q.data.reactive && !prefersReducedMotion && !analyserSilent;
@@ -198,14 +237,14 @@ export function BackgroundSong() {
 
     const tryPlay = async () => {
       try {
-        el.muted = false;
+        applyToBothAudio((a) => { a.muted = false; });
         await el.play();
         setMuted(false);
         setNeedsGesture(false);
         if (!fired.current.autoplay) { fired.current.autoplay = true; sendEvent("autoplay"); }
       } catch {
         try {
-          el.muted = true;
+          applyToBothAudio((a) => { a.muted = true; });
           await el.play();
           setMuted(true);
           setNeedsGesture(true);
@@ -220,7 +259,7 @@ export function BackgroundSong() {
       resumeAudio();
       if (!el.paused && !el.muted) return;
       try {
-        el.muted = false;
+        applyToBothAudio((a) => { a.muted = false; });
         await el.play();
         setMuted(false);
         setNeedsGesture(false);
@@ -244,7 +283,7 @@ export function BackgroundSong() {
   useEffect(() => {
     if (!q.data?.enabled || !stableUrl || (q.data.scheduleEnabled && !inWindow)) return;
     const id = window.setInterval(() => {
-      const el = audioRef.current;
+      const el = getActiveAudio();
       if (!el) return;
       if (el.paused && !needsGesture) {
         void el.play().catch(() => setNeedsGesture(true));
@@ -253,10 +292,14 @@ export function BackgroundSong() {
       const now = performance.now();
       const prev = lastProgressRef.current;
       if (!el.paused && !el.seeking && el.readyState >= 2) {
+        const d = el.duration;
+        if (Number.isFinite(d) && d > 1 && d - el.currentTime <= 0.32) {
+          switchSeamlessLoop();
+          return;
+        }
         if (Math.abs(el.currentTime - prev.time) < 0.01 && now - prev.at > 3500) {
-          const d = el.duration;
           if (Number.isFinite(d) && d - el.currentTime <= 0.5) {
-            restartLoop(el);
+            switchSeamlessLoop();
           } else {
             try { el.currentTime = Math.min(el.currentTime + 0.05, Math.max(0, (d || el.currentTime + 1) - 0.5)); } catch { /* ignore */ }
             void el.play().catch(() => setNeedsGesture(true));
@@ -272,9 +315,7 @@ export function BackgroundSong() {
 
   // Apply live volume changes without restarting playback.
   useEffect(() => {
-    const el = audioRef.current;
-    if (!el) return;
-    el.volume = volume;
+    applyToBothAudio((el) => { el.volume = volume; });
     if (typeof window !== "undefined") window.localStorage.setItem(VOLUME_KEY, volume.toFixed(2));
   }, [volume]);
 
@@ -282,18 +323,18 @@ export function BackgroundSong() {
   const blocked = q.data.scheduleEnabled && !inWindow;
 
   const toggle = () => {
-    const el = audioRef.current;
+    const el = getActiveAudio();
     if (!el) return;
     resumeAudio();
     if (el.paused) {
-      el.muted = false;
+      applyToBothAudio((a) => { a.muted = false; });
       el.play().catch(() => {});
       setMuted(false);
       attachAudio(el);
       if (!fired.current.unmute) { fired.current.unmute = true; sendEvent("unmute"); }
     } else {
       const next = !el.muted;
-      el.muted = next;
+      applyToBothAudio((a) => { a.muted = next; });
       setMuted(next);
       if (!next && !fired.current.unmute) { fired.current.unmute = true; sendEvent("unmute"); }
     }
@@ -303,8 +344,8 @@ export function BackgroundSong() {
   const trackLabel = q.data.trackTitle?.trim() || q.data.name?.replace(/\.[a-z0-9]+$/i, "") || "Background";
 
   const restartLoop = (el: HTMLAudioElement) => {
-    if (loopResettingRef.current) return;
-    loopResettingRef.current = true;
+    if (loopSwitchingRef.current) return;
+    loopSwitchingRef.current = true;
     const shouldResume = !needsGesture;
     const resume = () => {
       if (shouldResume) void el.play().catch(() => setNeedsGesture(true));
@@ -315,7 +356,7 @@ export function BackgroundSong() {
     } catch { /* ignore */ }
     window.setTimeout(resume, 40);
     window.setTimeout(resume, 180);
-    window.setTimeout(() => { loopResettingRef.current = false; }, 500);
+    window.setTimeout(() => { loopSwitchingRef.current = false; }, 500);
   };
 
   return (
@@ -325,15 +366,24 @@ export function BackgroundSong() {
         src={stableUrl ?? undefined}
         preload="auto"
         playsInline
-        loop
         crossOrigin="anonymous"
         onEnded={(e) => {
           // Safety net if the timeupdate pre-empt misses (tab throttled, etc.)
-          restartLoop(e.currentTarget);
+          if (e.currentTarget === getActiveAudio()) switchSeamlessLoop();
         }}
         onPlaying={(e) => { lastProgressRef.current = { time: e.currentTarget.currentTime, at: performance.now() }; }}
         onStalled={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
         onWaiting={(e) => { if (!needsGesture) void e.currentTarget.play().catch(() => setNeedsGesture(true)); }}
+      />
+      <audio
+        ref={loopAudioRef}
+        src={stableUrl ?? undefined}
+        preload="auto"
+        playsInline
+        crossOrigin="anonymous"
+        onEnded={(e) => {
+          if (e.currentTarget === getActiveAudio()) switchSeamlessLoop();
+        }}
       />
       <div
         className="fixed z-40 bottom-5 right-5 select-none"

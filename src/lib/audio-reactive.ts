@@ -128,6 +128,7 @@ export function attachAudio(el: HTMLAudioElement) {
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
     if (attachedEl !== el) {
+      try { source?.disconnect(); } catch { /* ignore */ }
       source = ctx.createMediaElementSource(el);
 
       const hp = ctx.createBiquadFilter();
