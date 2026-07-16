@@ -107,19 +107,19 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       }).eq("id", r.id);
       checked++;
       if (out.status === "active") active++;
-      else if (out.status === "invalid") invalid++;
-      else if (out.status === "on_hold") on_hold++;
+      else if (out.status === "invalid") { invalid++; const b = bucketReason(out.error); reasons[b] = (reasons[b] ?? 0) + 1; }
+      else if (out.status === "on_hold") { on_hold++; const b = out.error ? bucketReason(out.error) : "on_hold"; reasons[b] = (reasons[b] ?? 0) + 1; }
       else if (out.status === "free") free++;
       if (checked % 5 === 0 || checked === (rows?.length ?? 0)) {
         await recordJobProgress(jobId, {
           phase: "checking", total: rows?.length ?? 0,
-          checked, active, invalid, on_hold, free, proxy_mode: proxyMode,
+          checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
         });
       }
     }
     await recordJobProgress(jobId, {
       phase: "cleanup", total: rows?.length ?? 0,
-      checked, active, invalid, on_hold, free, proxy_mode: proxyMode,
+      checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
     });
 
     const cleanupOn = map.autocheck_cleanup !== "0";
