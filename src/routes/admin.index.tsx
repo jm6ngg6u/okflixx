@@ -600,10 +600,10 @@ function DashboardPage() {
       {/* Live activation pipelines — queue → cookie → proxy → worker → result */}
       <ActivationPipelines />
 
-      {/* Live ticker + Failure breakdown */}
+      {/* SLO · Live ticker · Failure breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="glass p-5 lg:col-span-2 relative overflow-hidden">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Radio className="w-4 h-4 text-[#ff2a3a]" />
@@ -614,72 +614,115 @@ function DashboardPage() {
                 <div className="font-display text-lg">Latest activations</div>
               </div>
             </div>
-            <Link to="/admin/attempts" className="text-xs font-mono text-white/40 hover:text-white inline-flex items-center gap-1">
-              Open log <ArrowUpRight className="w-3 h-3" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setClusterFailures((v) => !v)}
+                title={clusterFailures ? "Show all rows" : "Group repeat failures by IP + reason"}
+                className={`h-7 px-2.5 rounded-md border text-[10px] font-mono uppercase tracking-widest inline-flex items-center gap-1 transition ${
+                  clusterFailures
+                    ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
+                    : "border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/[0.06]"
+                }`}
+              >
+                <Layers className="w-3 h-3" /> Cluster
+              </button>
+              <Link to="/admin/attempts" className="text-xs font-mono text-white/40 hover:text-white inline-flex items-center gap-1">
+                Open log <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
           <div className="space-y-1.5">
-            {liveRows.length === 0 ? (
+            {tickerItems.length === 0 ? (
               <div className="text-sm text-white/40 font-mono py-6 text-center">
                 {initialAttempts.isLoading ? "Warming up…" : "No activations yet"}
               </div>
             ) : (
-              liveRows.map((r, idx) => (
-                <button
-                  type="button"
-                  key={r.id}
-                  onClick={() => setModalAttempt(r)}
-                  className={`w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border border-transparent transition text-left ${
-                    idx === 0 ? "bg-[#ff2a3a]/5 border-[#ff2a3a]/20" : "hover:bg-white/[0.04] hover:border-white/10"
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    r.result === "success" ? "bg-emerald-400" :
-                    r.result === "rate_limited" ? "bg-amber-400" :
-                    r.result === "bot_detected" ? "bg-[#ff2a3a]" : "bg-white/30"
-                  }`} />
-                  <span className="text-[#ff8a90] truncate">{r.code}</span>
-                  <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/40 border-white/10"}`}>
-                    {(r.result ?? "unknown").replace("_", " ")}
-                  </span>
-                  <span className="text-white/50 w-8 text-right">{r.country ?? "—"}</span>
-                  <span className="text-white/30 w-14 text-right">{relTime(r.created_at, nowTick)}</span>
-                </button>
-              ))
+              tickerItems.map((it, idx) => {
+                if (it.kind === "cluster") {
+                  const rep = it.rows[0];
+                  return (
+                    <button
+                      type="button"
+                      key={`c-${it.ip}-${it.result}-${rep.id}`}
+                      onClick={() => setModalAttempt(rep)}
+                      className="row-slide-in w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border border-amber-500/20 bg-amber-500/[0.04] hover:bg-amber-500/[0.08] transition text-left tabular-nums"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="text-amber-200 truncate inline-flex items-center gap-1.5">
+                        <Layers className="w-3 h-3" />
+                        <span>{it.rows.length}× repeats · IP {it.ip.slice(0, 10)}…</span>
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[it.result] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                        {it.result.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-white/50 w-8 text-right">{rep.country ?? "—"}</span>
+                      <span className="text-white/30 w-14 text-right">{relTime(rep.created_at, nowTick)}</span>
+                    </button>
+                  );
+                }
+                const r = it.row;
+                return (
+                  <button
+                    type="button"
+                    key={r.id}
+                    onClick={() => setModalAttempt(r)}
+                    className={`row-slide-in w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 text-xs font-mono py-1.5 px-2 rounded border transition text-left tabular-nums ${
+                      idx === 0 ? "bg-[#ff2a3a]/5 border-[#ff2a3a]/20" : "border-transparent hover:bg-white/[0.04] hover:border-white/10"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      r.result === "success" ? "bg-emerald-400" :
+                      r.result === "rate_limited" ? "bg-amber-400" :
+                      r.result === "bot_detected" ? "bg-[#ff2a3a]" : "bg-white/30"
+                    }`} />
+                    <span className="text-[#ff8a90] truncate">{r.code}</span>
+                    <span className={`px-1.5 py-0.5 rounded border text-[10px] ${RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                      {(r.result ?? "unknown").replace(/_/g, " ")}
+                    </span>
+                    <span className="text-white/50 w-8 text-right">{r.country ?? "—"}</span>
+                    <span className="text-white/30 w-14 text-right">{relTime(r.created_at, nowTick)}</span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
 
-        <div className="glass p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <XCircle className="w-4 h-4 text-[#ff2a3a]" />
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Breakdown</div>
-              <div className="font-display text-lg">Failure share</div>
+        <div className="space-y-4">
+          <SLOPanel successCount={kpi.success} totalCount={kpi.total} windowHours={hours} />
+
+          <div className="glass p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <XCircle className="w-4 h-4 text-[#ff2a3a]" />
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Breakdown</div>
+                <div className="font-display text-lg">Failure share</div>
+              </div>
             </div>
+            {failTotal === 0 ? (
+              <div className="text-sm text-white/40 font-mono py-6 text-center">Zero failures 🎉</div>
+            ) : (
+              <div className="space-y-3">
+                {failures.map((f) => {
+                  const pct = failTotal ? (f.value / failTotal) * 100 : 0;
+                  return (
+                    <div key={f.key}>
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="text-white/70">{f.label}</span>
+                        <span className="font-mono text-white/50 tabular-nums">{f.value} · {pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: f.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {failTotal === 0 ? (
-            <div className="text-sm text-white/40 font-mono py-6 text-center">Zero failures 🎉</div>
-          ) : (
-            <div className="space-y-3">
-              {failures.map((f) => {
-                const pct = failTotal ? (f.value / failTotal) * 100 : 0;
-                return (
-                  <div key={f.key}>
-                    <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="text-white/70">{f.label}</span>
-                      <span className="font-mono text-white/50">{f.value} · {pct.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: f.color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
+
 
       {/* Pool + quick actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
