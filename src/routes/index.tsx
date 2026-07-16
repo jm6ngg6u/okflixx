@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
+import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
 import { toast } from "sonner";
 import logo from "@/assets/brand-logo.png";
