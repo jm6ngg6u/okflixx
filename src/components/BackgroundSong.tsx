@@ -80,6 +80,7 @@ export function BackgroundSong() {
       el.muted = false;
       el.play().catch(() => {});
       setMuted(false);
+      if (q.data?.reactive) attachAudio(el);
     } else {
       const next = !el.muted;
       el.muted = next;
