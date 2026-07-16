@@ -120,3 +120,22 @@ export const getPublicStatus = createServerFn({ method: "GET" }).handler(async (
     message: map.maintenance_message ?? "",
   };
 });
+
+/** Latest scheduled-job runs, for the admin live-jobs panel. */
+export const listRecentJobRuns = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data, error } = await supabase
+      .from("job_runs")
+      .select("id, job, started_at, finished_at, ok, summary, progress, error")
+      .order("started_at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return { rows: data ?? [] };
+  });
