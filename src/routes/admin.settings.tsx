@@ -305,8 +305,9 @@ function TextField({ k, label, placeholder, local, set, onSave }: any) {
     </div>
   );
 }
-function ToggleField({ k, label, hint, local, set, onSave }: any) {
-  const on = local[k] === "1";
+function ToggleField({ k, label, hint, local, set, onSave, defaultOn }: any) {
+  const raw = local[k];
+  const on = raw === "1" || (raw === undefined && !!defaultOn);
   return (
     <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-3">
       <div className="min-w-0">
