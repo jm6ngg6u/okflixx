@@ -91,9 +91,14 @@ export const getDashboardStats = createServerFn({ method: "POST" })
 const AttemptsInput = z.object({
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(10).max(200).default(50),
+  /** Legacy single-result filter (kept for backwards compat). */
   result: z.string().optional(),
+  /** New multi-select result filter (chips). */
+  results: z.array(z.string()).optional(),
   country: z.string().optional(),
   q: z.string().optional(),
+  /** Restrict to attempts newer than N minutes; omit for "all time". */
+  sinceMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
 });
 
 export const listAttempts = createServerFn({ method: "POST" })
@@ -107,20 +112,63 @@ export const listAttempts = createServerFn({ method: "POST" })
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
 
+    // Base query — page slice with full detail columns.
     let q = supabase
       .from("activation_attempts")
-      .select("id, code, result, country, user_agent, created_at, ip_hash", { count: "exact" })
+      .select(
+        "id, code, result, country, user_agent, created_at, ip_hash, cookie_id, proxy_id, proxy_mode, attempt_number, duration_ms, error_message",
+        { count: "exact" },
+      )
       .order("created_at", { ascending: false })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
 
-    if (data.result) q = q.eq("result", data.result);
+    const results = data.results && data.results.length ? data.results : data.result ? [data.result] : null;
+    if (results && results.length) q = q.in("result", results);
     if (data.country) q = q.eq("country", data.country);
     if (data.q) q = q.or(`code.ilike.%${data.q}%,user_agent.ilike.%${data.q}%,ip_hash.ilike.%${data.q}%`);
+    let sinceIso: string | null = null;
+    if (data.sinceMinutes) {
+      sinceIso = new Date(Date.now() - data.sinceMinutes * 60_000).toISOString();
+      q = q.gte("created_at", sinceIso);
+    }
 
     const { data: rows, count, error } = await q;
     if (error) throw error;
-    return { rows: rows ?? [], count: count ?? 0 };
+
+    // Lightweight per-filter aggregate for the KPI strip. Pulls the same slice
+    // of columns (only the small ones) for up to 5000 matching rows so we can
+    // compute success rate, avg duration, and unique IP count without a second
+    // paginated round-trip.
+    let aggQuery = supabase
+      .from("activation_attempts")
+      .select("result, duration_ms, ip_hash")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (results && results.length) aggQuery = aggQuery.in("result", results);
+    if (data.country) aggQuery = aggQuery.eq("country", data.country);
+    if (data.q) aggQuery = aggQuery.or(`code.ilike.%${data.q}%,user_agent.ilike.%${data.q}%,ip_hash.ilike.%${data.q}%`);
+    if (sinceIso) aggQuery = aggQuery.gte("created_at", sinceIso);
+    const { data: aggRows } = await aggQuery;
+
+    const summary = { success: 0, fail: 0, total: 0, avg_duration_ms: 0, unique_ips: 0, sampled: (aggRows ?? []).length };
+    const ipSet = new Set<string>();
+    let durSum = 0;
+    let durN = 0;
+    for (const r of aggRows ?? []) {
+      summary.total++;
+      if ((r as any).result === "success") summary.success++;
+      else summary.fail++;
+      const d = (r as any).duration_ms;
+      if (typeof d === "number") { durSum += d; durN++; }
+      const ip = (r as any).ip_hash;
+      if (ip) ipSet.add(ip);
+    }
+    summary.avg_duration_ms = durN ? Math.round(durSum / durN) : 0;
+    summary.unique_ips = ipSet.size;
+
+    return { rows: rows ?? [], count: count ?? 0, summary };
   });
+
 
 /** Pool sizes for sidebar badges. */
 export const getPoolSummary = createServerFn({ method: "GET" })
