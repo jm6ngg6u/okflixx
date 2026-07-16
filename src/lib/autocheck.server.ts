@@ -157,8 +157,11 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       deleted = removed_invalid + removed_free + removed_on_hold + removed_duplicates;
     }
 
-    const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode };
+    const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode, reasons };
     await recordJobFinish(jobId, true, summary);
+    await supabaseAdmin.from("app_settings").upsert({
+      key: "cookies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
     return { ok: true, ...summary };
   } catch (e: any) {
     await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
