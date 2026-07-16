@@ -91,7 +91,7 @@ export function BackgroundSong() {
 
   return (
     <>
-      <audio ref={audioRef} src={q.data.url} loop preload="auto" playsInline autoPlay />
+      <audio ref={audioRef} src={q.data.url} loop preload="auto" playsInline autoPlay crossOrigin="anonymous" />
       <button
         onClick={toggle}
         aria-label={muted ? "Unmute background music" : "Mute background music"}
