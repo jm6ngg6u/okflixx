@@ -42,9 +42,79 @@
 [data-radix-popper-content-wrapper] > * {
   background-color: #0b0b0d !important;
   backdrop-filter: blur(14px) saturate(140%);
-  border-color: rgba(255,255,255,0.12) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 10px !important;
   box-shadow: 0 20px 60px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.04);
+  color: #f5f5f5 !important;
+  overflow: hidden;
 }
+/* Items inside any Radix menu/select on the admin surface */
+[data-radix-popper-content-wrapper] [role="option"],
+[data-radix-popper-content-wrapper] [role="menuitem"],
+[data-radix-popper-content-wrapper] [role="menuitemcheckbox"],
+[data-radix-popper-content-wrapper] [role="menuitemradio"] {
+  font-family: "Work Sans", "Inter", sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: rgba(245,245,245,0.85);
+  border-radius: 6px;
+}
+[data-radix-popper-content-wrapper] [role="option"][data-highlighted],
+[data-radix-popper-content-wrapper] [role="menuitem"][data-highlighted],
+[data-radix-popper-content-wrapper] [role="option"]:hover,
+[data-radix-popper-content-wrapper] [role="menuitem"]:hover {
+  background: linear-gradient(90deg, rgba(229,9,20,0.18), rgba(229,9,20,0.06)) !important;
+  color: #fff !important;
+  outline: none;
+}
+[data-radix-popper-content-wrapper] [role="option"][data-state="checked"] {
+  background: rgba(229,9,20,0.14) !important;
+  color: #fff !important;
+}
+[data-radix-popper-content-wrapper] [role="separator"] {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+/* ==== Admin shell typography ==== */
+.admin-shell {
+  font-family: "Work Sans", "Inter", sans-serif;
+  letter-spacing: 0.005em;
+}
+.admin-shell h1, .admin-shell h2, .admin-shell h3 {
+  font-family: "Sora", sans-serif;
+  letter-spacing: -0.02em;
+}
+/* Section labels, form labels, table headers → uppercase ops style */
+.admin-shell label,
+.admin-shell thead th,
+.admin-shell .kbd-label,
+.admin-shell [data-label] {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  font-family: "Work Sans", "Inter", sans-serif;
+}
+/* Trigger buttons for selects on admin — solid dark, red focus ring */
+.admin-shell button[role="combobox"],
+.admin-shell [data-slot="select-trigger"] {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  color: #f5f5f5 !important;
+  font-family: "Work Sans", "Inter", sans-serif;
+  letter-spacing: 0.02em;
+}
+.admin-shell button[role="combobox"]:hover,
+.admin-shell [data-slot="select-trigger"]:hover {
+  border-color: rgba(229,9,20,0.5) !important;
+}
+.admin-shell button[role="combobox"][data-state="open"],
+.admin-shell [data-slot="select-trigger"][data-state="open"] {
+  border-color: rgba(229,9,20,0.7) !important;
+  box-shadow: 0 0 0 3px rgba(229,9,20,0.15);
+}
+
 
 
 /* Hide the Lovable badge on published deployments without affecting layout */
