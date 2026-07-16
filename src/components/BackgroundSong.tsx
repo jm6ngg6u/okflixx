@@ -80,11 +80,12 @@ export function BackgroundSong() {
   const toggle = () => {
     const el = audioRef.current;
     if (!el) return;
+    resumeAudio();
     if (el.paused) {
       el.muted = false;
       el.play().catch(() => {});
       setMuted(false);
-      if (q.data?.reactive) attachAudio(el);
+      attachAudio(el);
     } else {
       const next = !el.muted;
       el.muted = next;
