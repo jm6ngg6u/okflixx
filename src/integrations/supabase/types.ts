@@ -152,6 +152,57 @@ export type Database = {
         }
         Relationships: []
       }
+      background_song_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: number
+          session_hash: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: never
+          session_hash?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: never
+          session_hash?: string | null
+        }
+        Relationships: []
+      }
+      background_song_history: {
+        Row: {
+          id: string
+          is_current: boolean
+          name: string
+          path: string
+          size_bytes: number
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          id?: string
+          is_current?: boolean
+          name: string
+          path: string
+          size_bytes?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          id?: string
+          is_current?: boolean
+          name?: string
+          path?: string
+          size_bytes?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       broadcasts: {
         Row: {
           audience: string

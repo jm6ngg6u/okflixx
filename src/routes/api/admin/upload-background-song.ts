@@ -60,20 +60,22 @@ export const Route = createFileRoute("/api/admin/upload-background-song")({
 
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-          // Remove previous file (best-effort)
-          const { data: prev } = await supabaseAdmin
-            .from("app_settings").select("value").eq("key", "background_song_path").maybeSingle();
-          const prevPath = prev?.value;
-
           const buf = new Uint8Array(await file.arrayBuffer());
           const { error: upErr } = await supabaseAdmin.storage
             .from("site-audio")
             .upload(path, buf, { contentType: type, upsert: true });
           if (upErr) return Response.json({ ok: false, error: "upload_failed", detail: upErr.message }, { status: 500 });
 
-          if (prevPath && prevPath !== path) {
-            await supabaseAdmin.storage.from("site-audio").remove([prevPath]);
-          }
+          // History: keep prior file in storage so admins can restore.
+          // Flip is_current off on prior rows, then insert this upload as current.
+          await supabaseAdmin.from("background_song_history").update({ is_current: false }).eq("is_current", true);
+          await supabaseAdmin.from("background_song_history").insert({
+            path,
+            name: origName,
+            size_bytes: file.size,
+            uploaded_by: userId,
+            is_current: true,
+          });
 
           const nowIso = new Date().toISOString();
           await supabaseAdmin.from("app_settings").upsert([
