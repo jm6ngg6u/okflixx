@@ -138,12 +138,13 @@ export function LiveJobsPanel() {
       const meta = JOB_META[r.job] ?? { label: r.job };
       const dur = fmtDuration(r.started_at, r.finished_at);
       let desc = "";
+      const rl = reasonsLine(r.summary);
       if (r.job === "cookies-autocheck") {
         const a = cookieSummaryLine(r.summary);
         const b = cookieCleanupLine(r.summary);
-        desc = [a, b].filter(Boolean).join(" • ") + ` • ${dur}`;
+        desc = [a, b, rl].filter(Boolean).join(" • ") + ` • ${dur}`;
       } else if (r.job === "proxies-autocheck") {
-        desc = `${proxySummaryLine(r.summary)} • ${dur}`;
+        desc = [proxySummaryLine(r.summary), rl].filter(Boolean).join(" • ") + ` • ${dur}`;
       } else if (r.job === "auto-cleanup") {
         desc = `${cleanupSummaryLine(r.summary)} • ${dur}`;
       } else {
