@@ -394,6 +394,31 @@ export function BackgroundSong() {
     if (typeof window !== "undefined") window.localStorage.setItem(VOLUME_KEY, volume.toFixed(2));
   }, [volume]);
 
+  // Mirror UI state into the health store.
+  useEffect(() => {
+    updateBgsHealth({
+      needsGesture,
+      muted,
+      activeIndex: activeAudioIndexRef.current as 0 | 1,
+      silent: analyserSilent,
+    });
+  }, [needsGesture, muted, analyserSilent]);
+
+  // Poll currentTime / duration into the health store while playing.
+  useEffect(() => {
+    if (!stableUrl) return;
+    const id = window.setInterval(() => {
+      const el = getActiveAudio();
+      if (!el) return;
+      updateBgsHealth({
+        currentTime: el.currentTime || 0,
+        duration: Number.isFinite(el.duration) ? el.duration : 0,
+        activeIndex: activeAudioIndexRef.current as 0 | 1,
+      });
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [stableUrl]);
+
   if (!q.data?.enabled || !stableUrl) return null;
   const blocked = q.data.scheduleEnabled && !inWindow;
 
