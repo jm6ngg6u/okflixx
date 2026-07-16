@@ -17,7 +17,7 @@ const ZERO: Levels = { bass: 0, mid: 0, treble: 0, level: 0, beat: 0 };
 let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let source: MediaElementAudioSourceNode | null = null;
-let data: Uint8Array | null = null;
+let data: Uint8Array<ArrayBuffer> | null = null;
 let attachedEl: HTMLAudioElement | null = null;
 
 let enabled = false;
