@@ -597,6 +597,9 @@ function DashboardPage() {
 
       <LiveJobsPanel />
 
+      {/* Live activation pipelines — queue → cookie → proxy → worker → result */}
+      <ActivationPipelines />
+
       {/* Live ticker + Failure breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="glass p-5 lg:col-span-2 relative overflow-hidden">
