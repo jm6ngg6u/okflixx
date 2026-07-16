@@ -326,7 +326,7 @@ export function BackgroundSong() {
           // a brief silence at wrap; a manual seek keeps playback continuous.
           const el = e.currentTarget;
           const d = el.duration;
-          if (Number.isFinite(d) && d > 0 && d - el.currentTime <= 0.035) {
+          if (Number.isFinite(d) && d > 0 && d - el.currentTime <= 0.25) {
             restartLoop(el);
           }
         }}
