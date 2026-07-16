@@ -1,14 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { listSettings, setSetting, toggleProxyMode, setMaintenance } from "@/lib/settings.functions";
+import {
+  listSettings, setSetting, toggleProxyMode, setMaintenance,
+  runCookiesAutocheckNow, runProxiesAutocheckNow,
+} from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save } from "lucide-react";
+import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
 
@@ -25,8 +28,39 @@ function SettingsPage() {
   const doMaint = useServerFn(setMaintenance);
   const qc = useQueryClient();
 
+  const doRunCookies = useServerFn(runCookiesAutocheckNow);
+  const doRunProxies = useServerFn(runProxiesAutocheckNow);
+
   const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
   const [local, setLocal] = useState<Record<string, string>>({});
+
+  const runCookiesMut = useMutation({
+    mutationFn: () => doRunCookies(),
+    onSuccess: (r: any) => {
+      toast.success("Cookie check finished", {
+        description: r?.skipped
+          ? `Skipped (${r.skipped})`
+          : `${r.checked ?? 0} checked · ${r.active ?? 0} active · ${r.invalid ?? 0} invalid · ${r.on_hold ?? 0} on-hold · ${r.free ?? 0} free`,
+      });
+      qc.invalidateQueries({ queryKey: ["cookies"] });
+      qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+      qc.invalidateQueries({ queryKey: ["job-runs"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Run failed"),
+  });
+  const runProxiesMut = useMutation({
+    mutationFn: () => doRunProxies(),
+    onSuccess: (r: any) => {
+      toast.success("Proxy check finished", {
+        description: r?.skipped
+          ? `Skipped (${r.skipped})`
+          : `${r.checked ?? 0} checked · ${r.ok_count ?? 0} valid · ${r.dead ?? 0} invalid${r.removed_invalid ? ` · ${r.removed_invalid} removed` : ""}`,
+      });
+      qc.invalidateQueries({ queryKey: ["proxies"] });
+      qc.invalidateQueries({ queryKey: ["job-runs"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Run failed"),
+  });
 
   useEffect(() => {
     if (q.data?.settings) setLocal(q.data.settings);
@@ -150,8 +184,68 @@ function SettingsPage() {
           <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} />
           <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} min={1} max={365} />
         </div>
+        <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-white/10">
+          <Button
+            size="sm"
+            onClick={() => runCookiesMut.mutate()}
+            disabled={runCookiesMut.isPending}
+            className="btn-red"
+          >
+            {runCookiesMut.isPending
+              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              : <Play className="w-3.5 h-3.5 mr-1.5" />}
+            Run cookie check now
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => runProxiesMut.mutate()}
+            disabled={runProxiesMut.isPending}
+            className="border-white/15 bg-white/5"
+          >
+            {runProxiesMut.isPending
+              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              : <Play className="w-3.5 h-3.5 mr-1.5" />}
+            Run proxy check now
+          </Button>
+          <span className="text-[11px] text-white/40 self-center ml-1">
+            Manual runs ignore the enabled toggle and use current proxy mode.
+          </span>
+        </div>
       </Section>
 
+      {/* Admin notifications */}
+      <Section
+        icon={Bell}
+        title="Admin notifications"
+        subtitle="Toast notifications when scheduled or manual jobs finish. Quiet hours mute toasts within a time window (24h HH:MM, local time)."
+      >
+        <div className="grid sm:grid-cols-2 gap-3">
+          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} defaultOn />
+          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} defaultOn />
+          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} defaultOn />
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-sm font-medium mb-2">Quiet hours</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Start</label>
+                <div className="flex gap-2 mt-1">
+                  <Input type="time" value={local.notify_quiet_start ?? ""} onChange={(e) => set("notify_quiet_start", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
+                  <Button size="sm" onClick={() => save("notify_quiet_start")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">End</label>
+                <div className="flex gap-2 mt-1">
+                  <Input type="time" value={local.notify_quiet_end ?? ""} onChange={(e) => set("notify_quiet_end", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
+                  <Button size="sm" onClick={() => save("notify_quiet_end")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+                </div>
+              </div>
+            </div>
+            <div className="text-[11px] text-white/40 mt-2">Leave blank to always notify. Window may wrap midnight.</div>
+          </div>
+        </div>
+      </Section>
 
       {/* Pool alerts */}
       <Section
@@ -211,8 +305,9 @@ function TextField({ k, label, placeholder, local, set, onSave }: any) {
     </div>
   );
 }
-function ToggleField({ k, label, hint, local, set, onSave }: any) {
-  const on = local[k] === "1";
+function ToggleField({ k, label, hint, local, set, onSave, defaultOn }: any) {
+  const raw = local[k];
+  const on = raw === "1" || (raw === undefined && !!defaultOn);
   return (
     <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-3">
       <div className="min-w-0">

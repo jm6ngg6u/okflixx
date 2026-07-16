@@ -1,7 +1,7 @@
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { listRecentJobRuns } from "@/lib/settings.functions";
+import { listRecentJobRuns, listSettings } from "@/lib/settings.functions";
 import { Badge } from "@/components/ui/badge";
 import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -78,6 +78,8 @@ function cleanupSummaryLine(s: any) {
 
 export function LiveJobsPanel() {
   const fetchRuns = useServerFn(listRecentJobRuns);
+  const fetchSettings = useServerFn(listSettings);
+  const qc = useQueryClient();
   const anyRunning = (rows: JobRow[]) => rows.some((r) => !r.finished_at);
 
   const q = useQuery({
@@ -85,8 +87,14 @@ export function LiveJobsPanel() {
     queryFn: () => fetchRuns(),
     refetchInterval: (query: any) => (anyRunning(query.state.data?.rows ?? []) ? 2_000 : 15_000),
   });
+  const settingsQ = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => fetchSettings(),
+    staleTime: 30_000,
+  });
+  const settings = settingsQ.data?.settings ?? {};
 
-  // Toast notifications on completion.
+  // Toast notifications on completion (respect notify_* + quiet hours).
   const seen = useRef<Set<string>>(new Set());
   const initialised = useRef(false);
   useEffect(() => {
@@ -99,6 +107,24 @@ export function LiveJobsPanel() {
     for (const r of rows) {
       if (!r.finished_at || seen.current.has(r.id)) continue;
       seen.current.add(r.id);
+
+      // Invalidate lists so the admin sees removed counts immediately.
+      if (r.job === "cookies-autocheck") {
+        qc.invalidateQueries({ queryKey: ["cookies"] });
+        qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+      } else if (r.job === "proxies-autocheck") {
+        qc.invalidateQueries({ queryKey: ["proxies"] });
+      }
+
+      // Notification filters
+      const notifyCookies = settings.notify_cookies !== "0";
+      const notifyProxies = settings.notify_proxies !== "0";
+      const notifyCleanup = settings.notify_cleanup !== "0";
+      if (r.job === "cookies-autocheck" && !notifyCookies) continue;
+      if (r.job === "proxies-autocheck" && !notifyProxies) continue;
+      if (r.job === "auto-cleanup" && !notifyCleanup) continue;
+      if (isQuietHoursNow(settings.notify_quiet_start, settings.notify_quiet_end)) continue;
+
       const meta = JOB_META[r.job] ?? { label: r.job };
       const dur = fmtDuration(r.started_at, r.finished_at);
       let desc = "";
@@ -119,7 +145,22 @@ export function LiveJobsPanel() {
         toast.success(`${meta.label} complete`, { description: desc, duration: 6000 });
       }
     }
-  }, [q.data]);
+  }, [q.data, qc, settings.notify_cookies, settings.notify_proxies, settings.notify_cleanup, settings.notify_quiet_start, settings.notify_quiet_end]);
+
+  function isQuietHoursNow(start?: string, end?: string) {
+    if (!start || !end) return false;
+    const parse = (s: string) => {
+      const [h, m] = s.split(":").map((n) => parseInt(n, 10));
+      if (Number.isNaN(h)) return null;
+      return h * 60 + (Number.isNaN(m) ? 0 : m);
+    };
+    const s = parse(start), e = parse(end);
+    if (s == null || e == null || s === e) return false;
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    // wraps midnight when start > end
+    return s < e ? cur >= s && cur < e : cur >= s || cur < e;
+  }
 
   const rows: JobRow[] = q.data?.rows ?? [];
   const active = rows.filter((r) => !r.finished_at);

@@ -139,3 +139,25 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
     if (error) throw error;
     return { rows: data ?? [] };
   });
+
+/** Admin: kick off cookie auto-check immediately (ignores enabled flag). */
+export const runCookiesAutocheckNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { runCookiesAutocheck } = await import("@/lib/autocheck.server");
+    return await runCookiesAutocheck(true);
+  });
+
+/** Admin: kick off proxy auto-check immediately (ignores enabled flag). */
+export const runProxiesAutocheckNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { runProxiesAutocheck } = await import("@/lib/autocheck.server");
+    return await runProxiesAutocheck(true);
+  });
