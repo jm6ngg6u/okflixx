@@ -65,6 +65,16 @@ function proxySummaryLine(s: any) {
   if (s.removed_invalid) parts.push(`${s.removed_invalid} removed`);
   return parts.join(" · ");
 }
+function reasonsLine(s: any): string {
+  const r = s?.reasons;
+  if (!r || typeof r !== "object") return "";
+  const entries = Object.entries(r as Record<string, number>)
+    .filter(([, n]) => (n as number) > 0)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
+    .slice(0, 4);
+  if (!entries.length) return "";
+  return "Reasons: " + entries.map(([k, n]) => `${k.replace(/_/g, " ")} ×${n}`).join(", ");
+}
 function cleanupSummaryLine(s: any) {
   if (!s) return "";
   const parts: string[] = [];
