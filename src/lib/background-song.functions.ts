@@ -48,7 +48,13 @@ export const getBackgroundSongAdmin = createServerFn({ method: "GET" })
     const { data } = await supabaseAdmin
       .from("app_settings")
       .select("key,value")
-      .in("key", ["background_song_enabled", "background_song_path", "background_song_name", "background_song_updated_at"]);
+      .in("key", [
+        "background_song_enabled",
+        "background_song_path",
+        "background_song_name",
+        "background_song_updated_at",
+        "background_song_reactive",
+      ]);
     const map: Record<string, string> = {};
     for (const r of data ?? []) map[r.key] = r.value;
 
