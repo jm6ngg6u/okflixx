@@ -91,7 +91,22 @@ export const Route = createFileRoute("/api/public/hooks/cookies-autocheck")({
             else if (out.status === "invalid") invalid++;
             else if (out.status === "on_hold") on_hold++;
             else if (out.status === "free") free++;
+            if (checked % 5 === 0 || checked === (rows?.length ?? 0)) {
+              await recordJobProgress(jobId, {
+                phase: "checking",
+                total: rows?.length ?? 0,
+                checked, active, invalid, on_hold, free,
+                proxy_mode: proxyMode,
+              });
+            }
           }
+          await recordJobProgress(jobId, {
+            phase: "cleanup",
+            total: rows?.length ?? 0,
+            checked, active, invalid, on_hold, free,
+            proxy_mode: proxyMode,
+          });
+
 
           // Auto-cleanup after check (default ON) — invalid, free/on_hold, duplicates.
           const cleanupOn = map.autocheck_cleanup !== "0";
