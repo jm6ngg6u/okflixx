@@ -55,7 +55,7 @@ export function attachAudio(el: HTMLAudioElement) {
       analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.72;
-      data = new Uint8Array(analyser.frequencyBinCount);
+      data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
       source.connect(analyser);
       analyser.connect(ctx.destination);
       attachedEl = el;
