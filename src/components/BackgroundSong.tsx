@@ -193,6 +193,10 @@ export function BackgroundSong() {
     } else if (trackKey && !stableUrl && url) {
       setStableUrl(url);
     }
+    updateBgsHealth({
+      stableUrl: url,
+      stableUrlActive: !!url && trackKey === lastTrackKeyRef.current,
+    });
   }, [q.data?.path, q.data?.updatedAt, q.data?.url, stableUrl]);
   const [showVolume, setShowVolume] = useState(false);
   const [nowMinute, setNowMinute] = useState(currentMinuteOfDay());
