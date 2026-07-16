@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { uploadProxies, listProxies, deleteProxy, checkAllProxies } from "@/lib/pool.functions";
+import { uploadProxies, listProxies, deleteProxy, checkAllProxies, deleteAllProxies, deleteInvalidProxies } from "@/lib/pool.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Globe2, Upload, PlayCircle, Trash2, FileUp, FileText, Loader2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Globe2, Upload, PlayCircle, Trash2, FileUp, FileText, Loader2, ShieldX, XCircle } from "lucide-react";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/proxies")({
