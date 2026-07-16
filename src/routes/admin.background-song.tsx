@@ -671,7 +671,31 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
         sourceRef.current.connect(analyserRef.current);
         analyserRef.current.connect(ctxRef.current.destination);
       }
-      await el.play();
+
+      // Ensure the media is loaded before play() so the browser doesn't abort
+      // the play request with "interrupted by a new load request".
+      if (el.readyState < 2) {
+        await new Promise<void>((resolve, reject) => {
+          const onReady = () => { cleanup(); resolve(); };
+          const onError = () => { cleanup(); reject(new Error("Failed to load track")); };
+          const cleanup = () => {
+            el.removeEventListener("loadeddata", onReady);
+            el.removeEventListener("canplay", onReady);
+            el.removeEventListener("error", onError);
+          };
+          el.addEventListener("loadeddata", onReady, { once: true });
+          el.addEventListener("canplay", onReady, { once: true });
+          el.addEventListener("error", onError, { once: true });
+          try { el.load(); } catch { /* noop */ }
+        });
+      }
+
+      try {
+        await el.play();
+      } catch (err: any) {
+        // Swallow benign AbortError caused by rapid load/play cycling.
+        if (err?.name !== "AbortError") throw err;
+      }
       setPlaying(true);
       let silenceStart = 0;
       const loop = () => {
@@ -715,6 +739,7 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
       toast.error("Couldn't start diagnostics", { description: e?.message ?? "AudioContext blocked" });
     }
   };
+
 
   const stop = () => {
     const el = audioRef.current;
