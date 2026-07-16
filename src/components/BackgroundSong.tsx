@@ -242,7 +242,7 @@ export function BackgroundSong() {
     if (typeof window !== "undefined") window.localStorage.setItem(VOLUME_KEY, volume.toFixed(2));
   }, [volume]);
 
-  if (!q.data?.enabled || !q.data.url) return null;
+  if (!q.data?.enabled || !stableUrl) return null;
   const blocked = q.data.scheduleEnabled && !inWindow;
 
   const toggle = () => {
