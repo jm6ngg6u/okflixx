@@ -342,6 +342,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("pointerdown", onTap);
       window.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("visibilitychange", onVis);
       clearTimeout(initialAnchor);
     };
   }, [trail, intensity, beamsPerBand]);
