@@ -175,9 +175,11 @@ function CookiePoolPage() {
   // Clear stale selections when rows change
   useEffect(() => {
     setSelection((prev) => {
+      if (prev.size === 0) return prev;
       const known = new Set(rows.map((r) => r.id));
       const next = new Set<string>();
       prev.forEach((id) => { if (known.has(id)) next.add(id); });
+      if (next.size === prev.size) return prev;
       return next;
     });
   }, [rows]);
