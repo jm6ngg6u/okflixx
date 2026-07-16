@@ -194,3 +194,108 @@ export const getRecentActivity = createServerFn({ method: "GET" })
       .limit(20);
     return { rows: data ?? [] };
   });
+
+/** Recent activation pipelines: group attempt rows by (code + ip_hash) into
+ *  ordered retry sequences so the dashboard can show queued → cookie → proxy → result
+ *  timelines with per-attempt timing.
+ *
+ *  Groups within a 5-minute rolling window per (code, ip_hash). Returns the
+ *  most recent N groups, newest first, with attempts inside each group ordered
+ *  by attempt_number then created_at.
+ */
+const PipelinesInput = z.object({
+  limit: z.number().int().min(1).max(30).default(10),
+  windowMinutes: z.number().int().min(1).max(60).default(30),
+});
+
+export const getActivationPipelines = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => PipelinesInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+
+    const since = new Date(Date.now() - data.windowMinutes * 60_000).toISOString();
+    const { data: rows, error } = await supabase
+      .from("activation_attempts")
+      .select("id, code, result, country, ip_hash, cookie_id, proxy_id, proxy_mode, attempt_number, duration_ms, error_message, created_at")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(600);
+    if (error) throw error;
+
+    type Row = {
+      id: string; code: string | null; result: string | null; country: string | null;
+      ip_hash: string | null; cookie_id: string | null; proxy_id: string | null;
+      proxy_mode: boolean | null; attempt_number: number | null;
+      duration_ms: number | null; error_message: string | null; created_at: string;
+    };
+
+    // Group by (code, ip_hash). Rows are already newest-first; walk them and
+    // start a new group when the gap exceeds 5 minutes for the same key.
+    const CLUSTER_GAP_MS = 5 * 60_000;
+    const groups = new Map<string, { key: string; rows: Row[]; last: number }>();
+    const orderedKeys: string[] = [];
+
+    for (const r of (rows ?? []) as Row[]) {
+      const code = (r.code ?? "").trim();
+      const ip = r.ip_hash ?? "";
+      if (!code) continue;
+      const baseKey = `${code}::${ip}`;
+      const ts = new Date(r.created_at).getTime();
+      const existing = groups.get(baseKey);
+      let key = baseKey;
+      if (existing && Math.abs(existing.last - ts) > CLUSTER_GAP_MS) {
+        // Same code+ip but too far apart → separate pipeline.
+        key = `${baseKey}::${ts}`;
+      }
+      let g = groups.get(key);
+      if (!g) {
+        g = { key, rows: [], last: ts };
+        groups.set(key, g);
+        orderedKeys.push(key);
+      }
+      g.rows.push(r);
+      g.last = Math.min(g.last, ts); // track earliest ts for ordering inside a group
+    }
+
+    const pipelines = orderedKeys.slice(0, data.limit).map((k) => {
+      const g = groups.get(k)!;
+      const sorted = [...g.rows].sort((a, b) => {
+        const an = a.attempt_number ?? 0;
+        const bn = b.attempt_number ?? 0;
+        if (an !== bn) return an - bn;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+      const final = sorted[sorted.length - 1];
+      const first = sorted[0];
+      const totalDuration = sorted.reduce((acc, r) => acc + (r.duration_ms ?? 0), 0);
+      return {
+        key: k,
+        code: final?.code ?? "",
+        country: final?.country ?? null,
+        ip_hash: final?.ip_hash ?? null,
+        started_at: first?.created_at ?? final?.created_at,
+        ended_at: final?.created_at,
+        final_result: final?.result ?? null,
+        attempts: sorted.map((r) => ({
+          id: r.id,
+          n: r.attempt_number ?? 1,
+          result: r.result,
+          duration_ms: r.duration_ms,
+          cookie_id: r.cookie_id,
+          proxy_id: r.proxy_id,
+          proxy_mode: !!r.proxy_mode,
+          error: r.error_message,
+          at: r.created_at,
+        })),
+        total_duration_ms: totalDuration,
+      };
+    });
+
+    return { pipelines };
+  });

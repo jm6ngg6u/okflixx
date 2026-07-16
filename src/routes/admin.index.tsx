@@ -22,10 +22,14 @@ import {
   Cookie, Globe2, Server, RefreshCw, Users, ScrollText, Sparkles, ArrowUpRight,
   Pause, Play, Radio, Gauge, Timer, Flame, ArrowUp, ArrowDown, Minus,
   Download, FileText, Bell, BellOff, AlertTriangle, X, Copy, Printer, Settings2,
+  Layers, GitCompare,
 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Line, ComposedChart } from "recharts";
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
+import { AnomalyBanner } from "@/components/AnomalyBanner";
+import { SLOPanel } from "@/components/SLOPanel";
+import { ActivationPipelines } from "@/components/ActivationPipelines";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Dashboard — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
@@ -97,6 +101,8 @@ function DashboardPage() {
   const [rtStatus, setRtStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [thresholds, setThresholds] = useState<Thresholds>(() => loadThresholds());
   const [activeAlerts, setActiveAlerts] = useState<{ id: string; kind: "failure" | "runway"; msg: string; at: number }[]>([]);
+  const [clusterFailures, setClusterFailures] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
 
   const fetchStats = useServerFn(getDashboardStats);
   const fetchPool = useServerFn(getPoolSummary);
@@ -191,11 +197,35 @@ function DashboardPage() {
   const burntPerHour = ((pool.data?.cookies.invalid ?? 0) + (pool.data?.cookies.on_hold ?? 0)) / Math.max(1, hours);
   const runwayHours = burntPerHour > 0.05 ? activeCookies / burntPerHour : Infinity;
 
-  const series = (stats.data?.series ?? []).map((s) => ({
-    t: new Date(s.t).toLocaleString(undefined, hours <= 48 ? { hour: "2-digit", day: "2-digit", month: "short" } : { day: "2-digit", month: "short" }),
-    Total: s.total,
-    Success: s.success,
-  }));
+  // Raw numeric series (for anomaly detection — needs actual timestamps + counts)
+  const rawSeries = stats.data?.series ?? [];
+
+  // Compare overlay: prevStats fetches window*2, so buckets whose timestamp is
+  // older than (now - hours) belong to the previous window. Shift them forward
+  // by exactly `hours` so they align on the same X-axis as the current series.
+  const compareSeries = useMemo(() => {
+    if (!compareMode) return null;
+    const prevAll = prevStats.data?.series ?? [];
+    if (!prevAll.length) return null;
+    const cutoff = Date.now() - hours * 3600_000;
+    const shifted = new Map<number, { total: number; success: number }>();
+    for (const s of prevAll) {
+      if (s.t >= cutoff) continue; // this bucket is in the current window
+      const shiftedT = s.t + hours * 3600_000;
+      shifted.set(shiftedT, { total: s.total, success: s.success });
+    }
+    return shifted;
+  }, [compareMode, prevStats.data, hours]);
+
+  const series = rawSeries.map((s) => {
+    const prev = compareSeries?.get(s.t);
+    return {
+      t: new Date(s.t).toLocaleString(undefined, hours <= 48 ? { hour: "2-digit", day: "2-digit", month: "short" } : { day: "2-digit", month: "short" }),
+      Total: s.total,
+      Success: s.success,
+      PrevTotal: prev?.total ?? null,
+    };
+  });
 
   const c = pool.data?.cookies ?? { active: 0, on_hold: 0, free: 0, invalid: 0, unknown: 0, total: 0 };
   const p = pool.data?.proxies ?? { valid: 0, invalid: 0, total: 0 };
@@ -210,6 +240,36 @@ function DashboardPage() {
   const anyFetching = stats.isFetching || pool.isFetching || health.isFetching;
 
   const [pulseKey, setPulseKey] = useState(0);
+
+  // Failure clustering: collapse repeat failures from the same IP+result into
+  // one row (with count) to keep the ticker readable during abuse waves.
+  type TickerItem = { kind: "row"; row: Attempt } | { kind: "cluster"; rows: Attempt[]; ip: string; result: string };
+  const tickerItems: TickerItem[] = useMemo(() => {
+    if (!clusterFailures) return liveRows.map((row) => ({ kind: "row", row }));
+    const CLUSTER_WINDOW_MS = 10 * 60_000;
+    const out: TickerItem[] = [];
+    const openClusters = new Map<string, { rows: Attempt[]; lastTs: number }>();
+    for (const r of liveRows) {
+      const isFail = r.result && r.result !== "success" && r.result !== "invalid_code";
+      if (!isFail || !r.ip_hash || !r.result) {
+        out.push({ kind: "row", row: r });
+        continue;
+      }
+      const key = `${r.ip_hash}::${r.result}`;
+      const ts = new Date(r.created_at).getTime();
+      const existing = openClusters.get(key);
+      if (existing && Math.abs(existing.lastTs - ts) <= CLUSTER_WINDOW_MS) {
+        existing.rows.push(r);
+        existing.lastTs = ts;
+      } else {
+        const bag = { rows: [r], lastTs: ts };
+        openClusters.set(key, bag);
+        out.push({ kind: "cluster", rows: bag.rows, ip: r.ip_hash, result: r.result });
+      }
+    }
+    // Drop clusters of 1 back down to a plain row.
+    return out.map((it) => (it.kind === "cluster" && it.rows.length === 1 ? { kind: "row", row: it.rows[0] } : it));
+  }, [liveRows, clusterFailures]);
 
   // Failure share (from aggregate window)
   const failures = [
@@ -355,7 +415,10 @@ function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 font-ops">
+      {/* Adaptive anomaly banner (rolling z-score on failure rate) */}
+      <AnomalyBanner series={rawSeries} />
+
       {/* Alert banner */}
       {activeAlerts.length > 0 && (
         <div className="space-y-2">
@@ -419,6 +482,17 @@ function DashboardPage() {
             <Printer className="w-3.5 h-3.5" /> PDF
           </button>
           <AlertsSettings thresholds={thresholds} onChange={(t) => { setThresholds(t); saveThresholds(t); }} />
+          <button
+            onClick={() => setCompareMode((v) => !v)}
+            title={compareMode ? "Hide previous-window overlay" : "Compare with previous window"}
+            className={`h-9 px-3 rounded-full border text-xs font-mono uppercase tracking-widest inline-flex items-center gap-1.5 transition ${
+              compareMode
+                ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.08] text-[#ff8a90]"
+                : "border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.06]"
+            }`}
+          >
+            <GitCompare className="w-3.5 h-3.5" /> Compare
+          </button>
           <button
             onClick={() => setPaused((v) => !v)}
             title={paused ? "Resume auto-refresh" : "Pause auto-refresh"}
