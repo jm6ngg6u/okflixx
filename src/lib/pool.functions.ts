@@ -392,16 +392,20 @@ export const deleteFreeHoldCookies = createServerFn({ method: "POST" })
     const { supabase, userId } = context as any;
     await assertAdmin(supabase, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { count } = await supabaseAdmin
-      .from("cookie_pool").select("id", { count: "exact", head: true })
-      .in("status", ["free", "on_hold"]);
+    const [{ count: freeCount }, { count: holdCount }] = await Promise.all([
+      supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true }).eq("status", "free"),
+      supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true }).eq("status", "on_hold"),
+    ]);
     const { error } = await supabaseAdmin
       .from("cookie_pool").delete().in("status", ["free", "on_hold"]);
     if (error) throw error;
+    const free = freeCount ?? 0;
+    const on_hold = holdCount ?? 0;
+    const deleted = free + on_hold;
     await supabaseAdmin.from("admin_activity_log").insert({
-      admin_id: userId, action: "cookie.delete_free_hold", details: { deleted: count ?? 0 },
+      admin_id: userId, action: "cookie.delete_free_hold", details: { deleted, free, on_hold },
     });
-    return { deleted: count ?? 0 };
+    return { deleted, free, on_hold };
   });
 
 // Mirrors bot.remove_duplicate_cookies — keep newest per email, then dedupe by fingerprint.
