@@ -91,9 +91,47 @@ export const Route = createFileRoute("/api/public/hooks/cookies-autocheck")({
             else if (out.status === "free") free++;
           }
 
-          const summary = { checked, active, invalid, on_hold, free, deleted, proxy_mode: proxyMode };
+          // Auto-cleanup after check (default ON) — invalid, free/on_hold, duplicates.
+          const cleanupOn = map.autocheck_cleanup !== "0";
+          let removed_invalid = 0, removed_free = 0, removed_on_hold = 0, removed_duplicates = 0;
+          if (cleanupOn) {
+            const { count: invCount } = await supabaseAdmin
+              .from("cookie_pool").select("id", { count: "exact", head: true })
+              .or("status.eq.invalid,is_valid.eq.false");
+            await supabaseAdmin.from("cookie_pool").delete().or("status.eq.invalid,is_valid.eq.false");
+            removed_invalid = invCount ?? 0;
+
+            const { count: freeC } = await supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true }).eq("status", "free");
+            const { count: holdC } = await supabaseAdmin.from("cookie_pool").select("id", { count: "exact", head: true }).eq("status", "on_hold");
+            await supabaseAdmin.from("cookie_pool").delete().in("status", ["free", "on_hold"]);
+            removed_free = freeC ?? 0;
+            removed_on_hold = holdC ?? 0;
+
+            // Dedup: keep newest per email / fingerprint.
+            const { data: allRows } = await supabaseAdmin
+              .from("cookie_pool").select("id,email,fingerprint,created_at")
+              .order("created_at", { ascending: false });
+            const seenE = new Set<string>(), seenF = new Set<string>();
+            const dupIds: string[] = [];
+            for (const r of allRows ?? []) {
+              const em = (r.email ?? "").trim().toLowerCase();
+              const fp = (r.fingerprint ?? "").trim();
+              let dup = false;
+              if (em) { if (seenE.has(em)) dup = true; else seenE.add(em); }
+              if (!dup && fp) { if (seenF.has(fp)) dup = true; else seenF.add(fp); }
+              if (dup) dupIds.push(r.id);
+            }
+            for (let i = 0; i < dupIds.length; i += 200) {
+              await supabaseAdmin.from("cookie_pool").delete().in("id", dupIds.slice(i, i + 200));
+            }
+            removed_duplicates = dupIds.length;
+            deleted = removed_invalid + removed_free + removed_on_hold + removed_duplicates;
+          }
+
+          const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode };
           await recordJobFinish(jobId, true, summary);
           return Response.json({ ok: true, ...summary });
+
         } catch (e: any) {
           await recordJobFinish(jobId, false, {}, String(e?.message ?? e));
           return Response.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
