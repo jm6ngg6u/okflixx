@@ -14,6 +14,154 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_key_redemptions: {
+        Row: {
+          activation_code: string | null
+          code_prefix: string | null
+          created_at: string
+          fingerprint_hash: string | null
+          id: string
+          ip_hash: string | null
+          key_id: string | null
+          reason: string | null
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          activation_code?: string | null
+          code_prefix?: string | null
+          created_at?: string
+          fingerprint_hash?: string | null
+          id?: string
+          ip_hash?: string | null
+          key_id?: string | null
+          reason?: string | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          activation_code?: string | null
+          code_prefix?: string | null
+          created_at?: string
+          fingerprint_hash?: string | null
+          id?: string
+          ip_hash?: string | null
+          key_id?: string | null
+          reason?: string | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_key_redemptions_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "access_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      access_keys: {
+        Row: {
+          code_hash: string
+          code_prefix: string
+          created_at: string
+          created_by: string | null
+          disabled: boolean
+          expires_at: string | null
+          first_redeemed_at: string | null
+          id: string
+          key_type: string
+          label: string | null
+          last_used_at: string | null
+          max_uses: number | null
+          notes: string | null
+          redeemer_fingerprint_hash: string | null
+          redeemer_ip_hash: string | null
+          updated_at: string
+          uses_count: number
+        }
+        Insert: {
+          code_hash: string
+          code_prefix: string
+          created_at?: string
+          created_by?: string | null
+          disabled?: boolean
+          expires_at?: string | null
+          first_redeemed_at?: string | null
+          id?: string
+          key_type: string
+          label?: string | null
+          last_used_at?: string | null
+          max_uses?: number | null
+          notes?: string | null
+          redeemer_fingerprint_hash?: string | null
+          redeemer_ip_hash?: string | null
+          updated_at?: string
+          uses_count?: number
+        }
+        Update: {
+          code_hash?: string
+          code_prefix?: string
+          created_at?: string
+          created_by?: string | null
+          disabled?: boolean
+          expires_at?: string | null
+          first_redeemed_at?: string | null
+          id?: string
+          key_type?: string
+          label?: string | null
+          last_used_at?: string | null
+          max_uses?: number | null
+          notes?: string | null
+          redeemer_fingerprint_hash?: string | null
+          redeemer_ip_hash?: string | null
+          updated_at?: string
+          uses_count?: number
+        }
+        Relationships: []
+      }
+      access_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          fingerprint_hash: string | null
+          id: string
+          ip_hash: string | null
+          key_id: string | null
+          session_token_hash: string
+          uses_count: number
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          fingerprint_hash?: string | null
+          id?: string
+          ip_hash?: string | null
+          key_id?: string | null
+          session_token_hash: string
+          uses_count?: number
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          fingerprint_hash?: string | null
+          id?: string
+          ip_hash?: string | null
+          key_id?: string | null
+          session_token_hash?: string
+          uses_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_sessions_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "access_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activation_attempts: {
         Row: {
           attempt_number: number
@@ -496,6 +644,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_access_key: {
+        Args: {
+          _code_hash: string
+          _fingerprint_hash: string
+          _ip_hash: string
+        }
+        Returns: {
+          key_id: string
+          key_type: string
+          ok: boolean
+          reason: string
+          remaining_uses: number
+        }[]
+      }
       count_eligible_cookies: {
         Args: {
           _include_statuses?: string[]
@@ -567,6 +729,7 @@ export type Database = {
           username: string
         }[]
       }
+      purge_expired_access_sessions: { Args: never; Returns: number }
       release_cookie: {
         Args: { _id: string; _outcome?: string; _success: boolean }
         Returns: undefined

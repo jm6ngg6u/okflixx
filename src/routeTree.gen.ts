@@ -25,6 +25,7 @@ import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminBackgroundSongRouteImport } from './routes/admin.background-song'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
+import { Route as AdminAccessRouteImport } from './routes/admin.access'
 import { Route as ApiPublicBackgroundSongAudioRouteImport } from './routes/api/public/background-song-audio'
 import { Route as ApiAdminUploadBackgroundSongRouteImport } from './routes/api/admin/upload-background-song'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
@@ -112,6 +113,11 @@ const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
   path: '/attempts',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAccessRoute = AdminAccessRouteImport.update({
+  id: '/access',
+  path: '/access',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicBackgroundSongAudioRoute =
   ApiPublicBackgroundSongAudioRouteImport.update({
     id: '/api/public/background-song-audio',
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/admin/access'
     | '/admin/attempts'
     | '/admin/background-song'
     | '/admin/cookies'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/admin/access'
     | '/admin/attempts'
     | '/admin/background-song'
     | '/admin/cookies'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/admin/access'
     | '/admin/attempts'
     | '/admin/background-song'
     | '/admin/cookies'
@@ -424,6 +436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAttemptsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/access': {
+      id: '/admin/access'
+      path: '/access'
+      fullPath: '/admin/access'
+      preLoaderRoute: typeof AdminAccessRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/background-song-audio': {
       id: '/api/public/background-song-audio'
       path: '/api/public/background-song-audio'
@@ -470,6 +489,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAccessRoute: typeof AdminAccessRoute
   AdminAttemptsRoute: typeof AdminAttemptsRoute
   AdminBackgroundSongRoute: typeof AdminBackgroundSongRoute
   AdminCookiesRoute: typeof AdminCookiesRoute
@@ -482,6 +502,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAccessRoute: AdminAccessRoute,
   AdminAttemptsRoute: AdminAttemptsRoute,
   AdminBackgroundSongRoute: AdminBackgroundSongRoute,
   AdminCookiesRoute: AdminCookiesRoute,
