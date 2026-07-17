@@ -334,37 +334,24 @@ function HomePage() {
     // Pre-flight gate checks — server is still source of truth, but naming
     // the blocking gate lets the user act immediately.
     if (gateBlocks.needsLogin) {
-      setLoginError("Sign in with Google to continue.");
-      toast.error("Sign-in required", { description: "Use the Sign in button above the code panel." });
+      setLoginError("Please sign in to continue.");
+      toast.error("Sign in required");
       return;
     }
     if (gateBlocks.needsKey) {
-      setKeyError("Redeem your access key before submitting.");
-      toast.error("Access key required", { description: "Paste your key and press Verify." });
+      setKeyError("Please enter your access key.");
+      toast.error("Access key required");
       return;
     }
     if (gateBlocks.needsCaptcha) {
-      setCaptchaError("Complete the human check below.");
-      toast.error("Human check required", { description: "Solve the captcha before submitting." });
+      setCaptchaError("Please complete the verification below.");
+      toast.error("Verification required");
       return;
     }
 
     setLoginError(null); setKeyError(null); setCaptchaError(null); setServiceError(null); setRetryCountdown(0);
     setSubmitting(true);
-
-    // Walk through enabled gates so the user sees a real per-step progress.
-    const g = gate.data;
-    const steps: Stage[] = [];
-    if (g?.loginRequired) steps.push("checking-login");
-    if (g?.accessKeyRequired) steps.push("checking-key");
-    if (g?.captchaRequired) steps.push("checking-captcha");
-    steps.push("checking-cookie");
-    const stageTimers: number[] = [];
-    setStage(steps[0]);
-    for (let i = 1; i < steps.length; i++) {
-      stageTimers.push(window.setTimeout(() => setStage(steps[i]), i * 450));
-    }
-    const activatingTimer = window.setTimeout(() => setStage("activating"), steps.length * 450 + 400);
+    setStage("working");
 
     try {
       const result = await activate({
@@ -381,49 +368,27 @@ function HomePage() {
           authUserId,
         },
       });
-      // Server-minted captcha_pass — cache for follow-up activations.
+      // Cache the server-issued verification pass (internal — not shown to user).
       const cp = (result as any).captchaPass as { token: string; exp: number } | null | undefined;
       if (cp && cp.token) {
         setCaptchaPassToken(cp.token);
         try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
       }
       if (result.ok) {
-        // Snapshot which gates passed for the receipt.
-        const passed: SuccessPayload["gatesPassed"] = [];
-        if (g?.loginRequired) passed.push({ key: "login", label: "Sign-in", detail: authEmail ?? "Signed in" });
-        if (g?.accessKeyRequired) passed.push({
-          key: "key",
-          label: "Access key",
-          detail: sessionToken ? "24-hour session" : "Verified",
-        });
-        if (g?.captchaRequired) passed.push({
-          key: "captcha",
-          label: "Human check",
-          detail: cp?.token ? "Captcha pass · 10 min" : "Verified",
-        });
         setSuccess({
           code,
-          attempts: result.attempts,
-          policy: result.policy,
           redirectUrl: result.redirectUrl,
-          gatesPassed: passed,
-          sessionExpiresAt: cp?.exp ?? null,
           account: result.account,
         });
-      } else if (result.error === "rate_limited") {
-        toast.error("Too many attempts", { description: "Try again in about 10 minutes, or solve the captcha to unlock unlimited activations." });
-      } else if (result.error === "bot_detected") {
-        toast.error("Automated activity detected", { description: "Refresh the page and try again." });
       } else if (result.error === "invalid_code") {
-        toast.error("Invalid TV code", { description: result.message ?? "Check the code shown on your TV and re-enter it." });
+        toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
       } else if (result.error === "maintenance") {
-        toast.error("Service unavailable", { description: result.message ?? "We're briefly down for maintenance — try again shortly." });
+        toast.error("Service temporarily unavailable", { description: "Please try again in a moment." });
       } else if (result.error === "login_required") {
-        setLoginError(result.message ?? "Sign in to activate.");
-        toast.error("Login gate blocked activation", { description: result.message ?? "Sign in with Google to continue." });
+        setLoginError("Please sign in to continue.");
+        toast.error("Sign in required");
       } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
-        const msg = result.message ?? "Captcha check failed. Please retry.";
-        setCaptchaError(msg);
+        setCaptchaError("Verification failed. Please try again.");
         setCaptchaToken("");
         setCaptchaPassToken(null);
         try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
@@ -432,58 +397,38 @@ function HomePage() {
             ? (window as any).hcaptcha : (window as any).turnstile;
           api?.reset?.();
         } catch { /* noop */ }
-        toast.error("Captcha gate blocked activation", { description: "Solve the fresh human check below and try again." });
+        toast.error("Verification failed", { description: "Please complete the check below and try again." });
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
         if (result.error === "access_key_invalid" && sessionToken) {
           localStorage.removeItem(SESSION_KEY);
           setSessionToken(null);
         }
-        setKeyError(result.message ?? "Access key required.");
-        toast.error("Access-key gate blocked activation", {
-          description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
-        });
-      } else if (result.error === "no_cookie") {
-        const errCode = `NC-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+        setKeyError("Please enter a valid access key.");
+        toast.error("Access key required");
+      } else if (result.error === "no_cookie" || result.error === "exhausted") {
         setServiceError({
-          kind: "no_cookie",
-          message: result.message ?? "Cookie pool is empty. Our team has been alerted — try again in a moment.",
-          code: errCode,
-          at: Date.now(),
-        });
-        setRetryCountdown(30);
-        setAutoRetry(true);
-        toast.error("Cookie pool empty", {
-          description: `No active cookies available. Auto-retry in 30s · ${errCode}`,
-        });
-      } else if (result.error === "exhausted") {
-        const errCode = `EX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-        setServiceError({
-          kind: "exhausted",
-          message: result.message ?? "We tried several cookies and none activated this code.",
-          attempts: result.attempts,
-          code: errCode,
+          kind: result.error === "no_cookie" ? "no_cookie" : "exhausted",
+          message: "We couldn't activate your TV right now. Please try again in a moment.",
+          code: "",
           at: Date.now(),
         });
         setRetryCountdown(20);
         setAutoRetry(true);
-        toast.error("Activation exhausted", {
-          description: `Attempted ${result.attempts ?? "several"} cookies. Auto-retry in 20s · ${errCode}`,
-        });
+        toast.error("Activation failed", { description: "Please try again in a moment." });
       } else {
-        toast.error("Server hiccup", { description: "Try again in a moment." });
+        // Generic bucket: rate_limited, bot_detected, unknown → same message.
+        toast.error("Activation failed", { description: "Please try again in a moment." });
       }
     } catch (err) {
       console.error(err);
-      toast.error("Network error", { description: "Check your connection and try again." });
+      toast.error("Activation failed", { description: "Please check your connection and try again." });
     } finally {
-      stageTimers.forEach((t) => window.clearTimeout(t));
-      window.clearTimeout(activatingTimer);
       setStage("idle");
-
       setSubmitting(false);
     }
   };
   handleActivateRef.current = handleActivate;
+
 
 
   const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
