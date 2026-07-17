@@ -167,11 +167,21 @@ function HomePage() {
   useEffect(() => { computeFingerprint().then(setFingerprint); }, []);
 
   // Retry countdown for service errors (no_cookie / exhausted).
+  const handleActivateRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (retryCountdown <= 0) return;
-    const t = window.setTimeout(() => setRetryCountdown((n) => Math.max(0, n - 1)), 1000);
+    const t = window.setTimeout(() => {
+      setRetryCountdown((n) => {
+        const next = Math.max(0, n - 1);
+        if (next === 0 && autoRetry && serviceError) {
+          // Fire on next tick so state settles.
+          window.setTimeout(() => handleActivateRef.current?.(), 0);
+        }
+        return next;
+      });
+    }, 1000);
     return () => window.clearTimeout(t);
-  }, [retryCountdown]);
+  }, [retryCountdown, autoRetry, serviceError]);
 
   // Track auth state (for login-gate).
   useEffect(() => {
