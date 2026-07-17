@@ -389,7 +389,15 @@ export const uploadProxies = createServerFn({ method: "POST" })
 
 export const listProxies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ page: z.number().int().min(0).default(0), pageSize: z.number().int().min(10).max(200).default(50) }).parse(d))
+  .inputValidator((d: unknown) => z.object({
+    page: z.number().int().min(0).default(0),
+    pageSize: z.number().int().min(10).max(200).default(50),
+    status: z.enum(["all", "valid", "invalid", "quarantined", "never_checked"]).default("all"),
+    scheme: z.string().optional(),
+    search: z.string().optional(),
+    minLatency: z.number().int().optional(),
+    maxLatency: z.number().int().optional(),
+  }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
     const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
@@ -397,9 +405,16 @@ export const listProxies = createServerFn({ method: "POST" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
-    const { data: rows, count, error } = await supabase
-      .from("proxy_pool")
-      .select("*", { count: "exact" })
+    let q = supabase.from("proxy_pool").select("*", { count: "exact" });
+    if (data.status === "valid") q = q.eq("is_valid", true).is("quarantined_at", null);
+    else if (data.status === "invalid") q = q.eq("is_valid", false);
+    else if (data.status === "quarantined") q = q.not("quarantined_at", "is", null);
+    else if (data.status === "never_checked") q = q.is("last_checked_at", null);
+    if (data.scheme && data.scheme !== "all") q = q.eq("scheme", data.scheme);
+    if (data.search && data.search.trim()) q = q.ilike("raw", `%${data.search.trim()}%`);
+    if (data.minLatency != null) q = q.gte("last_latency_ms", data.minLatency);
+    if (data.maxLatency != null) q = q.lte("last_latency_ms", data.maxLatency);
+    const { data: rows, count, error } = await q
       .order("created_at", { ascending: false })
       .range(data.page * data.pageSize, data.page * data.pageSize + data.pageSize - 1);
     if (error) throw error;
@@ -418,29 +433,172 @@ export const deleteProxy = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// -------- Live-progress concurrent recheck --------
+
+async function checkOneProxy(supabaseAdmin: any, p: any) {
+  const { checkProxyViaWorker } = await import("@/lib/worker.server");
+  const out = await checkProxyViaWorker({
+    proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
+  });
+  const success = !!out.ok;
+  const { data: cur } = await supabaseAdmin
+    .from("proxy_pool").select("success_count, failure_count, consecutive_failures")
+    .eq("id", p.id).maybeSingle();
+  const sc = (cur?.success_count ?? 0) + (success ? 1 : 0);
+  const fc = (cur?.failure_count ?? 0) + (success ? 0 : 1);
+  const cons = success ? 0 : (cur?.consecutive_failures ?? 0) + 1;
+  const tot = sc + fc;
+  const health = tot > 0 ? sc / tot : 0.5;
+  const quarantine = cons >= 5 ? new Date().toISOString() : null;
+  await supabaseAdmin.from("proxy_pool").update({
+    is_valid: success,
+    last_latency_ms: out.latency_ms ?? null,
+    last_error: out.error ?? null,
+    last_checked_at: new Date().toISOString(),
+    success_count: sc,
+    failure_count: fc,
+    consecutive_failures: cons,
+    health_score: health,
+    ...(quarantine ? { quarantined_at: quarantine } : {}),
+  }).eq("id", p.id);
+  return success;
+}
+
+async function runProxyRecheck(supabaseAdmin: any, ids: string[] | null, jobId: string) {
+  let query = supabaseAdmin.from("proxy_pool").select("id, scheme, ip, port, username, password");
+  if (ids && ids.length) query = query.in("id", ids);
+  const { data: rows } = await query.limit(2000);
+  const list = rows ?? [];
+  const total = list.length;
+  let done = 0, valid = 0, invalid = 0;
+  const started = Date.now();
+
+  await supabaseAdmin.from("job_runs").update({
+    progress: { total, done: 0, valid: 0, invalid: 0, phase: "running" },
+  }).eq("id", jobId);
+
+  const CONCURRENCY = 12;
+  let cursor = 0;
+  async function worker() {
+    while (cursor < list.length) {
+      const idx = cursor++;
+      const p = list[idx];
+      try {
+        const ok = await checkOneProxy(supabaseAdmin, p);
+        if (ok) valid++; else invalid++;
+      } catch { invalid++; }
+      done++;
+      if (done % 2 === 0 || done === total) {
+        const elapsed = (Date.now() - started) / 1000;
+        const rate = done / Math.max(elapsed, 0.1);
+        const eta_sec = rate > 0 ? Math.max(0, Math.round((total - done) / rate)) : null;
+        await supabaseAdmin.from("job_runs").update({
+          progress: { total, done, valid, invalid, phase: "running", eta_sec, rate: Number(rate.toFixed(2)) },
+        }).eq("id", jobId);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, list.length) }, worker));
+
+  await supabaseAdmin.from("job_runs").update({
+    finished_at: new Date().toISOString(),
+    ok: true,
+    summary: { total, valid, invalid },
+    progress: { total, done: total, valid, invalid, phase: "done" },
+  }).eq("id", jobId);
+  return { valid, invalid, total };
+}
+
 export const checkAllProxies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()).optional() }).parse(d))
+  .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { checkProxyViaWorker } = await import("@/lib/worker.server");
-    const { data: rows } = await supabaseAdmin.from("proxy_pool").select("id, scheme, ip, port, username, password").limit(500);
-    let valid = 0, invalid = 0;
-    for (const p of rows ?? []) {
-      const out = await checkProxyViaWorker({
-        proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
-      });
-      await supabaseAdmin.from("proxy_pool").update({
-        is_valid: out.ok,
-        last_latency_ms: out.latency_ms ?? null,
-        last_error: out.error ?? null,
-        last_checked_at: new Date().toISOString(),
-      }).eq("id", p.id);
-      if (out.ok) valid++; else invalid++;
-    }
-    return { valid, invalid };
+    const { data: job, error: jerr } = await supabaseAdmin.from("job_runs").insert({
+      job: "proxy_recheck",
+      started_at: new Date().toISOString(),
+      progress: { total: 0, done: 0, valid: 0, invalid: 0, phase: "starting" },
+    }).select("id").single();
+    if (jerr) throw jerr;
+    const result = await runProxyRecheck(supabaseAdmin, data.ids ?? null, job.id);
+    return { jobId: job.id, ...result };
+  });
+
+export const checkProxyById = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: p } = await supabaseAdmin.from("proxy_pool")
+      .select("id, scheme, ip, port, username, password").eq("id", data.id).maybeSingle();
+    if (!p) throw new Error("Proxy not found");
+    const ok = await checkOneProxy(supabaseAdmin, p);
+    return { ok };
+  });
+
+export const bulkDeleteProxies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()).min(1).max(2000) }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("proxy_pool").delete().in("id", data.ids);
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "proxy.bulk_delete", details: { count: data.ids.length },
+    });
+    return { deleted: data.ids.length };
+  });
+
+export const unquarantineProxy = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.rpc("unquarantine_proxy", { _id: data.id });
+    return { ok: true };
+  });
+
+export const getProxyStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data } = await supabase.rpc("get_proxy_stats");
+    return data ?? {};
+  });
+
+export const getActiveProxyJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { data } = await supabase.from("job_runs")
+      .select("id, started_at, finished_at, ok, summary, progress")
+      .eq("job", "proxy_recheck")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data ?? null;
   });
 
 // -------------------- Bulk cookie ops (admin-only) --------------------
