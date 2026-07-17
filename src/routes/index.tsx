@@ -131,6 +131,11 @@ function HomePage() {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [serviceError, setServiceError] = useState<
+    | { kind: "no_cookie" | "exhausted"; message: string; attempts?: number }
+    | null
+  >(null);
+  const [retryCountdown, setRetryCountdown] = useState(0);
 
   // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
   // Sent on subsequent activations so the user doesn't have to re-solve for
@@ -159,6 +164,13 @@ function HomePage() {
 
   // Compute fingerprint once on mount.
   useEffect(() => { computeFingerprint().then(setFingerprint); }, []);
+
+  // Retry countdown for service errors (no_cookie / exhausted).
+  useEffect(() => {
+    if (retryCountdown <= 0) return;
+    const t = window.setTimeout(() => setRetryCountdown((n) => Math.max(0, n - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [retryCountdown]);
 
   // Track auth state (for login-gate).
   useEffect(() => {
@@ -339,7 +351,7 @@ function HomePage() {
       return;
     }
 
-    setLoginError(null); setKeyError(null); setCaptchaError(null);
+    setLoginError(null); setKeyError(null); setCaptchaError(null); setServiceError(null); setRetryCountdown(0);
     setSubmitting(true);
 
     // Walk through enabled gates so the user sees a real per-step progress.
@@ -432,8 +444,25 @@ function HomePage() {
         toast.error("Access-key gate blocked activation", {
           description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
         });
-      } else if (result.error === "no_cookie" || result.error === "exhausted") {
-        toast.error("Couldn't activate right now", { description: result.message ?? "Please try again in a minute." });
+      } else if (result.error === "no_cookie") {
+        setServiceError({
+          kind: "no_cookie",
+          message: result.message ?? "Cookie pool is empty. Our team has been alerted — try again in a moment.",
+        });
+        setRetryCountdown(30);
+        toast.error("Cookie pool empty", {
+          description: "No active cookies available right now. Retry shortly.",
+        });
+      } else if (result.error === "exhausted") {
+        setServiceError({
+          kind: "exhausted",
+          message: result.message ?? "We tried several cookies and none activated this code.",
+          attempts: result.attempts,
+        });
+        setRetryCountdown(20);
+        toast.error("Activation exhausted", {
+          description: `We attempted ${result.attempts ?? "several"} cookies. Please retry in a few seconds.`,
+        });
       } else {
         toast.error("Server hiccup", { description: "Try again in a moment." });
       }
@@ -812,6 +841,59 @@ function HomePage() {
                   </div>
                 </div>
               )}
+
+              {serviceError && !submitting && (
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4 shadow-[0_0_0_1px_rgba(255,42,58,0.15)_inset]"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
+                      <AlertCircle className="w-4 h-4 text-[#ff8a90]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
+                          {serviceError.kind === "no_cookie" ? "Cookie pool empty" : "Activation exhausted"}
+                        </span>
+                        {serviceError.attempts != null && (
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/50">
+                            · {serviceError.attempts} attempts
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-white/85 leading-relaxed">
+                        {serviceError.message}
+                      </p>
+                      <p className="mt-1 text-xs text-white/50">
+                        {serviceError.kind === "no_cookie"
+                          ? "All active cookies are locked or being refreshed. Your code is still valid — just retry."
+                          : "This can happen when cookies expire mid-request. Retrying picks a fresh one."}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setServiceError(null); setRetryCountdown(0); handleActivate(); }}
+                          disabled={retryCountdown > 0}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Retry now"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setServiceError(null); setRetryCountdown(0); }}
+                          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:border-white/20 transition"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
 
               <button
                 onClick={handleActivate}
