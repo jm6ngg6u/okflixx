@@ -265,6 +265,22 @@ function PipelineRow({
             <Meta label="Total time" value={fmtMs(pipeline.total_duration_ms)} />
             <Meta label="IP hash" value={pipeline.ip_hash ? pipeline.ip_hash.slice(0, 10) + "…" : "—"} />
           </div>
+
+          {/* Retry action */}
+          <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-[10px] font-mono text-white/40">
+              admin retry uses the current rotation policy · logged as <span className="text-white/60">activation.admin_retry</span>
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onRetry(); }}
+              disabled={retrying}
+              className="group inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90] hover:bg-[#ff2a3a]/20 hover:border-[#ff2a3a]/60 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {retrying
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> retrying…</>
+                : <><RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-300" /> retry {pipeline.code}</>}
+            </button>
+          </div>
         </div>
       )}
     </div>
