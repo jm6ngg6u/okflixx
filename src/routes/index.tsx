@@ -347,6 +347,94 @@ function HomePage() {
                 style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
               />
 
+              {/* ---- ACCESS GATES ---- */}
+              {anyGate && (
+                <div className="mt-6 space-y-3">
+                  {/* Login gate */}
+                  {gate.data?.loginRequired && (
+                    <div className={`rounded-lg border p-3 flex items-center gap-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+                      <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
+                      <div className="flex-1 text-xs">
+                        {authUserId ? (
+                          <>Signed in as <span className="text-white font-mono">{authEmail}</span></>
+                        ) : (
+                          <>Sign-in required for activation.</>
+                        )}
+                      </div>
+                      {!authUserId && (
+                        <Link to="/auth" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Access key gate */}
+                  {gate.data?.accessKeyRequired && (
+                    <div className={`rounded-lg border p-3 ${sessionToken ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-white/[0.03]"}`}>
+                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
+                        <KeyRound className="w-3.5 h-3.5 text-[#ff8a90]" />
+                        <span>Access key required</span>
+                        {sessionToken && (
+                          <span className="ml-auto inline-flex items-center gap-1 text-violet-300 text-[10px]">
+                            <CheckCircle2 className="w-3 h-3" /> 24h unlock active
+                          </span>
+                        )}
+                      </div>
+                      {!sessionToken ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={accessKey}
+                            onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
+                            placeholder="NFX-XXXX-XXXX-XXXX"
+                            className="flex-1 bg-black/40 border border-white/10 rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#ff2a3a]/60"
+                            autoComplete="off"
+                          />
+                          <button
+                            type="button"
+                            onClick={redeemKey}
+                            disabled={redeeming || !accessKey.trim()}
+                            className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
+                          >
+                            {redeeming ? "Checking…" : "Verify"}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { localStorage.removeItem(SESSION_KEY); setSessionToken(null); setAccessKey(""); }}
+                          className="text-[10px] font-mono uppercase tracking-widest text-white/40 hover:text-white/70"
+                        >
+                          Lock session
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Captcha gate */}
+                  {gate.data?.captchaRequired && gate.data.captchaSiteKey && (
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#ff8a90]" />
+                        <span>Verify you're human</span>
+                        {captchaToken && (
+                          <span className="ml-auto inline-flex items-center gap-1 text-emerald-300">
+                            <CheckCircle2 className="w-3 h-3" /> Verified
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        ref={captchaWidgetRef}
+                        className={gate.data.captchaProvider === "hcaptcha" ? "h-captcha" : "cf-turnstile"}
+                        data-sitekey={gate.data.captchaSiteKey}
+                        data-callback="__emberlordCaptcha"
+                        data-theme="dark"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+
               <button
                 onClick={handleActivate}
                 disabled={submitting}
