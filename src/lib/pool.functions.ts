@@ -558,6 +558,201 @@ export const getCookieDetail = createServerFn({ method: "POST" })
     return row;
   });
 
+// -------------------- Upload dry-run preview --------------------
+
+const PreviewUploadInput = z.object({
+  blobs: z.array(z.string()).min(1).max(200),
+});
+
+/**
+ * Dry-run for cookie uploads. Parses each blob, computes its fingerprint, and
+ * checks whether it already exists in cookie_pool WITHOUT inserting anything.
+ * Client renders this before confirming a real upload.
+ */
+export const previewCookieUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => PreviewUploadInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    type Row = {
+      index: number;
+      action: "insert" | "duplicate" | "invalid" | "duplicate_in_batch";
+      pairs: number;
+      fingerprint: string | null;
+      reason?: string;
+      size: number;
+    };
+    const rows: Row[] = [];
+    const seenFp = new Set<string>();
+    const fingerprints: string[] = [];
+    const parsed: { i: number; fp: string | null; pairs: any[]; size: number; reason?: string }[] = [];
+    data.blobs.forEach((blob, i) => {
+      const size = blob.length;
+      const pairs = parseCookieBlob(blob);
+      if (pairs.length === 0) { parsed.push({ i, fp: null, pairs, size, reason: "no cookies parsed" }); return; }
+      if (!hasNetflixAuthCookie(pairs)) { parsed.push({ i, fp: null, pairs, size, reason: "no NetflixId/SecureNetflixId" }); return; }
+      const fp = fingerprintOf(pairs);
+      fingerprints.push(fp);
+      parsed.push({ i, fp, pairs, size });
+    });
+    const existing = new Set<string>();
+    for (let i = 0; i < fingerprints.length; i += 100) {
+      const chunk = fingerprints.slice(i, i + 100);
+      const { data: matches } = await supabaseAdmin
+        .from("cookie_pool").select("fingerprint").in("fingerprint", chunk);
+      for (const m of matches ?? []) existing.add(String((m as any).fingerprint));
+    }
+    for (const p of parsed) {
+      if (!p.fp) {
+        rows.push({ index: p.i, action: "invalid", pairs: p.pairs.length, fingerprint: null, reason: p.reason, size: p.size });
+        continue;
+      }
+      if (existing.has(p.fp)) {
+        rows.push({ index: p.i, action: "duplicate", pairs: p.pairs.length, fingerprint: p.fp, reason: "already in pool", size: p.size });
+        continue;
+      }
+      if (seenFp.has(p.fp)) {
+        rows.push({ index: p.i, action: "duplicate_in_batch", pairs: p.pairs.length, fingerprint: p.fp, reason: "duplicate within upload", size: p.size });
+        continue;
+      }
+      seenFp.add(p.fp);
+      rows.push({ index: p.i, action: "insert", pairs: p.pairs.length, fingerprint: p.fp, size: p.size });
+    }
+    const summary = {
+      total: rows.length,
+      insert: rows.filter((r) => r.action === "insert").length,
+      duplicate: rows.filter((r) => r.action === "duplicate").length,
+      duplicate_in_batch: rows.filter((r) => r.action === "duplicate_in_batch").length,
+      invalid: rows.filter((r) => r.action === "invalid").length,
+    };
+    return { rows, summary };
+  });
+
+// -------------------- Advanced bulk cleanup --------------------
+
+const CleanupFilters = z.object({
+  countries: z.array(z.string().length(2)).max(50).optional(),
+  statuses: z.array(z.enum(["active", "free", "on_hold", "invalid", "unknown"])).max(5).optional(),
+  neverUsedDays: z.number().int().min(0).max(365).optional(),
+  staleDays: z.number().int().min(0).max(365).optional(),
+  lowSuccessThreshold: z.number().int().min(0).max(100).optional(),
+  lowSuccessMinUses: z.number().int().min(1).max(10_000).optional(),
+  requireAll: z.boolean().default(true),
+});
+
+const AdvancedCleanupInput = z.object({
+  filters: CleanupFilters,
+  dryRun: z.boolean().default(true),
+});
+
+/**
+ * Advanced bulk cleanup — filter by country, status, freshness, usage, or
+ * success rate, preview matched rows, then optionally delete.
+ *
+ * requireAll=true → AND across filters (default). false → OR.
+ */
+export const advancedCleanupCookies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => AdvancedCleanupInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    await assertAdmin(supabase, userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { filters, dryRun } = data;
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("cookie_pool")
+      .select("id,email,country,status,total_uses,success_count,fail_count,last_checked_at,created_at,last_used_at")
+      .limit(10_000);
+    if (error) throw error;
+
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60_000;
+
+    type R = {
+      id: string; email: string | null; country: string | null; status: string | null;
+      total_uses: number | null; success_count: number | null; fail_count: number | null;
+      last_checked_at: string | null; created_at: string | null; last_used_at: string | null;
+    };
+
+    const active: string[] = [];
+    if (filters.countries && filters.countries.length > 0) active.push("countries");
+    if (filters.statuses && filters.statuses.length > 0) active.push("statuses");
+    if (typeof filters.neverUsedDays === "number") active.push("neverUsedDays");
+    if (typeof filters.staleDays === "number") active.push("staleDays");
+    if (typeof filters.lowSuccessThreshold === "number" && typeof filters.lowSuccessMinUses === "number") active.push("lowSuccess");
+    if (active.length === 0) return { matched: 0, deleted: 0, sample: [], summary: { byStatus: {}, byCountry: {} }, filters, activeFilters: active };
+
+    const countryUpper = new Set((filters.countries ?? []).map((c) => c.toUpperCase()));
+    const statusSet = new Set(filters.statuses ?? []);
+
+    const testCountry = (r: R) => !!r.country && countryUpper.has(r.country.toUpperCase());
+    const testStatus = (r: R) => !!r.status && statusSet.has(r.status as any);
+    const testNeverUsed = (r: R) => {
+      if ((r.total_uses ?? 0) > 0) return false;
+      const created = r.created_at ? Date.parse(r.created_at) : 0;
+      if (!created) return false;
+      return (now - created) >= (filters.neverUsedDays! * dayMs);
+    };
+    const testStale = (r: R) => {
+      const t = r.last_checked_at ? Date.parse(r.last_checked_at) : 0;
+      if (!t) return true;
+      return (now - t) >= (filters.staleDays! * dayMs);
+    };
+    const testLowSuccess = (r: R) => {
+      const uses = r.total_uses ?? 0;
+      if (uses < filters.lowSuccessMinUses!) return false;
+      const rate = (r.success_count ?? 0) / uses * 100;
+      return rate < filters.lowSuccessThreshold!;
+    };
+
+    const testers: ((r: R) => boolean)[] = [];
+    if (active.includes("countries")) testers.push(testCountry);
+    if (active.includes("statuses")) testers.push(testStatus);
+    if (active.includes("neverUsedDays")) testers.push(testNeverUsed);
+    if (active.includes("staleDays")) testers.push(testStale);
+    if (active.includes("lowSuccess")) testers.push(testLowSuccess);
+
+    const matched = (rows as R[]).filter((r) =>
+      filters.requireAll ? testers.every((t) => t(r)) : testers.some((t) => t(r)),
+    );
+
+    const summary = { byStatus: {} as Record<string, number>, byCountry: {} as Record<string, number> };
+    for (const r of matched) {
+      const s = r.status ?? "unknown";
+      summary.byStatus[s] = (summary.byStatus[s] ?? 0) + 1;
+      const c = (r.country ?? "??").toUpperCase();
+      summary.byCountry[c] = (summary.byCountry[c] ?? 0) + 1;
+    }
+
+    const sample = matched.slice(0, 25).map((r) => ({
+      id: r.id, email: r.email, country: r.country, status: r.status,
+      total_uses: r.total_uses, success_count: r.success_count, fail_count: r.fail_count,
+      last_checked_at: r.last_checked_at,
+    }));
+
+    if (dryRun) return { matched: matched.length, deleted: 0, sample, summary, filters, activeFilters: active };
+
+    let deleted = 0;
+    const ids = matched.map((r) => r.id);
+    for (let i = 0; i < ids.length; i += 200) {
+      const chunk = ids.slice(i, i + 200);
+      const { error: dErr } = await supabaseAdmin.from("cookie_pool").delete().in("id", chunk);
+      if (dErr) throw dErr;
+      deleted += chunk.length;
+    }
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "cookie.advanced_cleanup",
+      details: { deleted, matched: matched.length, filters, summary },
+    });
+    return { matched: matched.length, deleted, sample, summary, filters, activeFilters: active };
+  });
+
 // -------------------- Bulk proxy ops (admin-only) --------------------
 
 export const deleteAllProxies = createServerFn({ method: "POST" })
