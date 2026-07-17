@@ -548,7 +548,7 @@ const GateSettingsInput = z.object({
   loginRequired: z.boolean().optional(),
   captchaProvider: z.enum(["turnstile", "hcaptcha"]).optional(),
   captchaSiteKey: z.string().max(200).optional(),
-  userDailyActivationLimit: z.number().int().min(1).max(1000).optional(),
+  userDailyActivationLimit: z.number().int().min(0).max(10000).optional(),
 });
 
 export const setGateSettings = createServerFn({ method: "POST" })
