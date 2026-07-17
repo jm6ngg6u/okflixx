@@ -10,7 +10,7 @@ import { submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2 } from "lucide-react";
+import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
@@ -78,6 +78,8 @@ type SuccessPayload = {
   attempts: number;
   policy: string;
   redirectUrl: string;
+  gatesPassed: { key: "login" | "key" | "captcha"; label: string; detail: string }[];
+  sessionExpiresAt: number | null;
   account: {
     email: string | null;
     country: string | null;
@@ -90,6 +92,7 @@ type SuccessPayload = {
   };
 };
 
+
 function HomePage() {
   useReveal();
   const codeRef = useRef<CodeInputHandle>(null);
@@ -98,11 +101,14 @@ function HomePage() {
   const lastSubmitRef = useRef<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
-  const [stage, setStage] = useState<"idle" | "checking" | "activating">("idle");
+  // Multi-step progress: idle → checking-login → checking-key → checking-captcha → checking-cookie → activating.
+  type Stage = "idle" | "checking-login" | "checking-key" | "checking-captcha" | "checking-cookie" | "activating";
+  const [stage, setStage] = useState<Stage>("idle");
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
   const fetchCaptchaHealth = useServerFn(getCaptchaHealth);
+
 
   // Gate config polled every 10s so admin toggles reach the landing page.
   const gate = useQuery({
@@ -121,8 +127,11 @@ function HomePage() {
   });
 
   const [accessKey, setAccessKey] = useState("");
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
   // Sent on subsequent activations so the user doesn't have to re-solve for
   // every retry / new code within the window. Server enforces expiry + binding.
@@ -230,20 +239,30 @@ function HomePage() {
   // --- Redeem key ---
   const [redeeming, setRedeeming] = useState(false);
   async function redeemKey() {
-    if (!accessKey.trim()) { toast.error("Enter your access key"); return; }
-    if (!fingerprint) { toast.error("Preparing security check — try again in a moment."); return; }
+    setKeyError(null);
+    if (!accessKey.trim()) {
+      setKeyError("Enter your access key to continue.");
+      toast.error("Access key required", { description: "Paste the key you received to unlock activation." });
+      return;
+    }
+    if (!fingerprint) {
+      setKeyError("Preparing security check — try again in a moment.");
+      toast.error("Security check not ready", { description: "Give the page a moment to finish loading." });
+      return;
+    }
     setRedeeming(true);
     try {
       const r = await redeemFn({ data: { code: accessKey.trim(), fingerprint } });
       if (!r.ok) {
-        toast.error("Key rejected", {
-          description: r.reason === "already_redeemed" ? "This key was used on another device."
-            : r.reason === "expired" ? "This key has expired."
-            : r.reason === "disabled" ? "This key has been disabled."
-            : "Check the key and try again.",
-        });
+        const desc = r.reason === "already_redeemed" ? "This key was used on another device."
+          : r.reason === "expired" ? "This key has expired."
+          : r.reason === "disabled" ? "This key has been disabled."
+          : "Check the key and try again.";
+        setKeyError(desc);
+        toast.error("Key rejected", { description: desc });
         return;
       }
+      setKeyError(null);
       if (r.keyType === "session_24h" && r.sessionToken) {
         localStorage.setItem(SESSION_KEY, r.sessionToken);
         setSessionToken(r.sessionToken);
@@ -254,36 +273,89 @@ function HomePage() {
         });
       }
     } catch (e: any) {
-      toast.error("Redeem failed", { description: e?.message ?? "" });
+      const msg = e?.message ?? "Network error — please try again.";
+      setKeyError(msg);
+      toast.error("Redeem failed", { description: msg });
     } finally {
       setRedeeming(false);
     }
   }
+
+  // Reset just the *attempt* state. Keeps the code the user typed but drops
+  // captcha tokens / pass / 24h session / key input / inline errors, then
+  // re-solves whichever gates are currently enabled.
+  const resetAttempt = () => {
+    setCaptchaToken("");
+    setCaptchaError(null);
+    setCaptchaPassToken(null);
+    try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
+    setAccessKey("");
+    setKeyError(null);
+    if (sessionToken) {
+      localStorage.removeItem(SESSION_KEY);
+      setSessionToken(null);
+    }
+    setLoginError(null);
+    // Reset the captcha widget so a fresh challenge renders.
+    try {
+      const api: any = captchaWidgetProviderRef.current === "hcaptcha"
+        ? (window as any).hcaptcha : (window as any).turnstile;
+      api?.reset?.();
+    } catch { /* noop */ }
+    toast("Attempt reset", { description: "Re-run the security checks below." });
+  };
 
   const handleActivate = async () => {
     // Client throttle — 3s cooldown between submits.
     const now = Date.now();
     if (submitting) return;
     if (now - lastSubmitRef.current < 3000) {
-      toast.error("Slow down a moment.");
+      toast.error("Slow down a moment.", { description: "Please wait a few seconds between activations." });
       return;
     }
     lastSubmitRef.current = now;
 
     const code = (codeRef.current?.getCode() ?? "").toUpperCase();
     if (!/^[A-Z0-9]{8}$/.test(code)) {
-      toast.error("Enter the full 8-character code from your TV.");
+      toast.error("Invalid TV code", { description: "Enter the full 8-character code shown on your TV screen." });
       return;
     }
 
-    // Pre-flight gate checks (UI hints; server is source of truth).
-    if (gateBlocks.needsLogin) { toast.error("Please sign in first."); return; }
-    if (gateBlocks.needsCaptcha) { toast.error("Complete the captcha first."); return; }
-    if (gateBlocks.needsKey) { toast.error("Enter your access key first."); return; }
+    // Pre-flight gate checks — server is still source of truth, but naming
+    // the blocking gate lets the user act immediately.
+    if (gateBlocks.needsLogin) {
+      setLoginError("Sign in with Google to continue.");
+      toast.error("Sign-in required", { description: "Use the Sign in button above the code panel." });
+      return;
+    }
+    if (gateBlocks.needsKey) {
+      setKeyError("Redeem your access key before submitting.");
+      toast.error("Access key required", { description: "Paste your key and press Verify." });
+      return;
+    }
+    if (gateBlocks.needsCaptcha) {
+      setCaptchaError("Complete the human check below.");
+      toast.error("Human check required", { description: "Solve the captcha before submitting." });
+      return;
+    }
 
+    setLoginError(null); setKeyError(null); setCaptchaError(null);
     setSubmitting(true);
-    setStage("checking");
-    const stageTimer = window.setTimeout(() => setStage("activating"), 1200);
+
+    // Walk through enabled gates so the user sees a real per-step progress.
+    const g = gate.data;
+    const steps: Stage[] = [];
+    if (g?.loginRequired) steps.push("checking-login");
+    if (g?.accessKeyRequired) steps.push("checking-key");
+    if (g?.captchaRequired) steps.push("checking-captcha");
+    steps.push("checking-cookie");
+    const stageTimers: number[] = [];
+    setStage(steps[0]);
+    for (let i = 1; i < steps.length; i++) {
+      stageTimers.push(window.setTimeout(() => setStage(steps[i]), i * 450));
+    }
+    const activatingTimer = window.setTimeout(() => setStage("activating"), steps.length * 450 + 400);
+
     try {
       const result = await activate({
         data: {
@@ -306,29 +378,43 @@ function HomePage() {
         try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
       }
       if (result.ok) {
+        // Snapshot which gates passed for the receipt.
+        const passed: SuccessPayload["gatesPassed"] = [];
+        if (g?.loginRequired) passed.push({ key: "login", label: "Sign-in", detail: authEmail ?? "Signed in" });
+        if (g?.accessKeyRequired) passed.push({
+          key: "key",
+          label: "Access key",
+          detail: sessionToken ? "24-hour session" : "Verified",
+        });
+        if (g?.captchaRequired) passed.push({
+          key: "captcha",
+          label: "Human check",
+          detail: cp?.token ? "Captcha pass · 10 min" : "Verified",
+        });
         setSuccess({
           code,
           attempts: result.attempts,
           policy: result.policy,
           redirectUrl: result.redirectUrl,
+          gatesPassed: passed,
+          sessionExpiresAt: cp?.exp ?? null,
           account: result.account,
         });
       } else if (result.error === "rate_limited") {
-        toast.error("Too many attempts. Try again in 10 minutes.");
+        toast.error("Too many attempts", { description: "Try again in about 10 minutes, or solve the captcha to unlock unlimited activations." });
       } else if (result.error === "bot_detected") {
-        toast.error("Something looked off. Please refresh and try again.");
+        toast.error("Automated activity detected", { description: "Refresh the page and try again." });
       } else if (result.error === "invalid_code") {
-        toast.error(result.message ?? "That code doesn't look right. Check your TV screen.");
+        toast.error("Invalid TV code", { description: result.message ?? "Check the code shown on your TV and re-enter it." });
       } else if (result.error === "maintenance") {
-        toast.error(result.message ?? "The service is temporarily unavailable.");
+        toast.error("Service unavailable", { description: result.message ?? "We're briefly down for maintenance — try again shortly." });
       } else if (result.error === "login_required") {
-        toast.error(result.message ?? "Please sign in to activate.");
+        setLoginError(result.message ?? "Sign in to activate.");
+        toast.error("Login gate blocked activation", { description: result.message ?? "Sign in with Google to continue." });
       } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
         const msg = result.message ?? "Captcha check failed. Please retry.";
-        toast.error(msg);
         setCaptchaError(msg);
-        setCaptchaToken(""); // force re-solve
-        // Server rejected our pass (expired / device mismatch) — drop it too.
+        setCaptchaToken("");
         setCaptchaPassToken(null);
         try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
         try {
@@ -336,24 +422,29 @@ function HomePage() {
             ? (window as any).hcaptcha : (window as any).turnstile;
           api?.reset?.();
         } catch { /* noop */ }
+        toast.error("Captcha gate blocked activation", { description: "Solve the fresh human check below and try again." });
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
-        // Session might have expired — clear it so the input reappears.
         if (result.error === "access_key_invalid" && sessionToken) {
           localStorage.removeItem(SESSION_KEY);
           setSessionToken(null);
         }
-        toast.error(result.message ?? "Access key required.");
+        setKeyError(result.message ?? "Access key required.");
+        toast.error("Access-key gate blocked activation", {
+          description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
+        });
       } else if (result.error === "no_cookie" || result.error === "exhausted") {
-        toast.error(result.message ?? "We couldn't activate right now. Please try again shortly.");
+        toast.error("Couldn't activate right now", { description: result.message ?? "Please try again in a minute." });
       } else {
-        toast.error("Server hiccup. Try again in a moment.");
+        toast.error("Server hiccup", { description: "Try again in a moment." });
       }
     } catch (err) {
       console.error(err);
-      toast.error("Network error. Please try again.");
+      toast.error("Network error", { description: "Check your connection and try again." });
     } finally {
-      window.clearTimeout(stageTimer);
+      stageTimers.forEach((t) => window.clearTimeout(t));
+      window.clearTimeout(activatingTimer);
       setStage("idle");
+
       setSubmitting(false);
     }
   };
@@ -493,6 +584,16 @@ function HomePage() {
                         <span className={`w-1.5 h-1.5 rounded-full ${allSatisfied ? "bg-emerald-400" : "bg-[#ff2a3a] animate-pulse"}`} />
                         {allSatisfied ? "Ready" : "Action needed"}
                       </span>
+                      <button
+                        type="button"
+                        onClick={resetAttempt}
+                        disabled={submitting}
+                        title="Clear captcha, key session and re-run enabled gates"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/70 hover:text-white hover:border-white/20 hover:bg-white/[0.08] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Reset
+                      </button>
+
                     </div>
                     <div className="mt-3 h-1 rounded-full bg-white/5 overflow-hidden">
                       <div
@@ -528,20 +629,34 @@ function HomePage() {
 
                   {/* Login gate */}
                   {gate.data?.loginRequired && (
-                    <div className={`rounded-lg border p-3 flex items-center gap-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
-                      <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
-                      <div className="flex-1 text-xs">
-                        {authUserId ? (
-                          <>Signed in as <span className="text-white font-mono">{authEmail}</span></>
-                        ) : (
-                          <>Sign-in required for activation.</>
+                    <div className={`rounded-lg border p-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : loginError ? "border-red-500/40 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+                      <div className="flex items-center gap-3">
+                        <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
+                        <div className="flex-1 text-xs">
+                          {authUserId ? (
+                            <>Signed in as <span className="text-white font-mono">{authEmail}</span></>
+                          ) : (
+                            <>Sign-in required for activation.</>
+                          )}
+                        </div>
+                        {!authUserId && (
+                          <Link to="/login" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
                         )}
                       </div>
-                      {!authUserId && (
-                        <Link to="/login" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
+                      {!authUserId && !loginError && (
+                        <p className="mt-1.5 pl-7 text-[11px] text-white/45 leading-snug">
+                          Continue with Google — takes 5 seconds, one click.
+                        </p>
+                      )}
+                      {loginError && !authUserId && (
+                        <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-200">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{loginError}</span>
+                        </div>
                       )}
                     </div>
                   )}
+
 
                   {/* Access key gate */}
                   {gate.data?.accessKeyRequired && (
@@ -556,24 +671,35 @@ function HomePage() {
                         )}
                       </div>
                       {!sessionToken ? (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={accessKey}
-                            onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
-                            placeholder="NFX-XXXX-XXXX-XXXX"
-                            className="flex-1 bg-black/40 border border-white/10 rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#ff2a3a]/60"
-                            autoComplete="off"
-                          />
-                          <button
-                            type="button"
-                            onClick={redeemKey}
-                            disabled={redeeming || !accessKey.trim()}
-                            className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
-                          >
-                            {redeeming ? "Checking…" : "Verify"}
-                          </button>
-                        </div>
+                        <>
+                          <p className="text-[11px] text-white/45 leading-snug mb-2">
+                            Paste the key you received, then press Verify. Session and one-time keys are supported.
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={accessKey}
+                              onChange={(e) => { setAccessKey(e.target.value.toUpperCase()); if (keyError) setKeyError(null); }}
+                              placeholder="NFX-XXXX-XXXX-XXXX"
+                              className={`flex-1 bg-black/40 border rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none ${keyError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-[#ff2a3a]/60"}`}
+                              autoComplete="off"
+                            />
+                            <button
+                              type="button"
+                              onClick={redeemKey}
+                              disabled={redeeming || !accessKey.trim()}
+                              className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
+                            >
+                              {redeeming ? "Checking…" : "Verify"}
+                            </button>
+                          </div>
+                          {keyError && (
+                            <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-200">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <span>{keyError}</span>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <button
                           type="button"
@@ -583,6 +709,7 @@ function HomePage() {
                           Lock session
                         </button>
                       )}
+
                     </div>
                   )}
 
@@ -598,6 +725,13 @@ function HomePage() {
                           </span>
                         )}
                       </div>
+                      <p className="text-[11px] text-white/45 leading-snug mb-2">
+                        {captchaPassToken
+                          ? "You have a captcha pass — no need to solve again for the next few minutes."
+                          : "Solve the challenge once. Successful checks unlock a 10-minute pass on this device."}
+                      </p>
+
+
 
                       {/* Live captcha status banner */}
                       {captchaHealth.data && captchaHealth.data.status !== "idle" && (
@@ -652,22 +786,47 @@ function HomePage() {
                   </div>
                 </div>
               )}
-
-
+              {/* Per-step activation progress — visible during submit */}
+              {submitting && (
+                <div className="mt-6 rounded-lg border border-[#ff2a3a]/30 bg-[#ff2a3a]/5 p-3">
+                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-[#ff8a90] mb-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {stage === "checking-login" ? "Verifying sign-in"
+                      : stage === "checking-key" ? "Verifying access key"
+                      : stage === "checking-captcha" ? "Verifying human check"
+                      : stage === "checking-cookie" ? "Verifying cookie pool"
+                      : stage === "activating" ? "Activating on Netflix"
+                      : "Working"}
+                  </div>
+                  <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] transition-[width] duration-500 ease-out"
+                      style={{
+                        width: stage === "checking-login" ? "20%"
+                          : stage === "checking-key" ? "40%"
+                          : stage === "checking-captcha" ? "60%"
+                          : stage === "checking-cookie" ? "80%"
+                          : stage === "activating" ? "95%" : "10%",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleActivate}
                 disabled={submitting}
-                className="btn-red w-full mt-7 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {stage === "checking"
-                  ? "◆ Verifying cookie…"
-                  : stage === "activating"
-                    ? "◆ Activating on Netflix…"
-                    : submitting
-                      ? "Working…"
-                      : "Activate Now →"}
+                {stage === "checking-login" ? "◆ Verifying sign-in…"
+                  : stage === "checking-key" ? "◆ Verifying access key…"
+                  : stage === "checking-captcha" ? "◆ Verifying human check…"
+                  : stage === "checking-cookie" ? "◆ Verifying cookie…"
+                  : stage === "activating" ? "◆ Activating on Netflix…"
+                  : submitting ? "Working…"
+                  : "Activate Now →"}
               </button>
+
 
               <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
                 <span>Encrypted End-to-End</span>
@@ -861,16 +1020,32 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
     return () => window.clearTimeout(t);
   }, [count, payload.redirectUrl]);
 
+  const expiresLabel = useMemo(() => {
+    if (!payload.sessionExpiresAt) return null;
+    const ms = payload.sessionExpiresAt - Date.now();
+    if (ms <= 0) return "expired";
+    const m = Math.max(1, Math.round(ms / 60000));
+    return m >= 60 ? `${Math.round(m / 60)}h` : `${m}m`;
+  }, [payload.sessionExpiresAt]);
+
   const capture = async () => {
     try {
       // Best-effort: copy a text receipt to clipboard so the user has proof.
       const a = payload.account;
+      const gateLines = payload.gatesPassed.length
+        ? [`Gates passed: ${payload.gatesPassed.map((g) => `${g.label} (${g.detail})`).join(", ")}`]
+        : [];
+      const expLine = payload.sessionExpiresAt
+        ? [`Session expires: ${new Date(payload.sessionExpiresAt).toLocaleString()}`]
+        : [];
       const lines = [
         `EMBERLORD · Netflix TV Activation`,
         `Code: ${payload.code}`,
         `Time: ${new Date().toLocaleString()}`,
         `Attempts: ${payload.attempts}`,
         `Policy: ${payload.policy}`,
+        ...gateLines,
+        ...expLine,
         `Plan: ${a.plan_name ?? "Premium"} · ${a.video_quality ?? "UHD"}`,
         `Country: ${a.country ?? "—"}`,
         `Screens: ${a.max_streams ?? "—"}`,
@@ -884,6 +1059,7 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
       toast.error("Clipboard blocked — screenshot the panel instead.");
     }
   };
+
 
   const a = payload.account;
   return (
@@ -940,6 +1116,35 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
           <Detail label="Member since" value={a.member_since ?? "—"} />
           <Detail label="Account" value={maskEmail(a.email)} mono />
         </div>
+
+        {/* Gates passed receipt — only when at least one gate ran */}
+        {payload.gatesPassed.length > 0 && (
+          <div className="mt-5 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
+            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-300 mb-2">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Security checks passed
+              {expiresLabel && (
+                <span className="ml-auto normal-case tracking-normal text-[11px] text-emerald-100/80">
+                  Session valid for <span className="font-mono text-white">{expiresLabel}</span>
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {payload.gatesPassed.map((g) => (
+                <span
+                  key={g.key}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-100"
+                >
+                  <CheckCircle2 className="w-3 h-3 text-emerald-300" />
+                  <span className="font-mono uppercase tracking-widest text-[10px] text-emerald-200/80">{g.label}</span>
+                  <span className="text-emerald-100/80">·</span>
+                  <span>{g.detail}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         {/* Pipeline footer */}
         <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-widest text-white/50">
