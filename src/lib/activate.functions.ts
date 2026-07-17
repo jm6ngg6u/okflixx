@@ -16,7 +16,23 @@ const InputSchema = z.object({
 });
 
 type ActivateResult =
-  | { ok: true; message: string; attempts: number; redirectUrl: string }
+  | {
+      ok: true;
+      message: string;
+      attempts: number;
+      redirectUrl: string;
+      account: {
+        email: string | null;
+        country: string | null;
+        plan_name: string | null;
+        video_quality: string | null;
+        max_streams: number | null;
+        member_since: string | null;
+        payment_method: string | null;
+        name: string | null;
+      };
+      policy: string;
+    }
   | {
       ok: false;
       error:
@@ -30,6 +46,7 @@ type ActivateResult =
       attempts?: number;
       message?: string;
     };
+
 
 function hashIp(ip: string): string {
   const salt = process.env.SUPABASE_PROJECT_ID ?? "emberlord";
