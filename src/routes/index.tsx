@@ -629,20 +629,34 @@ function HomePage() {
 
                   {/* Login gate */}
                   {gate.data?.loginRequired && (
-                    <div className={`rounded-lg border p-3 flex items-center gap-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
-                      <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
-                      <div className="flex-1 text-xs">
-                        {authUserId ? (
-                          <>Signed in as <span className="text-white font-mono">{authEmail}</span></>
-                        ) : (
-                          <>Sign-in required for activation.</>
+                    <div className={`rounded-lg border p-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : loginError ? "border-red-500/40 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+                      <div className="flex items-center gap-3">
+                        <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
+                        <div className="flex-1 text-xs">
+                          {authUserId ? (
+                            <>Signed in as <span className="text-white font-mono">{authEmail}</span></>
+                          ) : (
+                            <>Sign-in required for activation.</>
+                          )}
+                        </div>
+                        {!authUserId && (
+                          <Link to="/login" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
                         )}
                       </div>
-                      {!authUserId && (
-                        <Link to="/login" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
+                      {!authUserId && !loginError && (
+                        <p className="mt-1.5 pl-7 text-[11px] text-white/45 leading-snug">
+                          Continue with Google — takes 5 seconds, one click.
+                        </p>
+                      )}
+                      {loginError && !authUserId && (
+                        <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-200">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{loginError}</span>
+                        </div>
                       )}
                     </div>
                   )}
+
 
                   {/* Access key gate */}
                   {gate.data?.accessKeyRequired && (
