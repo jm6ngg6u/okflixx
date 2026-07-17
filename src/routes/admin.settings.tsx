@@ -4,14 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
-  runCookiesAutocheckNow, runProxiesAutocheckNow, getPublicContacts,
+  runCookiesAutocheckNow, runProxiesAutocheckNow,
 } from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download, MessageCircle, Send, Instagram, Phone } from "lucide-react";
+import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download } from "lucide-react";
+
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
 import { listRecentJobRuns } from "@/lib/settings.functions";
