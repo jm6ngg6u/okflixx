@@ -99,23 +99,10 @@ export const logAuthEvent = createServerFn({ method: "POST" })
     const userAgent = (req?.headers.get("user-agent") ?? "").slice(0, 300);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Resolve user_id from email if possible (best-effort; ignored on error).
-    let userId: string | null = null;
-    if (data.email) {
-      try {
-        const { data: u } = await supabaseAdmin
-          .from("auth.users" as any)
-          .select("id")
-          .eq("email", data.email)
-          .maybeSingle();
-        userId = (u as any)?.id ?? null;
-      } catch { /* ignore */ }
-    }
-
     await supabaseAdmin.from("auth_audit_log").insert({
       event: data.event,
       email: data.email ?? null,
-      user_id: userId,
+      user_id: null,
       success: data.success,
       reason: data.reason ?? null,
       ip_hash: ipHash,
