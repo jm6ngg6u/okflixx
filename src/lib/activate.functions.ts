@@ -13,6 +13,11 @@ const InputSchema = z.object({
   code: z.string().length(8),
   website: z.string().max(0).optional().default(""),
   elapsedMs: z.number().int().min(0).max(24 * 60 * 60 * 1000),
+  accessKey: z.string().max(64).optional().nullable(),
+  accessSessionToken: z.string().max(128).optional().nullable(),
+  captchaToken: z.string().max(4096).optional().nullable(),
+  fingerprint: z.string().max(256).optional().nullable(),
+  authUserId: z.string().uuid().optional().nullable(),
 });
 
 type ActivateResult =
