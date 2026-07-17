@@ -113,6 +113,11 @@ function HomePage() {
 
   const [accessKey, setAccessKey] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  // Which provider the widget on this page was actually rendered for —
+  // sent to the server so a mismatched admin toggle produces a clear
+  // error instead of "captcha failed".
+  const captchaWidgetProviderRef = useRef<"turnstile" | "hcaptcha" | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("");
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
