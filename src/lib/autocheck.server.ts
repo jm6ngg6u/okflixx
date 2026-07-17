@@ -134,7 +134,9 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       stopped: control === "stop" || undefined,
     });
 
-    const cleanupOn = map.autocheck_cleanup !== "0";
+    // Cleanup is skipped when the admin pressed Stop mid-run — we save what
+    // was checked but do not sweep the pool. Cancel already returned above.
+    const cleanupOn = map.autocheck_cleanup !== "0" && control !== "stop";
     let removed_invalid = 0, removed_free = 0, removed_on_hold = 0, removed_duplicates = 0;
     if (cleanupOn) {
       const { count: invCount } = await supabaseAdmin
@@ -169,8 +171,14 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       deleted = removed_invalid + removed_free + removed_on_hold + removed_duplicates;
     }
 
-    const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode, reasons };
+    const summary = {
+      checked, active, invalid, on_hold, free, deleted,
+      removed_invalid, removed_free, removed_on_hold, removed_duplicates,
+      proxy_mode: proxyMode, reasons,
+      stopped: control === "stop" || undefined,
+    };
     await recordJobFinish(jobId, true, summary);
+    // On stop, still advance the cursor: partial work counts as a run.
     await supabaseAdmin.from("app_settings").upsert({
       key: "cookies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
