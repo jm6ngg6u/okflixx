@@ -537,6 +537,11 @@ function CookiePoolPage() {
 
         <div className="flex-1" />
 
+        <Button size="sm" onClick={() => setAdvancedOpen(true)}
+          className="bg-gradient-to-r from-[#ff2a3a] to-[#b0060f] hover:from-[#ff3a4a] hover:to-[#c81020] text-white border-0 shadow-[0_4px_20px_-4px_rgba(255,42,58,0.5)]">
+          <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" /> Advanced cleanup
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10">
