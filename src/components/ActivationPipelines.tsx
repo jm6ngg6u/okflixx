@@ -51,11 +51,30 @@ function isTerminal(result: string | null): boolean {
  */
 export function ActivationPipelines() {
   const fetchPipelines = useServerFn(getActivationPipelines);
+  const fetchRateLimit = useServerFn(getRateLimitStatus);
+  const retryFn = useServerFn(retryActivationAdmin);
   const qc = useQueryClient();
 
   const q = useQuery({
     queryKey: ["activation-pipelines"],
     queryFn: () => fetchPipelines({ data: { limit: 8, windowMinutes: 30 } }),
+    refetchInterval: 15_000,
+  });
+  const rl = useQuery({
+    queryKey: ["rate-limit-status"],
+    queryFn: () => fetchRateLimit({ data: { windowMinutes: 15 } }),
+    refetchInterval: 20_000,
+  });
+
+  const retryMut = useMutation({
+    mutationFn: async (code: string) => retryFn({ data: { code } }),
+    onSuccess: (r: any) => {
+      if (r?.ok) toast.success(`Retry succeeded · ${r.status} · ${r.duration_ms}ms`);
+      else toast.error(`Retry → ${r?.status ?? "error"}`);
+      qc.invalidateQueries({ queryKey: ["activation-pipelines"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+  });
     refetchInterval: 15_000,
   });
 
