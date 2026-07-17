@@ -836,23 +836,8 @@ function HomePage() {
                             · {serviceError.attempts} attempts
                           </span>
                         )}
-                        <span className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">
-                          Code
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(
-                                `${serviceError.code} · ${serviceError.kind} · ${new Date(serviceError.at).toISOString()}${serviceError.attempts != null ? ` · attempts=${serviceError.attempts}` : ""}`,
-                              ).then(() => toast.success("Error code copied", { description: "Share this with support." }))
-                                .catch(() => toast.error("Copy failed"));
-                            }}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/[0.04] text-white/80 hover:text-white hover:border-white/25 transition"
-                            title="Copy error code"
-                          >
-                            {serviceError.code}
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </span>
+
+
                       </div>
                       <p className="mt-2 text-sm text-white/90 leading-relaxed">
                         {serviceError.kind === "no_cookie"
