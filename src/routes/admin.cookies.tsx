@@ -184,6 +184,7 @@ function CookiePoolPage() {
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const [realtimeUp, setRealtimeUp] = useState(false);
   const [nextTickIn, setNextTickIn] = useState(LIVE_POLL_MS / 1000);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const pageSize = 25;
 
   const isAnyChecking = checkingIds.size > 0 || pageCheckProgress !== null;
