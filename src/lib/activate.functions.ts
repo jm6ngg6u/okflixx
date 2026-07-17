@@ -304,6 +304,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         user_agent: userAgent,
         country,
         proxy_mode: false,
+        user_id: verifiedUserId,
       });
       return { ok: false, error: "rate_limited" };
     }
