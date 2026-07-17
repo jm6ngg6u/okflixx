@@ -30,47 +30,70 @@ function MfaPage() {
   const [qr, setQr] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
-  const [phase, setPhase] = useState<"loading" | "enroll" | "codes" | "challenge">("loading");
+  const [phase, setPhase] = useState<"loading" | "enroll" | "codes" | "challenge" | "error">("loading");
   const [codes, setCodes] = useState<string[]>([]);
+  const [status, setStatus] = useState("Preparing secure verification…");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: sess } = await supabase.auth.getSession();
+  async function startMfaFlow() {
+    setPhase("loading");
+    setErrorMessage(null);
+    setStatus("Checking session…");
+    try {
+      const { data: sess, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
       if (!sess.session) {
         navigate({ to: "/auth" });
         return;
       }
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      setStatus("Checking two-factor status…");
+      const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aalError) throw aalError;
       if (aal?.currentLevel === "aal2" && mode === "enroll") {
         navigate({ to: "/admin" });
         return;
       }
-      const { data: factors } = await supabase.auth.mfa.listFactors();
+
+      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+      if (factorsError) throw factorsError;
       const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
 
       if (verified && mode === "challenge") {
         setFactorId(verified.id);
+        setStatus("");
         setPhase("challenge");
         return;
       }
 
+      setStatus("Creating authenticator setup…");
       // Enrollment path — clean any stale unverified factors first
       for (const f of factors?.all ?? []) {
         if (f.factor_type === "totp" && f.status !== "verified") {
-          await supabase.auth.mfa.unenroll({ factorId: f.id });
+          const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId: f.id });
+          if (unenrollError) throw unenrollError;
         }
       }
       const { data: en, error } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Emberlord Admin" });
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
+      if (error) throw error;
       setFactorId(en.id);
       setQr(en.totp.qr_code);
       setSecret(en.totp.secret);
+      setStatus("");
       setPhase("enroll");
-      await logMfaEvent({ data: { event: "totp_enroll_start", success: true } }).catch(() => {});
-    })();
+      void logMfaEvent({ data: { event: "totp_enroll_start", success: true } }).catch(() => {});
+    } catch (err: any) {
+      const message = err?.message ?? "Two-factor setup could not start. Please retry.";
+      setStatus("");
+      setErrorMessage(message);
+      setPhase("error");
+      toast.error(message);
+      void logMfaEvent({ data: { event: "totp_flow_error", success: false, metadata: { reason: message } } }).catch(() => {});
+    }
+  }
+
+  useEffect(() => {
+    void startMfaFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -85,18 +108,20 @@ function MfaPage() {
       if (chErr) throw chErr;
       const { error: vErr } = await supabase.auth.mfa.verify({ factorId, challengeId: ch.id, code });
       if (vErr) {
-        await logMfaEvent({ data: { event: "totp_enroll_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
+      void logMfaEvent({ data: { event: "totp_enroll_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
+        setErrorMessage(vErr.message);
         toast.error(vErr.message);
         setBusy(false);
         return;
       }
-      await logMfaEvent({ data: { event: "totp_enroll_ok", success: true } }).catch(() => {});
+      void logMfaEvent({ data: { event: "totp_enroll_ok", success: true } }).catch(() => {});
       // Generate recovery codes
       const res = await generateRecoveryCodes();
       setCodes(res.codes);
       setPhase("codes");
       setBusy(false);
     } catch (err: any) {
+      setErrorMessage(err?.message ?? "Verification failed");
       toast.error(err?.message ?? "Verification failed");
       setBusy(false);
     }
@@ -113,14 +138,16 @@ function MfaPage() {
       if (chErr) throw chErr;
       const { error: vErr } = await supabase.auth.mfa.verify({ factorId, challengeId: ch.id, code });
       if (vErr) {
-        await logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
+        void logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
+        setErrorMessage(vErr.message);
         toast.error(vErr.message);
         setBusy(false);
         return;
       }
-      await logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
+      void logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
       navigate({ to: "/admin" });
     } catch (err: any) {
+      setErrorMessage(err?.message ?? "Verification failed");
       toast.error(err?.message ?? "Verification failed");
       setBusy(false);
     }
@@ -163,8 +190,29 @@ function MfaPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {phase === "loading" && (
-            <div className="flex items-center justify-center py-10">
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
               <Loader2 className="h-6 w-6 animate-spin text-white/40" />
+              <div className="text-xs text-white/50">{status}</div>
+            </div>
+          )}
+
+          {phase === "error" && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 flex gap-2 text-sm text-red-100">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-300" />
+                <div>
+                  <div className="font-medium">Two-factor setup is blocked</div>
+                  <div className="text-red-100/75 mt-1">{errorMessage}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => navigate({ to: "/auth" })} className="border-white/15">
+                  Back
+                </Button>
+                <Button type="button" onClick={startMfaFlow} className="btn-red">
+                  Retry
+                </Button>
+              </div>
             </div>
           )}
 
