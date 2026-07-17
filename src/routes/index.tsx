@@ -136,19 +136,47 @@ function HomePage() {
     return () => { sub.subscription.unsubscribe(); };
   }, []);
 
-  // Load Turnstile / hCaptcha script when captcha gate is on.
+  // Load Turnstile / hCaptcha script when captcha gate is on, then explicitly render the widget.
   const captchaWidgetRef = useRef<HTMLDivElement>(null);
+  const captchaRenderedRef = useRef(false);
   useEffect(() => {
     if (!gate.data?.captchaRequired || !gate.data.captchaSiteKey) return;
     const provider = gate.data.captchaProvider;
     const src = provider === "hcaptcha"
-      ? "https://js.hcaptcha.com/1/api.js"
-      : "https://challenges.cloudflare.com/turnstile/v0/api.js";
-    if (!document.querySelector(`script[src="${src}"]`)) {
-      const s = document.createElement("script"); s.src = src; s.async = true; s.defer = true; document.head.appendChild(s);
-    }
-    // Register a callback that reads the token.
-    (window as any).__emberlordCaptcha = (token: string) => setCaptchaToken(token);
+      ? "https://js.hcaptcha.com/1/api.js?render=explicit"
+      : "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    const ensureScript = () => new Promise<void>((resolve) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) { resolve(); return; }
+      const s = document.createElement("script");
+      s.src = src; s.async = true; s.defer = true;
+      s.onload = () => resolve();
+      document.head.appendChild(s);
+    });
+    let cancelled = false;
+    (async () => {
+      await ensureScript();
+      const start = Date.now();
+      while (!cancelled) {
+        const api: any = provider === "hcaptcha" ? (window as any).hcaptcha : (window as any).turnstile;
+        if (api && captchaWidgetRef.current && !captchaRenderedRef.current) {
+          try {
+            api.render(captchaWidgetRef.current, {
+              sitekey: gate.data!.captchaSiteKey,
+              theme: "dark",
+              callback: (token: string) => setCaptchaToken(token),
+              "expired-callback": () => setCaptchaToken(""),
+              "error-callback": () => setCaptchaToken(""),
+            });
+            captchaRenderedRef.current = true;
+          } catch { /* already rendered */ }
+          return;
+        }
+        if (Date.now() - start > 8000) return;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    })();
+    return () => { cancelled = true; };
   }, [gate.data?.captchaRequired, gate.data?.captchaSiteKey, gate.data?.captchaProvider]);
 
   const gateBlocks = useMemo(() => {
@@ -424,11 +452,9 @@ function HomePage() {
                       </div>
                       <div
                         ref={captchaWidgetRef}
-                        className={gate.data.captchaProvider === "hcaptcha" ? "h-captcha" : "cf-turnstile"}
-                        data-sitekey={gate.data.captchaSiteKey}
-                        data-callback="__emberlordCaptcha"
-                        data-theme="dark"
+                        className="min-h-[78px]"
                       />
+
                     </div>
                   )}
                 </div>
