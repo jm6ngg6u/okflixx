@@ -307,23 +307,29 @@ export const submitActivation = createServerFn({ method: "POST" })
         };
       }
     }
-    const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
-    const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
-      _ip_hash: ipHash,
-      _minutes: 10,
-    });
-    if ((recent ?? 0) >= rlWindow) {
-      await supabaseAdmin.from("activation_attempts").insert({
-        code,
-        result: "rate_limited",
-        ip_hash: ipHash,
-        user_agent: userAgent,
-        country,
-        proxy_mode: false,
-        user_id: verifiedUserId,
+    // Per-IP rate limit — a bot/scraper safety net. A user who solved the
+    // captcha or is signed in has already proved they're human, so we skip
+    // the IP cap for them (removes false positives on shared / NAT'd IPs).
+    if (!captchaPassed && !verifiedUserId) {
+      const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
+      const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
+        _ip_hash: ipHash,
+        _minutes: 10,
       });
-      return { ok: false, error: "rate_limited" };
+      if ((recent ?? 0) >= rlWindow) {
+        await supabaseAdmin.from("activation_attempts").insert({
+          code,
+          result: "rate_limited",
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          country,
+          proxy_mode: false,
+          user_id: verifiedUserId,
+        });
+        return { ok: false, error: "rate_limited" };
+      }
     }
+
 
     // 5. Config for the loop.
     const proxyMode = (await getSetting(supabaseAdmin, "proxy_mode", "0")) === "1";
