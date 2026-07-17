@@ -364,20 +364,65 @@ function SettingsPage() {
             />
           </div>
 
-          <ContactRow icon={Send} label="Telegram" accent="#229ED9" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="@yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Instagram} label="Instagram" accent="#E1306C" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="@yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Phone} label="WhatsApp" accent="#25D366" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+          {local.contact_enabled !== "1" && (
+            ((local.contact_tg_username ?? "").trim() ||
+             (local.contact_ig_username ?? "").trim() ||
+             (local.contact_wa_number ?? "").trim()) ? (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs px-3 py-2">
+                Handles are filled but the master toggle is <b>OFF</b> — nothing appears on the public site. Enable the switch above to publish.
+              </div>
+            ) : null
+          )}
+
+          <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+
+          {/* Live preview */}
+          <ContactPreview local={local} />
         </div>
       </Section>
     </div>
   );
 }
 
-function ContactRow({ icon: Icon, label, accent, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
-  icon: any; label: string; accent: string; nameKey: string; handleKey: string; handlePlaceholder: string;
-  local: Record<string, string>; set: (k: string, v: string) => void; onSave: (k: string) => void;
+// ---- Contact normalization helpers ---------------------------------------
+function normalizeHandle(kind: "telegram" | "instagram" | "whatsapp", raw: string): string {
+  const v = (raw ?? "").trim();
+  if (!v) return "";
+  if (kind === "whatsapp") return v.replace(/[^\d+]/g, "").replace(/^\++/, "").replace(/\+/g, "");
+  // telegram / instagram username: strip leading @, spaces, urls
+  let u = v.replace(/^https?:\/\/(t\.me|telegram\.me|instagram\.com|www\.instagram\.com)\//i, "");
+  u = u.replace(/^@+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
+  return u.replace(/[^A-Za-z0-9_.]/g, "");
+}
+function hrefFor(kind: "telegram" | "instagram" | "whatsapp", handle: string): string | null {
+  if (!handle) return null;
+  if (kind === "telegram") return `https://t.me/${handle}`;
+  if (kind === "instagram") return `https://instagram.com/${handle}`;
+  return `https://wa.me/${handle}`;
+}
+function displayHandle(kind: "telegram" | "instagram" | "whatsapp", handle: string): string {
+  if (!handle) return "";
+  return kind === "whatsapp" ? `+${handle}` : `@${handle}`;
+}
+
+function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
+  icon: any; label: string; kind: "telegram" | "instagram" | "whatsapp"; accent: string;
+  nameKey: string; handleKey: string; handlePlaceholder: string;
+  local: Record<string, string>; set: (k: string, v: string) => void;
+  onSave: (k: string, valueOverride?: string) => void | Promise<void>;
 }) {
-  const filled = !!(local[handleKey] ?? "").trim();
+  const rawHandle = (local[handleKey] ?? "").trim();
+  const normalized = normalizeHandle(kind, rawHandle);
+  const filled = !!normalized;
+  const invalid = !!rawHandle && !normalized;
+  const commitHandle = () => {
+    if (rawHandle === normalized) { if (rawHandle) onSave(handleKey); return; }
+    set(handleKey, normalized);
+    onSave(handleKey, normalized);
+  };
+  const commitName = () => onSave(nameKey);
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-2">
       <div className="flex items-center gap-2">
@@ -395,22 +440,96 @@ function ContactRow({ icon: Icon, label, accent, nameKey, handleKey, handlePlace
       <div className="grid sm:grid-cols-2 gap-2">
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Display name</label>
-          <div className="flex gap-2">
-            <Input placeholder={label} value={local[nameKey] ?? ""} onChange={(e) => set(nameKey, e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-            <Button size="sm" onClick={() => onSave(nameKey)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
-          </div>
+          <Input
+            placeholder={label}
+            value={local[nameKey] ?? ""}
+            onChange={(e) => set(nameKey, e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            className="bg-white/5 border-white/10 font-mono text-xs"
+          />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label === "WhatsApp" ? "Phone number" : "Username"}</label>
-          <div className="flex gap-2">
-            <Input placeholder={handlePlaceholder} value={local[handleKey] ?? ""} onChange={(e) => set(handleKey, e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-            <Button size="sm" onClick={() => onSave(handleKey)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
+            {kind === "whatsapp" ? "Phone number (with country code)" : "Username"}
+          </label>
+          <Input
+            placeholder={handlePlaceholder}
+            value={local[handleKey] ?? ""}
+            onChange={(e) => set(handleKey, e.target.value)}
+            onBlur={commitHandle}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            className={`bg-white/5 border-white/10 font-mono text-xs ${invalid ? "border-red-500/50" : ""}`}
+          />
+          <div className="text-[11px] font-mono text-white/40 flex items-center gap-2">
+            {filled ? (
+              <>
+                <span className="text-white/60">→ {displayHandle(kind, normalized)}</span>
+                <span className="text-white/25">·</span>
+                <a href={hrefFor(kind, normalized) ?? "#"} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white truncate">{hrefFor(kind, normalized)}</a>
+              </>
+            ) : invalid ? (
+              <span className="text-red-300">Invalid — check the format</span>
+            ) : (
+              <span className="text-white/30">{kind === "whatsapp" ? "Digits only, include country code" : "@ and URL prefix are stripped automatically"}</span>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+function ContactPreview({ local }: { local: Record<string, string> }) {
+  const enabled = local.contact_enabled === "1";
+  const items: Array<{ kind: "telegram" | "instagram" | "whatsapp"; name: string; accent: string; Icon: any; handle: string; href: string }> = [];
+  const push = (kind: "telegram" | "instagram" | "whatsapp", nameKey: string, handleKey: string, fallbackName: string, accent: string, Icon: any) => {
+    const h = normalizeHandle(kind, local[handleKey] ?? "");
+    if (!h) return;
+    const href = hrefFor(kind, h);
+    if (!href) return;
+    items.push({ kind, name: (local[nameKey] ?? "").trim() || fallbackName, accent, Icon, handle: displayHandle(kind, h), href });
+  };
+  push("telegram", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
+  push("instagram", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
+  push("whatsapp", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
+
+  return (
+    <div className="rounded-md border border-white/10 bg-black/40 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Live preview</div>
+        <Badge variant="outline" className={enabled && items.length
+          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+          : "bg-white/10 text-white/50 border-white/15"}>
+          {enabled && items.length ? `${items.length} VISIBLE` : "HIDDEN ON SITE"}
+        </Badge>
+      </div>
+      {enabled && items.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {items.map((c) => (
+            <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
+              className="group flex items-center gap-2.5 rounded-full border bg-black/40 backdrop-blur px-3.5 py-2 transition hover:bg-black/60"
+              style={{ borderColor: `${c.accent}55` }}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center icon-glow"
+                style={{ background: `${c.accent}22`, border: `1px solid ${c.accent}66`, color: c.accent, ["--glow-color" as any]: c.accent }}>
+                <c.Icon className="w-4 h-4" />
+              </span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-white/50">{c.name}</span>
+                <span className="text-xs text-white/90 font-medium">{c.handle}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-xs text-white/40 py-6 font-mono">
+          {enabled ? "Fill any handle above to preview it here." : "Master toggle is off — the strip is hidden on the public site."}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   icon: any; title: string; subtitle?: string; pill?: React.ReactNode; children: React.ReactNode; highlight?: string;
