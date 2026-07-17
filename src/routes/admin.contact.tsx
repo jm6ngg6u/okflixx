@@ -189,16 +189,17 @@ function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, ha
 }
 
 function ContactPreview({ local }: { local: Record<string, string> }) {
-  const items: Array<{ kind: Kind; name: string; accent: string; Icon: any; handle: string; href: string }> = [];
-  const push = (kind: Kind, enableKey: string, nameKey: string, handleKey: string, fb: string, accent: string, Icon: any) => {
+  const items: Array<{ kind: Kind; name: string; Icon: any; handle: string; href: string }> = [];
+  const push = (kind: Kind, enableKey: string, nameKey: string, handleKey: string, Icon: any) => {
     if ((local[enableKey] ?? "1") !== "1") return;
     const h = normalizeHandle(kind, local[handleKey] ?? "");
     if (!h) return;
-    items.push({ kind, name: (local[nameKey] ?? "").trim() || fb, accent, Icon, handle: displayHandle(kind, h), href: hrefFor(kind, h) });
+    const name = (local[nameKey] ?? "").trim();
+    items.push({ kind, name, Icon, handle: displayHandle(kind, h), href: hrefFor(kind, h) });
   };
-  push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
-  push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
-  push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
+  push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", Send);
+  push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", Instagram);
+  push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", Phone);
   return (
     <div className="rounded-md border border-white/10 bg-black/40 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -212,18 +213,21 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
       {items.length > 0 ? (
         <div className="flex flex-wrap items-center justify-center gap-3">
           {items.map((c) => (
-            <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
-              className="group flex items-center gap-2.5 rounded-full border bg-black/40 backdrop-blur px-3.5 py-2 transition hover:bg-black/60"
-              style={{ borderColor: `${c.accent}55` }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center icon-glow"
-                style={{ background: `${c.accent}22`, border: `1px solid ${c.accent}66`, color: c.accent, ["--glow-color" as any]: c.accent }}>
+            c.name ? (
+              <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
+                className="group flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 transition hover:border-[#ff2a3a]/40 hover:bg-white/[0.06]">
+                <span className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70 group-hover:text-[#ff2a3a] group-hover:border-[#ff2a3a]/40 transition">
+                  <c.Icon className="w-4 h-4" />
+                </span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-white/70">{c.name}</span>
+              </a>
+            ) : (
+              <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
+                aria-label={c.kind}
+                className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70 transition hover:text-[#ff2a3a] hover:border-[#ff2a3a]/40 hover:bg-white/[0.06]">
                 <c.Icon className="w-4 h-4" />
-              </span>
-              <span className="flex flex-col leading-tight">
-                <span className="text-[11px] font-mono uppercase tracking-widest text-white/50">{c.name}</span>
-                <span className="text-xs text-white/90 font-medium">{c.handle}</span>
-              </span>
-            </a>
+              </a>
+            )
           ))}
         </div>
       ) : (
