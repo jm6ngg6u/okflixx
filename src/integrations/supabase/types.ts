@@ -725,6 +725,11 @@ export type Database = {
         Args: { _ip_hash: string; _minutes: number }
         Returns: number
       }
+      count_recent_captcha_failures: {
+        Args: { _ip_hash: string; _minutes: number }
+        Returns: number
+      }
+      get_captcha_health: { Args: { _minutes?: number }; Returns: Json }
       get_proxy_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
@@ -783,6 +788,7 @@ export type Database = {
           username: string
         }[]
       }
+      purge_captcha_verify_log: { Args: { _days?: number }; Returns: number }
       purge_expired_access_sessions: { Args: never; Returns: number }
       release_cookie: {
         Args: { _id: string; _outcome?: string; _success: boolean }

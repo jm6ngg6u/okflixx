@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   KeyRound, Plus, Copy, ShieldCheck, ShieldAlert, Ban, Trash2, Infinity as Inf,
   UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle, Play, Activity,
+  Download, Trash, Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import {
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
   testCaptchaKeys, listCaptchaLogs, listActivationCaptchaDebug,
+  exportCaptchaLogsCsv, getCaptchaRetention, setCaptchaRetention, purgeCaptchaLogsNow,
 } from "@/lib/access-keys.functions";
 
 export const Route = createFileRoute("/admin/access")({
@@ -47,6 +49,18 @@ function AccessAdminPage() {
   const runTestKeys = useServerFn(testCaptchaKeys);
   const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
   const fetchActivationDebug = useServerFn(listActivationCaptchaDebug);
+  const exportCsv = useServerFn(exportCaptchaLogsCsv);
+  const fetchRetention = useServerFn(getCaptchaRetention);
+  const saveRetention = useServerFn(setCaptchaRetention);
+  const purgeNow = useServerFn(purgeCaptchaLogsNow);
+
+  const retention = useQuery({
+    queryKey: ["captcha-retention"],
+    queryFn: () => fetchRetention(),
+    refetchInterval: 15000,
+  });
+  const [retDays, setRetDays] = useState<string>("");
+  const [failLimit, setFailLimit] = useState<string>("");
 
   const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
   const [testing, setTesting] = useState(false);
@@ -302,6 +316,101 @@ function AccessAdminPage() {
                 : (<><Play className="w-3.5 h-3.5 mr-1.5" /> Test captcha keys</>)}
             </Button>
           </div>
+
+          {/* Retention & rate-limit + CSV export toolbar */}
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 flex flex-wrap items-end gap-3">
+            <div className="min-w-[140px]">
+              <Label className="label-caps mb-1.5 block">Retention (days)</Label>
+              <Input
+                type="number" min={1} max={365}
+                placeholder={String(retention.data?.retentionDays ?? 7)}
+                value={retDays}
+                onChange={(e) => setRetDays(e.target.value)}
+              />
+            </div>
+            <div className="min-w-[180px]">
+              <Label className="label-caps mb-1.5 block">Fail limit / 10 min / IP</Label>
+              <Input
+                type="number" min={1} max={500}
+                placeholder={String(retention.data?.failLimitPer10min ?? 20)}
+                value={failLimit}
+                onChange={(e) => setFailLimit(e.target.value)}
+              />
+            </div>
+            <Button
+              size="sm" variant="secondary"
+              onClick={async () => {
+                try {
+                  const payload: any = {};
+                  if (retDays) payload.retentionDays = Math.max(1, Math.min(365, parseInt(retDays, 10) || 7));
+                  if (failLimit) payload.failLimitPer10min = Math.max(1, Math.min(500, parseInt(failLimit, 10) || 20));
+                  if (Object.keys(payload).length === 0) { toast.info("Nothing to save"); return; }
+                  await saveRetention({ data: payload });
+                  toast.success("Captcha policy saved");
+                  setRetDays(""); setFailLimit("");
+                  qc.invalidateQueries({ queryKey: ["captcha-retention"] });
+                } catch (e: any) {
+                  toast.error(`Save failed: ${e?.message ?? "unknown"}`);
+                }
+              }}
+            >
+              <Save className="w-3.5 h-3.5 mr-1.5" /> Save policy
+            </Button>
+            <Button
+              size="sm" variant="outline"
+              onClick={async () => {
+                try {
+                  const r = await exportCsv({ data: { limit: 2000 } });
+                  const blob = new Blob([r.csv], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `captcha-verify-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
+                  document.body.appendChild(a); a.click(); a.remove();
+                  URL.revokeObjectURL(url);
+                  toast.success(`Exported ${r.count} row(s)`);
+                } catch (e: any) {
+                  toast.error(`Export failed: ${e?.message ?? "unknown"}`);
+                }
+              }}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="text-red-300 hover:text-red-200">
+                  <Trash className="w-3.5 h-3.5 mr-1.5" /> Purge now
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Purge captcha logs?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deletes captcha verify log rows older than the current retention
+                    ({retention.data?.retentionDays ?? 7} days). This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      try {
+                        const r = await purgeNow({ data: { days: retention.data?.retentionDays ?? 7 } });
+                        toast.success(`Purged ${r.deleted} row(s)`);
+                        qc.invalidateQueries({ queryKey: ["captcha-logs"] });
+                      } catch (e: any) {
+                        toast.error(`Purge failed: ${e?.message ?? "unknown"}`);
+                      }
+                    }}
+                  >Purge</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 ml-auto">
+              Daily auto-purge · 03:17 UTC
+            </div>
+          </div>
+
 
           {testResult && (
             <div className={`rounded-lg border px-4 py-3 text-[12px] ${
