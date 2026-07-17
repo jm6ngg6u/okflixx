@@ -973,3 +973,183 @@ export const removeUserActivationOverride = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+// ==========================================================================
+// ADMIN — "last updated by/at" for gate settings. Powers the header strip
+// on /admin/access so admins can see when (and by whom) settings changed.
+// ==========================================================================
+export const getGateLastUpdated = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const KEYS = [
+      "access_key_required", "captcha_required", "login_required",
+      "captcha_provider", "captcha_site_key", "user_daily_activation_limit",
+    ];
+    const { data: rows } = await supabaseAdmin
+      .from("app_settings")
+      .select("key,value,updated_at,updated_by")
+      .in("key", KEYS);
+    const list = rows ?? [];
+    // Resolve editor emails for display (bounded scan).
+    const ids = new Set(list.map((r: any) => r.updated_by).filter(Boolean));
+    const emailById = new Map<string, string>();
+    if (ids.size > 0) {
+      for (let page = 1; page <= 2; page++) {
+        const { data: udata } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        for (const u of udata?.users ?? []) if (ids.has(u.id)) emailById.set(u.id, u.email ?? "");
+        if ((udata?.users ?? []).length < 1000) break;
+      }
+    }
+    let latest: { key: string; updated_at: string; email: string | null } | null = null;
+    for (const r of list as any[]) {
+      const email = r.updated_by ? emailById.get(r.updated_by) ?? null : null;
+      if (!latest || new Date(r.updated_at).getTime() > new Date(latest.updated_at).getTime()) {
+        latest = { key: r.key, updated_at: r.updated_at, email };
+      }
+    }
+    return {
+      latest,
+      perKey: list.map((r: any) => ({
+        key: r.key, updated_at: r.updated_at,
+        email: r.updated_by ? emailById.get(r.updated_by) ?? null : null,
+      })),
+    };
+  });
+
+// ==========================================================================
+// ADMIN — access-related audit timeline. Merges admin_activity_log entries
+// prefixed with `access_gates`, `access_keys`, `captcha.`, `user_override.`
+// with actor emails and target metadata. Read-only.
+// ==========================================================================
+export const listAccessAudit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ limit: z.number().int().min(1).max(200).default(60) }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const PREFIXES = ["access_gates", "access_keys", "captcha", "user_override"];
+    const orFilter = PREFIXES.map((p) => `action.like.${p}.%,action.like.${p}%`).join(",");
+    const { data: rows, error } = await supabaseAdmin
+      .from("admin_activity_log")
+      .select("id, created_at, admin_id, actor_label, action, target, details")
+      .or(orFilter)
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (error) throw error;
+    const list = rows ?? [];
+    const ids = new Set(list.map((r: any) => r.admin_id).filter(Boolean));
+    const emailById = new Map<string, string>();
+    if (ids.size > 0) {
+      for (let page = 1; page <= 2; page++) {
+        const { data: udata } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        for (const u of udata?.users ?? []) if (ids.has(u.id)) emailById.set(u.id, u.email ?? "");
+        if ((udata?.users ?? []).length < 1000) break;
+      }
+    }
+    return {
+      rows: list.map((r: any) => ({
+        id: r.id,
+        created_at: r.created_at,
+        action: r.action,
+        target: r.target,
+        details: r.details,
+        actor: r.admin_id ? emailById.get(r.admin_id) ?? r.actor_label ?? null : r.actor_label ?? null,
+      })),
+    };
+  });
+
+// ==========================================================================
+// ADMIN — activation policy preview. Given an identity (email + credentials
+// present), evaluates every gate in the same order the server does and
+// returns per-gate PASS/BLOCK/N-A with the reason. Real-time dry-run.
+// ==========================================================================
+export const previewActivationPolicy = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      email: z.string().email().max(320).optional().nullable(),
+      hasAccessKey: z.boolean().default(false),
+      hasCaptchaPass: z.boolean().default(false),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: settingRows } = await supabaseAdmin
+      .from("app_settings").select("key,value")
+      .in("key", ["access_key_required", "captcha_required", "login_required", "user_daily_activation_limit", "maintenance_enabled"]);
+    const s: Record<string, string> = {};
+    for (const r of settingRows ?? []) s[r.key] = r.value;
+    const loginRequired = s.login_required === "1";
+    const captchaRequired = s.captcha_required === "1";
+    const accessKeyRequired = s.access_key_required === "1";
+    const maintenance = s.maintenance_enabled === "1";
+    const globalCap = Math.max(0, parseInt(s.user_daily_activation_limit ?? "10", 10) || 0);
+
+    // Resolve user identity (optional).
+    let user: { id: string; email: string } | null = null;
+    if (data.email) user = await findUserByEmail(supabaseAdmin, data.email);
+
+    // Override + usage.
+    let overrideCap: number | null = null;
+    let used24h = 0;
+    if (user) {
+      const { data: ov } = await supabaseAdmin
+        .from("user_activation_overrides").select("daily_limit").eq("user_id", user.id).maybeSingle();
+      if (ov && typeof (ov as any).daily_limit === "number") overrideCap = (ov as any).daily_limit;
+      const { data: n } = await supabaseAdmin.rpc("count_user_recent_attempts", {
+        _user_id: user.id, _minutes: 24 * 60,
+      });
+      used24h = (n as number) ?? 0;
+    }
+    const effectiveCap = overrideCap !== null ? overrideCap : globalCap;
+    const capUnlimited = effectiveCap === 0;
+    const capExhausted = !capUnlimited && used24h >= effectiveCap;
+
+    type Gate = { key: string; label: string; verdict: "pass" | "block" | "na"; reason: string };
+    const gates: Gate[] = [];
+    gates.push({
+      key: "maintenance", label: "Maintenance mode",
+      verdict: maintenance ? "block" : "pass",
+      reason: maintenance ? "Site is in maintenance — nobody can activate." : "off",
+    });
+    gates.push({
+      key: "login", label: "Login gate",
+      verdict: !loginRequired ? "na" : user ? "pass" : "block",
+      reason: !loginRequired ? "off"
+        : user ? `Signed in as ${user.email}` : "Not signed in — visitor is blocked.",
+    });
+    gates.push({
+      key: "captcha", label: "Captcha gate",
+      verdict: !captchaRequired ? "na" : data.hasCaptchaPass ? "pass" : "block",
+      reason: !captchaRequired ? "off"
+        : data.hasCaptchaPass ? "Fresh captcha_pass token present." : "Must solve captcha (no pass token).",
+    });
+    gates.push({
+      key: "access_key", label: "Access-key gate",
+      verdict: !accessKeyRequired ? "na" : data.hasAccessKey ? "pass" : "block",
+      reason: !accessKeyRequired ? "off"
+        : data.hasAccessKey ? "Access key / session token present." : "Requires a valid access key.",
+    });
+    gates.push({
+      key: "cap", label: "Daily activation cap",
+      verdict: !user || capUnlimited ? "na" : capExhausted ? "block" : "pass",
+      reason: !user ? "N/A — no user selected"
+        : capUnlimited ? "Unlimited (cap = 0)"
+        : `${used24h} / ${effectiveCap} used in last 24h`
+          + (overrideCap !== null ? ` (per-user override)` : ` (global)`),
+    });
+
+    const allow = gates.every((g) => g.verdict !== "block");
+    return {
+      allow,
+      user: user ? { id: user.id, email: user.email } : null,
+      gates,
+      config: { loginRequired, captchaRequired, accessKeyRequired, globalCap, maintenance },
+      cap: { effective: effectiveCap, override: overrideCap, used24h, unlimited: capUnlimited },
+    };
+  });

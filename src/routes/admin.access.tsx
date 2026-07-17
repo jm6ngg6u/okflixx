@@ -27,6 +27,7 @@ import {
   listRedemptions, getAccessStats,
   testCaptchaKeys,
   listUserActivationOverrides, setUserActivationOverride, removeUserActivationOverride,
+  getGateLastUpdated, listAccessAudit, previewActivationPolicy,
 } from "@/lib/access-keys.functions";
 
 
@@ -697,8 +698,186 @@ function AccessAdminPage() {
           </table>
         </div>
       </div>
+
+      {/* NEW — Policy preview + Audit timeline + Last-updated strip */}
+      <AccessOpsPanels />
     </div>
   );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// Ops panels: real-time policy preview + gate audit timeline + last-updated
+// ───────────────────────────────────────────────────────────────────────
+function AccessOpsPanels() {
+  const runPreview = useServerFn(previewActivationPolicy);
+  const fetchAudit = useServerFn(listAccessAudit);
+  const fetchLastUpdated = useServerFn(getGateLastUpdated);
+
+  const lastUpdated = useQuery({
+    queryKey: ["gate-last-updated"],
+    queryFn: () => fetchLastUpdated(),
+    refetchInterval: REFRESH_MS,
+  });
+  const audit = useQuery({
+    queryKey: ["access-audit"],
+    queryFn: () => fetchAudit({ data: { limit: 60 } }),
+    refetchInterval: REFRESH_MS,
+  });
+
+  const [pvEmail, setPvEmail] = useState("");
+  const [pvHasKey, setPvHasKey] = useState(false);
+  const [pvHasCaptcha, setPvHasCaptcha] = useState(false);
+  const preview = useMutation({
+    mutationFn: () => runPreview({ data: {
+      email: pvEmail.trim() || null,
+      hasAccessKey: pvHasKey,
+      hasCaptchaPass: pvHasCaptcha,
+    } }),
+  });
+
+  const l = lastUpdated.data?.latest;
+  const rel = l ? relTime(l.updated_at) : null;
+
+  return (
+    <div className="space-y-6">
+      {/* Last-updated strip */}
+      <div className="glass border border-white/10 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+        <div className="font-mono uppercase tracking-widest text-white/40">Config state</div>
+        {l ? (
+          <>
+            <span className="text-white/70">
+              Last change <span className="text-white">{rel}</span> — {prettyKey(l.key)}
+            </span>
+            <span className="text-white/50">
+              by <span className="text-white/80">{l.email ?? "system"}</span>
+            </span>
+          </>
+        ) : (
+          <span className="text-white/50">No configuration changes recorded yet.</span>
+        )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Policy preview */}
+        <div className="glass border border-white/10 p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Activity className="w-4 h-4 text-[#ff8a90]" />
+            <h2 className="font-display text-xl">Activation policy preview</h2>
+          </div>
+          <p className="text-white/55 text-xs mb-4">
+            Dry-run every gate for a hypothetical visitor. Server evaluates the same rules used at activation time.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2 mb-3">
+            <div>
+              <Label className="text-[11px] uppercase tracking-widest text-white/50">User email (optional)</Label>
+              <Input value={pvEmail} onChange={(e) => setPvEmail(e.target.value)}
+                placeholder="visitor@example.com" className="mt-1 bg-black/40 border-white/10" />
+            </div>
+            <div className="flex items-end gap-4">
+              <label className="flex items-center gap-2 text-xs text-white/70">
+                <Switch checked={pvHasKey} onCheckedChange={setPvHasKey} /> Has access key
+              </label>
+              <label className="flex items-center gap-2 text-xs text-white/70">
+                <Switch checked={pvHasCaptcha} onCheckedChange={setPvHasCaptcha} /> Captcha solved
+              </label>
+            </div>
+          </div>
+          <Button onClick={() => preview.mutate()} disabled={preview.isPending}
+            className="bg-[#ff2a3a] hover:bg-[#ff2a3a]/90">
+            {preview.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+            Evaluate
+          </Button>
+
+          {preview.data && (
+            <div className="mt-4 space-y-3">
+              <div className={`rounded-lg border px-3 py-2 text-sm flex items-center gap-2 ${
+                preview.data.allow
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-red-500/40 bg-red-500/10 text-red-200"
+              }`}>
+                {preview.data.allow ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                <span className="font-medium">
+                  {preview.data.allow ? "ACTIVATION ALLOWED" : "ACTIVATION BLOCKED"}
+                </span>
+                {preview.data.user && (
+                  <span className="ml-auto text-xs opacity-75">as {preview.data.user.email}</span>
+                )}
+              </div>
+              <ul className="divide-y divide-white/5 border border-white/10 rounded-lg overflow-hidden">
+                {preview.data.gates.map((g: any) => (
+                  <li key={g.key} className="flex items-center gap-3 px-3 py-2 text-sm bg-black/20">
+                    <span className={
+                      g.verdict === "pass" ? "text-emerald-300" :
+                      g.verdict === "block" ? "text-red-300" : "text-white/40"
+                    }>
+                      {g.verdict === "pass" ? "PASS" : g.verdict === "block" ? "BLOCK" : "N/A "}
+                    </span>
+                    <span className="text-white/85 min-w-[9rem]">{g.label}</span>
+                    <span className="text-white/55 text-xs">{g.reason}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-white/40">
+                Cap: {preview.data.cap.unlimited
+                  ? "unlimited"
+                  : `${preview.data.cap.used24h} / ${preview.data.cap.effective} last 24h`}
+                {preview.data.cap.override !== null && " (per-user override)"}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Audit timeline */}
+        <div className="glass border border-white/10 p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <ShieldCheck className="w-4 h-4 text-[#ff8a90]" />
+            <h2 className="font-display text-xl">Audit timeline</h2>
+          </div>
+          <p className="text-white/55 text-xs mb-4">
+            Every change to gates, captcha config, per-user overrides, and access keys. Newest first.
+          </p>
+          <div className="max-h-[420px] overflow-auto pr-1 space-y-2">
+            {(audit.data?.rows ?? []).map((r: any) => (
+              <div key={r.id} className="rounded-lg border border-white/5 bg-black/30 px-3 py-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-[#ff8a90]">
+                    {r.action}
+                  </span>
+                  <span className="ml-auto text-white/40">{relTime(r.created_at)}</span>
+                </div>
+                <div className="mt-1 text-white/70">
+                  <span className="text-white/50">by</span>{" "}
+                  <span className="text-white/90">{r.actor ?? "system"}</span>
+                  {r.target && <> — <span className="text-white/60">{r.target}</span></>}
+                </div>
+                {r.details && Object.keys(r.details).length > 0 && (
+                  <div className="mt-1 font-mono text-[10px] text-white/40 truncate">
+                    {JSON.stringify(r.details)}
+                  </div>
+                )}
+              </div>
+            ))}
+            {audit.data && audit.data.rows.length === 0 && (
+              <div className="text-white/40 text-sm py-6 text-center">No audit entries yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function relTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  const diff = Date.now() - t;
+  const s = Math.max(0, Math.round(diff / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  return `${d}d ago`;
 }
 
 // ───────────────────────────────────────────────────────────────────────

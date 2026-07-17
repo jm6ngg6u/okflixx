@@ -123,6 +123,20 @@ function HomePage() {
   const [accessKey, setAccessKey] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
+  // Sent on subsequent activations so the user doesn't have to re-solve for
+  // every retry / new code within the window. Server enforces expiry + binding.
+  const CAPTCHA_PASS_KEY = "cp1";
+  const [captchaPassToken, setCaptchaPassToken] = useState<string | null>(
+    typeof window !== "undefined" ? (() => {
+      const raw = sessionStorage.getItem(CAPTCHA_PASS_KEY);
+      if (!raw) return null;
+      try {
+        const { token, exp } = JSON.parse(raw) as { token: string; exp: number };
+        return exp > Date.now() ? token : null;
+      } catch { return null; }
+    })() : null,
+  );
   // Which provider the widget on this page was actually rendered for —
   // sent to the server so a mismatched admin toggle produces a clear
   // error instead of "captcha failed".
@@ -206,11 +220,12 @@ function HomePage() {
     if (!g) return { needsLogin: false, needsCaptcha: false, needsKey: false, hasSession: false };
     return {
       needsLogin: g.loginRequired && !authUserId,
-      needsCaptcha: g.captchaRequired && !captchaToken,
+      // Captcha is satisfied by either a fresh widget token OR a live pass token.
+      needsCaptcha: g.captchaRequired && !captchaToken && !captchaPassToken,
       needsKey: g.accessKeyRequired && !accessKey && !sessionToken,
       hasSession: !!sessionToken,
     };
-  }, [gate.data, authUserId, captchaToken, accessKey, sessionToken]);
+  }, [gate.data, authUserId, captchaToken, captchaPassToken, accessKey, sessionToken]);
 
   // --- Redeem key ---
   const [redeeming, setRedeeming] = useState(false);
@@ -279,10 +294,17 @@ function HomePage() {
           accessSessionToken: sessionToken,
           captchaToken: captchaToken || null,
           captchaWidgetProvider: captchaWidgetProviderRef.current,
+          captchaPassToken: captchaPassToken || null,
           fingerprint: fingerprint || null,
           authUserId,
         },
       });
+      // Server-minted captcha_pass — cache for follow-up activations.
+      const cp = (result as any).captchaPass as { token: string; exp: number } | null | undefined;
+      if (cp && cp.token) {
+        setCaptchaPassToken(cp.token);
+        try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
+      }
       if (result.ok) {
         setSuccess({
           code,
@@ -306,7 +328,9 @@ function HomePage() {
         toast.error(msg);
         setCaptchaError(msg);
         setCaptchaToken(""); // force re-solve
-        // Re-render the widget so the user can solve again.
+        // Server rejected our pass (expired / device mismatch) — drop it too.
+        setCaptchaPassToken(null);
+        try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
         try {
           const api: any = captchaWidgetProviderRef.current === "hcaptcha"
             ? (window as any).hcaptcha : (window as any).turnstile;
