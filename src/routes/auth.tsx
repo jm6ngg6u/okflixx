@@ -27,6 +27,7 @@ function AuthPage() {
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin + "/admin",
+        extraParams: { prompt: "select_account consent" },
       });
       if (result.error) {
         toast.error(result.error.message ?? "Sign-in failed");
