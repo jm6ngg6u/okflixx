@@ -1383,13 +1383,29 @@ function BulkUpload({ runUpload, onDone }: { runUpload: (b: string[], l: string)
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <div className="text-xs text-white/50">{files.length} file{files.length === 1 ? "" : "s"} queued</div>
-        <Button onClick={submit} disabled={files.length === 0 || busy} className="btn-red">
-          {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-          {busy ? "Uploading…" : `Upload ${files.length}`}
-        </Button>
-      </div>
+      {preview && files.length > 0 && (
+        <UploadPreviewPanel
+          blobs={files.map((f) => ({ name: f.name, text: f.text }))}
+          onCancel={() => setPreview(false)}
+          onConfirm={async () => { await submit(); setPreview(false); }}
+        />
+      )}
+
+      {!preview && (
+        <div className="flex justify-between items-center">
+          <div className="text-xs text-white/50">{files.length} file{files.length === 1 ? "" : "s"} queued</div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setPreview(true)} disabled={files.length === 0 || busy}
+              className="border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20">
+              <Eye className="w-4 h-4 mr-2" /> Preview (dry-run)
+            </Button>
+            <Button onClick={submit} disabled={files.length === 0 || busy} className="btn-red">
+              {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              {busy ? "Uploading…" : `Upload ${files.length}`}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
