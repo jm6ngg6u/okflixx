@@ -16,6 +16,7 @@ const InputSchema = z.object({
   accessKey: z.string().max(64).optional().nullable(),
   accessSessionToken: z.string().max(128).optional().nullable(),
   captchaToken: z.string().max(4096).optional().nullable(),
+  captchaWidgetProvider: z.enum(["turnstile", "hcaptcha"]).optional().nullable(),
   fingerprint: z.string().max(256).optional().nullable(),
   authUserId: z.string().uuid().optional().nullable(),
 });
