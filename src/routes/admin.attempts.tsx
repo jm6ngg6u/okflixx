@@ -509,9 +509,22 @@ function AttemptsPage() {
                     </td>
                     <td className={`px-3 ${rowPad} ${rowText} text-white/50`}>
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        {r.selection_reason?.policy && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest bg-[#ff2a3a]/10 border border-[#ff2a3a]/30 text-[#ff8a90]"
+                            title={r.selection_reason?.why ?? ""}
+                          >
+                            {r.selection_reason.policy.replace("_", " ")}
+                          </span>
+                        )}
                         {r.cookie_id && (
-                          <span className="inline-flex items-center gap-1 text-white/40" title={`Cookie ${r.cookie_id}`}>
+                          <span className="inline-flex items-center gap-1 text-white/40" title={`Cookie ${r.cookie_id}${r.selection_reason?.cookie?.total_uses != null ? ` · ${r.selection_reason.cookie.total_uses} uses` : ""}`}>
                             <Cookie className="w-3 h-3" /> {r.cookie_id.slice(0, 6)}
+                          </span>
+                        )}
+                        {r.selection_reason?.eligible_at_pick != null && (
+                          <span className="text-white/35 tabular-nums" title="Eligible cookies at pick time">
+                            elig {r.selection_reason.eligible_at_pick}
                           </span>
                         )}
                         {r.proxy_id && (
@@ -524,7 +537,7 @@ function AttemptsPage() {
                             · {r.error_message}
                           </span>
                         )}
-                        {!r.cookie_id && !r.proxy_id && !r.error_message && (
+                        {!r.cookie_id && !r.proxy_id && !r.error_message && !r.selection_reason && (
                           <span className="text-white/30">—</span>
                         )}
                       </div>
