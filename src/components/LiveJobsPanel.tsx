@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { listRecentJobRuns, listSettings } from "@/lib/settings.functions";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles } from "lucide-react";
+import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 type JobRow = {
@@ -20,8 +20,10 @@ type JobRow = {
 const JOB_META: Record<string, { label: string; icon: any }> = {
   "cookies-autocheck": { label: "Cookie auto-check", icon: Cookie },
   "proxies-autocheck": { label: "Proxy auto-check", icon: Globe2 },
+  "proxy_recheck": { label: "Proxy recheck", icon: RefreshCw },
   "auto-cleanup": { label: "Nightly cleanup", icon: Sparkles },
 };
+
 
 function fmtDuration(a: string, b: string | null) {
   const start = new Date(a).getTime();
