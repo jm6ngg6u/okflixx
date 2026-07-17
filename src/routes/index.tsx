@@ -102,6 +102,7 @@ function HomePage() {
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
+  const fetchCaptchaHealth = useServerFn(getCaptchaHealth);
 
   // Gate config polled every 10s so admin toggles reach the landing page.
   const gate = useQuery({
@@ -109,6 +110,14 @@ function HomePage() {
     queryFn: () => fetchGate(),
     refetchInterval: 10_000,
     staleTime: 5_000,
+  });
+
+  // Live captcha health for the status banner (5-min rolling window).
+  const captchaHealth = useQuery({
+    queryKey: ["public-captcha-health"],
+    queryFn: () => fetchCaptchaHealth(),
+    refetchInterval: 15_000,
+    enabled: !!gate.data?.captchaRequired,
   });
 
   const [accessKey, setAccessKey] = useState("");
