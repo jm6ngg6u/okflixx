@@ -189,28 +189,28 @@ function ProxiesPage() {
             <Globe2 className="w-5 h-5 text-[#ff2a3a]" />
           </div>
           <div>
-            <h1 className="font-display text-2xl md:text-3xl">Proxy pool</h1>
-            <p className="text-sm text-white/50 max-w-2xl mt-1 flex items-center gap-2">
+            <h1 className="font-display text-2xl md:text-3xl normal-case">Proxy pool</h1>
+            <p className="text-sm text-white/50 max-w-2xl mt-1 flex items-center gap-2 normal-case">
               <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-              Live · concurrent recheck · health scoring · auto-quarantine at 5 fails
+              live · concurrent recheck · health scoring · auto-quarantine at 5 fails
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => checkMut.mutate(undefined)} disabled={jobRunning || checkMut.isPending} className="btn-red">
+          <Button onClick={() => checkMut.mutate(undefined)} disabled={jobRunning || checkMut.isPending} className="btn-red normal-case">
             {jobRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
             {jobRunning ? "Rechecking…" : "Recheck all"}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={delInvalidMut.isPending} className="border-red-500/30 text-red-300 hover:bg-red-500/10">
+              <Button variant="outline" disabled={delInvalidMut.isPending} className="border-red-500/30 text-red-300 hover:bg-red-500/10 normal-case">
                 <XCircle className="w-4 h-4 mr-2" /> Remove invalid
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Remove invalid proxies?</AlertDialogTitle>
-                <AlertDialogDescription>Deletes every proxy currently marked invalid. Can't be undone.</AlertDialogDescription>
+                <AlertDialogDescription>Deletes every proxy currently marked invalid (already checked at least once). Never-checked proxies are kept.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -220,7 +220,7 @@ function ProxiesPage() {
           </AlertDialog>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={delAllMut.isPending} className="border-red-500/40 text-red-300 hover:bg-red-500/10">
+              <Button variant="outline" disabled={delAllMut.isPending} className="border-red-500/40 text-red-300 hover:bg-red-500/10 normal-case">
                 <ShieldX className="w-4 h-4 mr-2" /> Clear all
               </Button>
             </AlertDialogTrigger>
@@ -239,15 +239,17 @@ function ProxiesPage() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <StatCard label="Total" value={s?.total ?? 0} icon={<Globe2 className="w-3.5 h-3.5" />} />
-        <StatCard label="Valid" value={s?.valid ?? 0} tone="emerald" icon={<ShieldCheck className="w-3.5 h-3.5" />} />
-        <StatCard label="Invalid" value={s?.invalid ?? 0} tone="red" icon={<XCircle className="w-3.5 h-3.5" />} />
-        <StatCard label="Quarantined" value={s?.quarantined ?? 0} tone="amber" icon={<ShieldAlert className="w-3.5 h-3.5" />} />
-        <StatCard label="Never checked" value={s?.never_checked ?? 0} tone="dim" />
-        <StatCard label="Checked 1h" value={s?.checked_1h ?? 0} tone="dim" icon={<Activity className="w-3.5 h-3.5" />} />
-        <StatCard label="Avg latency" value={s?.avg_latency_ms ? `${s.avg_latency_ms}ms` : "—"} tone="dim" icon={<Zap className="w-3.5 h-3.5" />} />
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <StatCard label="total" value={s?.total ?? 0} icon={<Globe2 className="w-3.5 h-3.5" />} />
+        <StatCard label="valid" value={s?.valid ?? 0} tone="emerald" icon={<ShieldCheck className="w-3.5 h-3.5" />} />
+        <StatCard label="invalid" value={s?.invalid ?? 0} tone="red" icon={<XCircle className="w-3.5 h-3.5" />} />
+        <StatCard label="quarantined" value={s?.quarantined ?? 0} tone="amber" icon={<ShieldAlert className="w-3.5 h-3.5" />} />
+        <StatCard label="unchecked" value={s?.never_checked ?? 0} tone="sky" icon={<RefreshCw className="w-3.5 h-3.5" />} />
+        <StatCard label="checked 1h" value={s?.checked_1h ?? 0} tone="dim" icon={<Activity className="w-3.5 h-3.5" />} />
+        <StatCard label="avg health" value={s?.avg_health != null ? `${Math.round((s.avg_health ?? 0) * 100)}%` : "—"} tone="dim" />
+        <StatCard label="avg latency" value={s?.avg_latency_ms ? `${s.avg_latency_ms}ms` : "—"} tone="dim" icon={<Zap className="w-3.5 h-3.5" />} />
       </div>
+
 
       {/* Live progress strip */}
       {jobRunning && (
@@ -312,39 +314,40 @@ function ProxiesPage() {
       {/* Table + filters */}
       <div className="glass overflow-hidden">
         <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between flex-wrap gap-3">
-          <div className="font-display text-lg">Proxies <span className="text-white/40 text-sm">({data?.count ?? 0})</span></div>
+          <div className="font-display text-lg normal-case">Proxies <span className="text-white/40 text-sm">({data?.count ?? 0})</span></div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
               <Input
-                placeholder="Search ip / raw…"
+                placeholder="search ip / raw…"
                 value={filters.search}
                 onChange={(e) => { setFilters({ ...filters, search: e.target.value }); setPage(0); }}
-                className="pl-8 h-8 w-52 bg-white/5 border-white/10 text-xs"
+                className="pl-8 h-8 w-52 bg-white/5 border-white/10 text-xs normal-case placeholder:normal-case"
               />
             </div>
             <Select value={filters.status} onValueChange={(v: any) => { setFilters({ ...filters, status: v }); setPage(0); }}>
-              <SelectTrigger className="h-8 w-36 bg-white/5 border-white/10 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All status</SelectItem>
-                <SelectItem value="valid">Valid</SelectItem>
-                <SelectItem value="invalid">Invalid</SelectItem>
-                <SelectItem value="quarantined">Quarantined</SelectItem>
-                <SelectItem value="never_checked">Never checked</SelectItem>
+              <SelectTrigger className="h-8 w-40 bg-[#0b0b0d] border-white/10 text-xs normal-case"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[#0b0b0d] border-white/10">
+                <SelectItem value="all" className="normal-case">all status</SelectItem>
+                <SelectItem value="valid" className="normal-case">valid ({s?.valid ?? 0})</SelectItem>
+                <SelectItem value="invalid" className="normal-case">invalid ({s?.invalid ?? 0})</SelectItem>
+                <SelectItem value="quarantined" className="normal-case">quarantined ({s?.quarantined ?? 0})</SelectItem>
+                <SelectItem value="never_checked" className="normal-case">unchecked ({s?.never_checked ?? 0})</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filters.scheme} onValueChange={(v: any) => { setFilters({ ...filters, scheme: v }); setPage(0); }}>
-              <SelectTrigger className="h-8 w-32 bg-white/5 border-white/10 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All schemes</SelectItem>
-                <SelectItem value="http">http</SelectItem>
-                <SelectItem value="https">https</SelectItem>
-                <SelectItem value="socks5">socks5</SelectItem>
-                <SelectItem value="socks4">socks4</SelectItem>
+              <SelectTrigger className="h-8 w-32 bg-[#0b0b0d] border-white/10 text-xs normal-case"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[#0b0b0d] border-white/10">
+                <SelectItem value="all" className="normal-case">all schemes</SelectItem>
+                <SelectItem value="http" className="normal-case">http</SelectItem>
+                <SelectItem value="https" className="normal-case">https</SelectItem>
+                <SelectItem value="socks5" className="normal-case">socks5</SelectItem>
+                <SelectItem value="socks4" className="normal-case">socks4</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
+
 
         {/* Bulk toolbar */}
         {selected.size > 0 && (
@@ -364,19 +367,19 @@ function ProxiesPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/5">
+            <thead className="text-[11px] tracking-wide text-white/50 border-b border-white/5 normal-case">
               <tr>
                 <th className="p-3 w-8">
                   <Checkbox checked={allChecked} data-state={someChecked ? "indeterminate" : allChecked ? "checked" : "unchecked"} onCheckedChange={toggleAll} />
                 </th>
-                <th className="text-left p-3">Endpoint</th>
-                <th className="text-left p-3">Scheme</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Health</th>
-                <th className="text-left p-3">Latency</th>
-                <th className="text-left p-3">Uses</th>
-                <th className="text-left p-3">Last check</th>
-                <th className="text-right p-3">Actions</th>
+                <th className="text-left p-3">endpoint</th>
+                <th className="text-left p-3">scheme</th>
+                <th className="text-left p-3">status</th>
+                <th className="text-left p-3">health</th>
+                <th className="text-left p-3">latency</th>
+                <th className="text-left p-3">uses</th>
+                <th className="text-left p-3">last check</th>
+                <th className="text-right p-3">actions</th>
               </tr>
             </thead>
             <tbody>
@@ -384,6 +387,7 @@ function ProxiesPage() {
               {!isLoading && rows.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-white/40">No proxies match — adjust filters or import a list above.</td></tr>}
               {rows.map((r: any) => {
                 const quar = !!r.quarantined_at;
+                const neverChecked = !r.last_checked_at;
                 const health = typeof r.health_score === "number" ? r.health_score : 0.5;
                 const healthPct = Math.round(health * 100);
                 const healthColor = health >= 0.75 ? "bg-emerald-500" : health >= 0.5 ? "bg-amber-500" : "bg-red-500";
@@ -393,17 +397,20 @@ function ProxiesPage() {
                       <Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleOne(r.id)} />
                     </td>
                     <td className="p-3 font-mono text-xs">{r.ip}:{r.port}{r.username ? <span className="text-white/30 ml-1">· auth</span> : null}</td>
-                    <td className="p-3 text-white/60 text-xs uppercase">{r.scheme}</td>
+                    <td className="p-3 text-white/60 text-xs lowercase">{r.scheme}</td>
                     <td className="p-3">
                       {quar ? (
-                        <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30">quarantined</Badge>
+                        <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30 normal-case">quarantined</Badge>
+                      ) : neverChecked ? (
+                        <Badge variant="outline" className="bg-sky-500/15 text-sky-300 border-sky-500/30 normal-case">unchecked</Badge>
                       ) : (
-                        <Badge variant="outline" className={r.is_valid ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-red-500/15 text-red-300 border-red-500/30"}>
+                        <Badge variant="outline" className={`normal-case ${r.is_valid ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-red-500/15 text-red-300 border-red-500/30"}`}>
                           {r.is_valid ? "valid" : "invalid"}
                         </Badge>
                       )}
                       {r.last_error && <div className="text-[10px] text-white/40 mt-1 truncate max-w-[180px]">{r.last_error}</div>}
                     </td>
+
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <div className="w-16 h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -447,16 +454,17 @@ function ProxiesPage() {
   );
 }
 
-function StatCard({ label, value, tone = "default", icon }: { label: string; value: any; tone?: "default" | "emerald" | "red" | "amber" | "dim"; icon?: React.ReactNode }) {
+function StatCard({ label, value, tone = "default", icon }: { label: string; value: any; tone?: "default" | "emerald" | "red" | "amber" | "dim" | "sky"; icon?: React.ReactNode }) {
   const toneCls =
     tone === "emerald" ? "text-emerald-300" :
     tone === "red" ? "text-red-300" :
     tone === "amber" ? "text-amber-300" :
+    tone === "sky" ? "text-sky-300" :
     tone === "dim" ? "text-white/70" :
     "text-white";
   return (
     <div className="glass p-3 rounded-lg">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40">
+      <div className="flex items-center gap-1.5 text-[11px] tracking-wide text-white/45 normal-case">
         {icon}
         {label}
       </div>
@@ -464,3 +472,4 @@ function StatCard({ label, value, tone = "default", icon }: { label: string; val
     </div>
   );
 }
+
