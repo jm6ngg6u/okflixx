@@ -18,6 +18,22 @@ export const Route = createFileRoute("/auth")({
 
 type Step = "credentials" | "totp" | "recovery";
 
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 15000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(`${label} timed out. Please retry.`)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("credentials");
@@ -68,10 +84,13 @@ function AuthPage() {
     setErrorMessage(null);
     setStatus("Signing in…");
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        }),
+        "Password sign-in",
+      );
       if (error) {
         void logMfaEvent({
           data: { event: "password_signin_fail", email: email.trim(), success: false, metadata: { reason: error.message } },
@@ -94,7 +113,10 @@ function AuthPage() {
         data: { event: "password_signin_ok", email: email.trim(), success: true },
       }).catch(() => {});
 
-      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+      const { data: factors, error: factorsError } = await withTimeout(
+        supabase.auth.mfa.listFactors(),
+        "Authenticator check",
+      );
       if (factorsError) throw factorsError;
       const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
       if (verified) {
@@ -128,13 +150,19 @@ function AuthPage() {
         setBusy(false);
         return;
       }
-      const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
+      const { data: ch, error: chErr } = await withTimeout(
+        supabase.auth.mfa.challenge({ factorId }),
+        "Authenticator challenge",
+      );
       if (chErr) throw chErr;
-      const { error: vErr } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: ch.id,
-        code,
-      });
+      const { error: vErr } = await withTimeout(
+        supabase.auth.mfa.verify({
+          factorId,
+          challengeId: ch.id,
+          code,
+        }),
+        "Authenticator verification",
+      );
       if (vErr) {
         void logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
         setErrorMessage(vErr.message);
