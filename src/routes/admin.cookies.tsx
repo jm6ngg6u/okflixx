@@ -151,31 +151,30 @@ function CookiePoolPage() {
 
   const isAnyChecking = checkingIds.size > 0 || pageCheckProgress !== null;
 
-  const { data, isLoading, isFetching, dataUpdatedAt } = useQuery({
+  const listArgs = { page, pageSize, status: status || undefined, country: country || undefined,
+    q: q || undefined, sort, sortDir, stuckOnly: stuckOnly || undefined };
+  const { data, isLoading, isFetching, dataUpdatedAt, error, isError, refetch } = useQuery({
     queryKey: ["cookies", page, status, country, q, sort, sortDir, stuckOnly],
-    queryFn: () => list({ data: {
-      page, pageSize,
-      status: status || undefined,
-      country: country || undefined,
-      q: q || undefined,
-      sort, sortDir,
-      stuckOnly: stuckOnly || undefined,
-    }}),
-    refetchInterval: isAnyChecking ? 2_000 : LIVE_POLL_MS,
+    queryFn: () => logAdminFetch("listCookies", listArgs, () => list({ data: listArgs })),
+    refetchInterval: (query) => (query.state.error ? false : (isAnyChecking ? 2_000 : LIVE_POLL_MS)),
     placeholderData: (prev) => prev,
+    retry: 1,
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats, error: statsError } = useQuery({
     queryKey: ["cookie-stats"],
-    queryFn: () => statsFn({}),
-    refetchInterval: STATS_POLL_MS,
+    queryFn: () => logAdminFetch("getCookiePoolStats", {}, () => statsFn({})),
+    refetchInterval: (query) => (query.state.error ? false : STATS_POLL_MS),
+    retry: 1,
   });
 
   const { data: countries } = useQuery({
     queryKey: ["cookie-countries"],
-    queryFn: () => listCountries({}),
+    queryFn: () => logAdminFetch("listCookieCountries", {}, () => listCountries({})),
     refetchInterval: 30_000,
+    retry: 1,
   });
+
 
   const rows: any[] = useMemo(() => data?.rows ?? [], [data]);
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
