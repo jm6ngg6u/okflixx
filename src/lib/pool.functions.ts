@@ -406,10 +406,13 @@ export const listProxies = createServerFn({ method: "POST" })
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
     let q = supabase.from("proxy_pool").select("*", { count: "exact" });
-    if (data.status === "valid") q = q.eq("is_valid", true).is("quarantined_at", null);
-    else if (data.status === "invalid") q = q.eq("is_valid", false);
+    if (data.status === "valid") q = q.eq("is_valid", true).is("quarantined_at", null).not("last_checked_at", "is", null);
+    // "invalid" excludes never-checked and quarantined so a fresh upload is NOT
+    // double-counted; it lives only in the "never_checked" bucket until first check.
+    else if (data.status === "invalid") q = q.eq("is_valid", false).not("last_checked_at", "is", null).is("quarantined_at", null);
     else if (data.status === "quarantined") q = q.not("quarantined_at", "is", null);
     else if (data.status === "never_checked") q = q.is("last_checked_at", null);
+
     if (data.scheme && data.scheme !== "all") q = q.eq("scheme", data.scheme);
     if (data.search && data.search.trim()) q = q.ilike("raw", `%${data.search.trim()}%`);
     if (data.minLatency != null) q = q.gte("last_latency_ms", data.minLatency);
