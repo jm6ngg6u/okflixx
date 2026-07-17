@@ -10,7 +10,7 @@ import { submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
+import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Copy, LifeBuoy, X } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
@@ -132,10 +132,11 @@ function HomePage() {
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<
-    | { kind: "no_cookie" | "exhausted"; message: string; attempts?: number }
+    | { kind: "no_cookie" | "exhausted"; message: string; attempts?: number; code: string; at: number }
     | null
   >(null);
   const [retryCountdown, setRetryCountdown] = useState(0);
+  const [autoRetry, setAutoRetry] = useState(true);
 
   // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
   // Sent on subsequent activations so the user doesn't have to re-solve for
@@ -166,11 +167,21 @@ function HomePage() {
   useEffect(() => { computeFingerprint().then(setFingerprint); }, []);
 
   // Retry countdown for service errors (no_cookie / exhausted).
+  const handleActivateRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (retryCountdown <= 0) return;
-    const t = window.setTimeout(() => setRetryCountdown((n) => Math.max(0, n - 1)), 1000);
+    const t = window.setTimeout(() => {
+      setRetryCountdown((n) => {
+        const next = Math.max(0, n - 1);
+        if (next === 0 && autoRetry && serviceError) {
+          // Fire on next tick so state settles.
+          window.setTimeout(() => handleActivateRef.current?.(), 0);
+        }
+        return next;
+      });
+    }, 1000);
     return () => window.clearTimeout(t);
-  }, [retryCountdown]);
+  }, [retryCountdown, autoRetry, serviceError]);
 
   // Track auth state (for login-gate).
   useEffect(() => {
@@ -445,23 +456,31 @@ function HomePage() {
           description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
         });
       } else if (result.error === "no_cookie") {
+        const errCode = `NC-${Date.now().toString(36).toUpperCase().slice(-6)}`;
         setServiceError({
           kind: "no_cookie",
           message: result.message ?? "Cookie pool is empty. Our team has been alerted — try again in a moment.",
+          code: errCode,
+          at: Date.now(),
         });
         setRetryCountdown(30);
+        setAutoRetry(true);
         toast.error("Cookie pool empty", {
-          description: "No active cookies available right now. Retry shortly.",
+          description: `No active cookies available. Auto-retry in 30s · ${errCode}`,
         });
       } else if (result.error === "exhausted") {
+        const errCode = `EX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
         setServiceError({
           kind: "exhausted",
           message: result.message ?? "We tried several cookies and none activated this code.",
           attempts: result.attempts,
+          code: errCode,
+          at: Date.now(),
         });
         setRetryCountdown(20);
+        setAutoRetry(true);
         toast.error("Activation exhausted", {
-          description: `We attempted ${result.attempts ?? "several"} cookies. Please retry in a few seconds.`,
+          description: `Attempted ${result.attempts ?? "several"} cookies. Auto-retry in 20s · ${errCode}`,
         });
       } else {
         toast.error("Server hiccup", { description: "Try again in a moment." });
@@ -477,6 +496,8 @@ function HomePage() {
       setSubmitting(false);
     }
   };
+  handleActivateRef.current = handleActivate;
+
 
   const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
 
@@ -862,29 +883,69 @@ function HomePage() {
                             · {serviceError.attempts} attempts
                           </span>
                         )}
+                        <span className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">
+                          Code
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(
+                                `${serviceError.code} · ${serviceError.kind} · ${new Date(serviceError.at).toISOString()}${serviceError.attempts != null ? ` · attempts=${serviceError.attempts}` : ""}`,
+                              ).then(() => toast.success("Error code copied", { description: "Share this with support." }))
+                                .catch(() => toast.error("Copy failed"));
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/[0.04] text-white/80 hover:text-white hover:border-white/25 transition"
+                            title="Copy error code"
+                          >
+                            {serviceError.code}
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </span>
                       </div>
-                      <p className="mt-1 text-sm text-white/85 leading-relaxed">
-                        {serviceError.message}
-                      </p>
-                      <p className="mt-1 text-xs text-white/50">
+                      <p className="mt-2 text-sm text-white/90 leading-relaxed">
                         {serviceError.kind === "no_cookie"
-                          ? "All active cookies are locked or being refreshed. Your code is still valid — just retry."
-                          : "This can happen when cookies expire mid-request. Retrying picks a fresh one."}
+                          ? "The activation pool is momentarily empty — every active cookie is locked in another request or being refreshed."
+                          : `We tried ${serviceError.attempts ?? "several"} cookies and none accepted your code. This usually means cookies expired mid-request.`}
                       </p>
-                      <div className="mt-3 flex items-center gap-2">
+                      <p className="mt-1.5 text-xs text-white/60">
+                        <span className="font-mono uppercase tracking-widest text-white/40">Next step · </span>
+                        {serviceError.kind === "no_cookie"
+                          ? "Wait a few seconds — cookies auto-unlock. Your TV code stays valid, no need to re-enter it."
+                          : "Keep the same TV code visible and let us retry with a fresh cookie."}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => { setServiceError(null); setRetryCountdown(0); handleActivate(); }}
-                          disabled={retryCountdown > 0}
+                          onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(true); handleActivate(); }}
+                          disabled={retryCountdown > 0 && !autoRetry}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          <RotateCcw className="w-3 h-3" />
-                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Retry now"}
+                          <RotateCcw className={`w-3 h-3 ${retryCountdown > 0 && autoRetry ? "animate-spin-slow" : ""}`} />
+                          {retryCountdown > 0
+                            ? (autoRetry ? `Auto-retry in ${retryCountdown}s` : `Retry in ${retryCountdown}s`)
+                            : "Retry now"}
                         </button>
+                        {retryCountdown > 0 && autoRetry && (
+                          <button
+                            type="button"
+                            onClick={() => setAutoRetry(false)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/15 bg-white/[0.04] text-white/80 hover:text-white hover:border-white/30 transition"
+                            title="Cancel auto-retry"
+                          >
+                            <X className="w-3 h-3" />
+                            Cancel auto-retry
+                          </button>
+                        )}
+                        <a
+                          href="mailto:support@lovable.dev?subject=TV%20Activation%20Error"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/70 hover:text-white hover:border-white/25 transition"
+                        >
+                          <LifeBuoy className="w-3 h-3" />
+                          Get help
+                        </a>
                         <button
                           type="button"
-                          onClick={() => { setServiceError(null); setRetryCountdown(0); }}
-                          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:border-white/20 transition"
+                          onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(false); }}
+                          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/50 hover:text-white/90 hover:border-white/20 transition"
                         >
                           Dismiss
                         </button>
