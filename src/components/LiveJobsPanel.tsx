@@ -233,11 +233,42 @@ function RunningRow({ row }: { row: JobRow }) {
   const Icon = meta.icon;
   const p = row.progress ?? {};
   const total = p.total ?? 0;
-  const done = p.checked ?? 0;
+  const done = p.checked ?? p.done ?? 0;
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+
+  const control = useServerFn(requestJobControl);
+  const qc = useQueryClient();
+  const [confirm, setConfirm] = useState<null | "stop" | "cancel">(null);
+  const [pending, setPending] = useState<null | "stop" | "cancel">(null);
+  const requested: "stop" | "cancel" | null =
+    (row as any).control === "stop" || (row as any).control === "cancel"
+      ? (row as any).control
+      : null;
+
+  async function submit(action: "stop" | "cancel") {
+    setConfirm(null);
+    setPending(action);
+    try {
+      await control({ data: { id: row.id, action } });
+      toast.message(action === "stop" ? "Stop requested" : "Cancel requested", {
+        description: action === "stop"
+          ? "Job will finish the current item and save progress."
+          : "Job will abort and progress will be discarded.",
+      });
+      qc.invalidateQueries({ queryKey: ["job-runs"] });
+    } catch (e: any) {
+      toast.error("Could not send signal", { description: String(e?.message ?? e) });
+      setPending(null);
+    }
+  }
+
+  const stopColor = "border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20";
+  const cancelColor = "border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20";
+  const disabled = !!pending || !!requested;
+
   return (
     <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Loader2 className="w-3.5 h-3.5 text-emerald-300 animate-spin shrink-0" />
           <Icon className="w-3.5 h-3.5 text-white/60 shrink-0" />
@@ -247,16 +278,77 @@ function RunningRow({ row }: { row: JobRow }) {
               {p.phase}
             </Badge>
           )}
+          {requested && (
+            <Badge variant="outline" className={requested === "stop"
+              ? "bg-amber-500/15 border-amber-500/40 text-amber-200 text-[10px] uppercase"
+              : "bg-red-500/15 border-red-500/40 text-red-200 text-[10px] uppercase"}>
+              {requested === "stop" ? "Stopping…" : "Cancelling…"}
+            </Badge>
+          )}
         </div>
-        <span className="text-xs text-white/50 font-mono shrink-0">{fmtDuration(row.started_at, null)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-white/50 font-mono">{fmtDuration(row.started_at, null)}</span>
+          <Button
+            size="sm" variant="outline" disabled={disabled}
+            onClick={() => setConfirm("stop")}
+            className={`h-7 px-2 text-[11px] gap-1 ${stopColor} disabled:opacity-40`}
+            title="Stop and save partial progress"
+          >
+            <Square className="w-3 h-3" /> Stop
+          </Button>
+          <Button
+            size="sm" variant="outline" disabled={disabled}
+            onClick={() => setConfirm("cancel")}
+            className={`h-7 px-2 text-[11px] gap-1 ${cancelColor} disabled:opacity-40`}
+            title="Cancel and discard progress"
+          >
+            <Ban className="w-3 h-3" /> Cancel
+          </Button>
+        </div>
       </div>
       <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full transition-all ${requested === "cancel"
+            ? "bg-gradient-to-r from-red-400 to-red-500"
+            : requested === "stop"
+              ? "bg-gradient-to-r from-amber-400 to-amber-500"
+              : "bg-gradient-to-r from-emerald-400 to-emerald-500"}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <div className="flex items-center justify-between mt-2 text-[11px] text-white/60 font-mono">
         <span>{done}/{total} • {pct}%</span>
-        <span className="truncate ml-3">{row.job === "cookies-autocheck" ? cookieSummaryLine(p) : row.job === "proxies-autocheck" ? proxySummaryLine(p) : ""}</span>
+        <span className="truncate ml-3">{row.job === "cookies-autocheck" ? cookieSummaryLine(p) : row.job.startsWith("prox") ? proxySummaryLine(p) : ""}</span>
       </div>
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent className="bg-[#0b0b0d] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 font-display">
+              <OctagonAlert className={`w-5 h-5 ${confirm === "cancel" ? "text-red-400" : "text-amber-400"}`} />
+              {confirm === "stop" ? "Stop and save progress?" : "Cancel and discard progress?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70 leading-relaxed">
+              {confirm === "stop" ? (
+                <>The job will finish the current item, skip the cleanup sweep, and save everything that was checked so far. Safe to resume later.</>
+              ) : (
+                <>The job will abort at the next checkpoint. Cleanup is skipped, the run cursor is <span className="text-white">not</span> advanced, and this run is marked <span className="text-red-300">cancelled</span>. Rows already updated cannot be reverted.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 hover:bg-white/10">Back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirm && submit(confirm)}
+              className={confirm === "cancel"
+                ? "bg-red-500/90 hover:bg-red-500 text-white border-0"
+                : "bg-amber-500/90 hover:bg-amber-500 text-black border-0"}
+            >
+              {confirm === "stop" ? "Stop and save" : "Cancel run"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
