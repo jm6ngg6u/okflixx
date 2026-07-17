@@ -9,6 +9,23 @@ import { z } from "zod";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
+function humanCaptchaReason(reason?: string, codes?: string[]): string {
+  const c = new Set(codes ?? []);
+  if (c.has("invalid-input-secret")) return "server secret was rejected — rotate it in project secrets";
+  if (c.has("missing-input-secret")) return "server secret is not configured";
+  if (c.has("invalid-input-response")) return "the widget token is invalid or already used";
+  if (c.has("missing-input-response")) return "no widget token was submitted";
+  if (c.has("timeout-or-duplicate")) return "the widget token expired — solve the captcha again";
+  if (c.has("bad-request")) return "the request was malformed";
+  if (c.has("sitekey-secret-mismatch")) return "site key and secret belong to different projects";
+  if (c.has("hostname-mismatch")) return "this domain isn't allowed on the site key";
+  if (!reason) return "unknown provider error";
+  if (reason.startsWith("captcha_network")) return "couldn't reach the captcha provider";
+  if (reason === "captcha_secret_missing") return "server secret is not configured";
+  if (reason === "empty_token") return "no widget token was submitted";
+  return reason.replace(/_/g, " ");
+}
+
 const InputSchema = z.object({
   code: z.string().length(8),
   website: z.string().max(0).optional().default(""),
