@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -37,11 +36,6 @@ import { Route as ApiPublicHooksPoolAlertRouteImport } from './routes/api/public
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
 import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -184,7 +178,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
-  '/reset-password': typeof ResetPasswordRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -212,7 +205,6 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
-  '/reset-password': typeof ResetPasswordRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -242,7 +234,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
-  '/reset-password': typeof ResetPasswordRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -273,7 +264,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/login'
-    | '/reset-password'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -301,7 +291,6 @@ export interface FileRouteTypes {
     | '/account'
     | '/auth'
     | '/login'
-    | '/reset-password'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -330,7 +319,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/login'
-    | '/reset-password'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -360,7 +348,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   LoginRoute: typeof LoginRoute
-  ResetPasswordRoute: typeof ResetPasswordRoute
   BgPreviewAuroraRoute: typeof BgPreviewAuroraRoute
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
@@ -375,13 +362,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -603,7 +583,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   LoginRoute: LoginRoute,
-  ResetPasswordRoute: ResetPasswordRoute,
   BgPreviewAuroraRoute: BgPreviewAuroraRoute,
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
