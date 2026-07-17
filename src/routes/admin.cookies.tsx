@@ -648,7 +648,45 @@ function CookiePoolPage() {
           )}
         </div>
 
+        {isError && (
+          <div
+            role="alert"
+            className="mx-4 mb-3 rounded-lg border border-red-500/40 bg-gradient-to-r from-red-500/15 to-red-500/5 p-4 flex items-start gap-3"
+          >
+            <AlertTriangle className="w-5 h-5 text-red-300 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-red-100">
+                Couldn't load cookies
+              </div>
+              <div className="text-xs text-red-200/80 mt-1 break-words">
+                {(error as any)?.message || "The cookies request failed. Check your connection or try again."}
+              </div>
+              <div className="text-[10px] text-red-200/50 mt-1 font-mono">
+                op: listCookies · see browser console for full detail
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/20"
+            >
+              {isFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {statsError && !isError && (
+          <div className="mx-4 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Stats temporarily unavailable — table data is still live.
+          </div>
+        )}
+
         <div className="overflow-x-auto">
+
           <table className="w-full text-sm">
             <thead>
               <tr>
