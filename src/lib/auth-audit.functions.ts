@@ -68,8 +68,7 @@ export const checkOtpLimit = createServerFn({ method: "POST" })
 export const recordOtpSent = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => OtpCheckInput.parse(d))
   .handler(async ({ data }) => {
-    const req = getRequest();
-    const ipHash = await sha256Hex(pickIp(req));
+    const ipHash = await sha256Hex(readIp());
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.rpc("record_otp_attempt", {
       _email: data.email,
