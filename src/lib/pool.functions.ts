@@ -511,7 +511,7 @@ async function runProxyRecheck(supabaseAdmin: any, ids: string[] | null, jobId: 
 
 export const checkAllProxies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()).optional() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ ids: z.array(z.string().uuid()).optional() }).parse(d ?? {}))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
