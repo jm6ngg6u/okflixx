@@ -206,8 +206,10 @@ function AdminLayout() {
 
     { to: "/admin/staff", label: "Staff & roles", icon: Users, adminOnly: true },
     { to: "/admin/security", label: "Security (TOTP)", icon: KeyRound },
+    { to: "/admin/contact", label: "Contact channels", icon: MessageCircle, adminOnly: true },
     { to: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
     { to: "/admin/background-song", label: "Background song", icon: Music4, adminOnly: true },
+
   ];
   const visibleNav = nav.filter((n) => !n.adminOnly || role.data?.isAdmin);
 
