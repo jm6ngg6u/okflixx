@@ -86,7 +86,7 @@ const AuthEventInput = z.object({
   email: z.string().email().optional(),
   success: z.boolean(),
   reason: z.string().max(200).optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export const logAuthEvent = createServerFn({ method: "POST" })
