@@ -24,7 +24,7 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
-  testCaptchaKeys, listCaptchaLogs,
+  testCaptchaKeys, listCaptchaLogs, listActivationCaptchaDebug,
 } from "@/lib/access-keys.functions";
 
 export const Route = createFileRoute("/admin/access")({
@@ -46,12 +46,18 @@ function AccessAdminPage() {
   const fetchStats = useServerFn(getAccessStats);
   const runTestKeys = useServerFn(testCaptchaKeys);
   const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
+  const fetchActivationDebug = useServerFn(listActivationCaptchaDebug);
 
   const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
   const [testing, setTesting] = useState(false);
   const captchaLogs = useQuery({
     queryKey: ["captcha-logs"],
     queryFn: () => fetchCaptchaLogs({ data: { limit: 30 } }),
+    refetchInterval: 5000,
+  });
+  const activationDebug = useQuery({
+    queryKey: ["activation-captcha-debug"],
+    queryFn: () => fetchActivationDebug({ data: { limit: 25 } }),
     refetchInterval: 5000,
   });
 
@@ -242,6 +248,28 @@ function AccessAdminPage() {
               </p>
             </div>
           </div>
+          {(() => {
+            const key = (c.captchaSiteKey || "").trim();
+            if (!key) return null;
+            // hCaptcha site keys are UUID-shaped (with dashes). Turnstile keys start with 0x/1x/2x/3x.
+            const looksLikeHcaptcha = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+            const looksLikeTurnstile = /^[0-3]x[A-Za-z0-9_-]{10,}$/.test(key);
+            const inferred = looksLikeHcaptcha ? "hcaptcha" : looksLikeTurnstile ? "turnstile" : null;
+            if (!inferred || inferred === c.captchaProvider) return null;
+            return (
+              <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-[12px] text-red-100 flex items-start gap-2">
+                <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
+                <div>
+                  <div className="font-medium">Provider / site-key mismatch</div>
+                  <div className="text-red-200/80 mt-1">
+                    This site key looks like a <b>{inferred === "hcaptcha" ? "hCaptcha" : "Cloudflare Turnstile"}</b> key,
+                    but the selected provider is <b>{c.captchaProvider === "hcaptcha" ? "hCaptcha" : "Cloudflare Turnstile"}</b>.
+                    Switch the provider above or paste a matching site key — activations will fail otherwise.
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -341,6 +369,82 @@ function AccessAdminPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVATION ↔ CAPTCHA DEBUG — last N attempts joined to their verify entry */}
+      {c?.captchaRequired && (
+        <div className="glass p-6 border border-white/10 space-y-3">
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/60">
+            <Activity className="w-4 h-4 text-[#ff8a90]" /> Activation captcha debug
+            <span className="text-white/30 normal-case tracking-normal font-sans">
+              — last 25 activation attempts and the captcha verify that produced them
+            </span>
+          </div>
+          <div className="rounded-md border border-white/10 overflow-hidden">
+            <table className="w-full text-[11px]">
+              <thead className="bg-white/[0.03] text-white/50">
+                <tr>
+                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Time</th>
+                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Code</th>
+                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Activation</th>
+                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Captcha</th>
+                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Reason / codes</th>
+                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Token</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(activationDebug.data?.rows ?? []).length === 0 ? (
+                  <tr><td colSpan={6} className="px-3 py-6 text-center text-white/40">No activation attempts yet.</td></tr>
+                ) : (activationDebug.data!.rows.map((r: any) => {
+                  const cap = r.captcha as null | {
+                    provider: string; success: boolean; reason: string | null;
+                    error_codes: string[]; http_status: number | null;
+                    latency_ms: number | null; token_prefix: string | null;
+                    token_length: number | null; delta_ms: number;
+                  };
+                  const okAct = r.result === "success";
+                  return (
+                    <tr key={r.attempt_id} className="border-t border-white/5 hover:bg-white/[0.02] align-top">
+                      <td className="px-3 py-2 text-white/60 whitespace-nowrap">
+                        {new Date(r.attempt_created_at).toLocaleTimeString()}
+                      </td>
+                      <td className="px-3 py-2 text-white/70 font-mono">{r.code ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        <span className={okAct ? "text-emerald-300" : "text-red-300"}>{r.result}</span>
+                        {r.error_message && (
+                          <div className="text-white/40 text-[10px] mt-0.5 max-w-[280px] truncate" title={r.error_message}>
+                            {r.error_message}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {cap ? (
+                          <span className={cap.success ? "text-emerald-300" : "text-red-300"}>
+                            {cap.provider} · {cap.success ? "ok" : "fail"}
+                            <span className="text-white/30 ml-1">({cap.http_status ?? "—"})</span>
+                          </span>
+                        ) : (
+                          <span className="text-white/30">no match</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-white/60">
+                        {cap
+                          ? [cap.reason, (cap.error_codes ?? []).join(", ")].filter(Boolean).join(" · ") || "—"
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-white/40 whitespace-nowrap">
+                        {cap?.token_prefix ? `${cap.token_prefix}… (${cap.token_length})` : "—"}
+                        {cap && (
+                          <div className="text-[10px] text-white/30">Δ {Math.round(cap.delta_ms)}ms</div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                }))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
