@@ -548,6 +548,7 @@ const GateSettingsInput = z.object({
   loginRequired: z.boolean().optional(),
   captchaProvider: z.enum(["turnstile", "hcaptcha"]).optional(),
   captchaSiteKey: z.string().max(200).optional(),
+  userDailyActivationLimit: z.number().int().min(1).max(1000).optional(),
 });
 
 export const setGateSettings = createServerFn({ method: "POST" })
@@ -568,6 +569,8 @@ export const setGateSettings = createServerFn({ method: "POST" })
       rows.push({ key: "captcha_provider", value: data.captchaProvider, updated_at: now, updated_by: userId });
     if (data.captchaSiteKey !== undefined)
       rows.push({ key: "captcha_site_key", value: data.captchaSiteKey, updated_at: now, updated_by: userId });
+    if (data.userDailyActivationLimit !== undefined)
+      rows.push({ key: "user_daily_activation_limit", value: String(data.userDailyActivationLimit), updated_at: now, updated_by: userId });
     if (rows.length > 0) {
       await supabaseAdmin.from("app_settings").upsert(rows);
       await supabaseAdmin.from("admin_activity_log").insert({
