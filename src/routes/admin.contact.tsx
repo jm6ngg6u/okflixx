@@ -98,13 +98,13 @@ function ContactPage() {
       </div>
 
       <div className="glass p-5 space-y-4">
-        <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9"
+        <ContactRow icon={Send} label="Telegram" kind="telegram"
           enableKey="contact_tg_enabled" nameKey="contact_tg_name" handleKey="contact_tg_username"
           handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-        <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C"
+        <ContactRow icon={Instagram} label="Instagram" kind="instagram"
           enableKey="contact_ig_enabled" nameKey="contact_ig_name" handleKey="contact_ig_username"
           handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-        <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366"
+        <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp"
           enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number"
           handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
 
