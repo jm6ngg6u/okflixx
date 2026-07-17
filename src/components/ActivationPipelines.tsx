@@ -243,6 +243,7 @@ export function ActivationPipelines() {
               onToggle={() => setExpanded((e) => ({ ...e, [p.key]: !e[p.key] }))}
               onRetry={() => retryMut.mutate(p.code)}
               retrying={retryMut.isPending && retryMut.variables === p.code}
+              precheck={pc.data as any}
             />
           ))}
         </div>
