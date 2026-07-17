@@ -452,11 +452,9 @@ function HomePage() {
                       </div>
                       <div
                         ref={captchaWidgetRef}
-                        className={gate.data.captchaProvider === "hcaptcha" ? "h-captcha" : "cf-turnstile"}
-                        data-sitekey={gate.data.captchaSiteKey}
-                        data-callback="__emberlordCaptcha"
-                        data-theme="dark"
+                        className="min-h-[78px]"
                       />
+
                     </div>
                   )}
                 </div>
