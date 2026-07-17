@@ -294,10 +294,17 @@ function HomePage() {
           accessSessionToken: sessionToken,
           captchaToken: captchaToken || null,
           captchaWidgetProvider: captchaWidgetProviderRef.current,
+          captchaPassToken: captchaPassToken || null,
           fingerprint: fingerprint || null,
           authUserId,
         },
       });
+      // Server-minted captcha_pass — cache for follow-up activations.
+      const cp = (result as any).captchaPass as { token: string; exp: number } | null | undefined;
+      if (cp && cp.token) {
+        setCaptchaPassToken(cp.token);
+        try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
+      }
       if (result.ok) {
         setSuccess({
           code,
@@ -321,7 +328,9 @@ function HomePage() {
         toast.error(msg);
         setCaptchaError(msg);
         setCaptchaToken(""); // force re-solve
-        // Re-render the widget so the user can solve again.
+        // Server rejected our pass (expired / device mismatch) — drop it too.
+        setCaptchaPassToken(null);
+        try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
         try {
           const api: any = captchaWidgetProviderRef.current === "hcaptcha"
             ? (window as any).hcaptcha : (window as any).turnstile;
