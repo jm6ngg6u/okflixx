@@ -31,6 +31,23 @@ function useReveal() {
   }, []);
 }
 
+type SuccessPayload = {
+  code: string;
+  attempts: number;
+  policy: string;
+  redirectUrl: string;
+  account: {
+    email: string | null;
+    country: string | null;
+    plan_name: string | null;
+    video_quality: string | null;
+    max_streams: number | null;
+    member_since: string | null;
+    payment_method: string | null;
+    name: string | null;
+  };
+};
+
 function HomePage() {
   useReveal();
   const codeRef = useRef<CodeInputHandle>(null);
@@ -38,6 +55,8 @@ function HomePage() {
   const mountedAtRef = useRef<number>(Date.now());
   const lastSubmitRef = useRef<number>(0);
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<SuccessPayload | null>(null);
+  const [stage, setStage] = useState<"idle" | "checking" | "activating">("idle");
   const activate = useServerFn(submitActivation);
 
   const handleActivate = async () => {
@@ -57,6 +76,9 @@ function HomePage() {
     }
 
     setSubmitting(true);
+    setStage("checking");
+    // Visual cue that the pipeline moved from check → activate.
+    const stageTimer = window.setTimeout(() => setStage("activating"), 1200);
     try {
       const result = await activate({
         data: {
@@ -66,8 +88,13 @@ function HomePage() {
         },
       });
       if (result.ok) {
-        toast.success(result.message ?? "Code accepted — opening Netflix…");
-        setTimeout(() => { window.location.href = result.redirectUrl; }, 800);
+        setSuccess({
+          code,
+          attempts: result.attempts,
+          policy: result.policy,
+          redirectUrl: result.redirectUrl,
+          account: result.account,
+        });
       } else if (result.error === "rate_limited") {
         toast.error("Too many attempts. Try again in 10 minutes.");
       } else if (result.error === "bot_detected") {
@@ -86,13 +113,18 @@ function HomePage() {
       console.error(err);
       toast.error("Network error. Please try again.");
     } finally {
+      window.clearTimeout(stageTimer);
+      setStage("idle");
       setSubmitting(false);
     }
   };
 
+
   return (
     <div className="relative min-h-screen text-white">
       <LiveBackground />
+      {success && <SuccessOverlay payload={success} onClose={() => setSuccess(null)} />}
+
       <ClickRipple />
       <BackgroundSong />
 
@@ -161,8 +193,15 @@ function HomePage() {
                 disabled={submitting}
                 className="btn-red w-full mt-7 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? "Activating…" : "Activate Now →"}
+                {stage === "checking"
+                  ? "◆ Verifying cookie…"
+                  : stage === "activating"
+                    ? "◆ Activating on Netflix…"
+                    : submitting
+                      ? "Working…"
+                      : "Activate Now →"}
               </button>
+
               <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
                 <span>Encrypted End-to-End</span>
                 <span className="text-[#ff2a3a]">● Online</span>
@@ -325,3 +364,148 @@ function HomePage() {
     </div>
   );
 }
+
+function flagEmoji(cc: string | null): string {
+  if (!cc || cc.length !== 2) return "🌐";
+  const A = 0x1f1e6;
+  const up = cc.toUpperCase();
+  return String.fromCodePoint(A + up.charCodeAt(0) - 65) + String.fromCodePoint(A + up.charCodeAt(1) - 65);
+}
+
+function maskEmail(email: string | null): string {
+  if (!email) return "—";
+  const [local, domain] = email.split("@");
+  if (!domain) return email;
+  const shown = local.length <= 2 ? local[0] ?? "" : local.slice(0, 2);
+  return `${shown}${"•".repeat(Math.max(2, local.length - shown.length))}@${domain}`;
+}
+
+function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose: () => void }) {
+  const [count, setCount] = useState(6);
+  const [captured, setCaptured] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (count <= 0) {
+      window.location.href = payload.redirectUrl;
+      return;
+    }
+    const t = window.setTimeout(() => setCount((c) => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [count, payload.redirectUrl]);
+
+  const capture = async () => {
+    try {
+      // Best-effort: copy a text receipt to clipboard so the user has proof.
+      const a = payload.account;
+      const lines = [
+        `EMBERLORD · Netflix TV Activation`,
+        `Code: ${payload.code}`,
+        `Time: ${new Date().toLocaleString()}`,
+        `Attempts: ${payload.attempts}`,
+        `Policy: ${payload.policy}`,
+        `Plan: ${a.plan_name ?? "Premium"} · ${a.video_quality ?? "UHD"}`,
+        `Country: ${a.country ?? "—"}`,
+        `Screens: ${a.max_streams ?? "—"}`,
+        `Member since: ${a.member_since ?? "—"}`,
+      ].join("\n");
+      await navigator.clipboard.writeText(lines);
+      setCaptured(true);
+      toast.success("Receipt copied to clipboard");
+      window.setTimeout(() => setCaptured(false), 2000);
+    } catch {
+      toast.error("Clipboard blocked — screenshot the panel instead.");
+    }
+  };
+
+  const a = payload.account;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+      {/* Ember burst */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(closest-side,rgba(255,42,58,0.35),transparent_70%)] animate-pulse" />
+        {Array.from({ length: 18 }).map((_, i) => (
+          <span
+            key={i}
+            className="absolute w-1 h-1 rounded-full bg-[#ff9a86]"
+            style={{
+              left: `${50 + Math.cos((i / 18) * Math.PI * 2) * 32}%`,
+              top: `${50 + Math.sin((i / 18) * Math.PI * 2) * 32}%`,
+              boxShadow: "0 0 12px #ff2a3a, 0 0 24px #ff2a3a",
+              animation: `ping 1.6s ${(i * 80) % 1200}ms cubic-bezier(0,0,0.2,1) infinite`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div
+        ref={cardRef}
+        className="relative w-full max-w-2xl glass p-8 md:p-10 border border-[#ff2a3a]/30 shadow-[0_0_0_1px_rgba(255,42,58,0.25),0_30px_120px_-20px_rgba(255,42,58,0.55)] animate-in zoom-in-95 duration-300"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-[#ff2a3a] to-[#b0060f] flex items-center justify-center shadow-[0_0_40px_rgba(255,42,58,0.6)]">
+              <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12l5 5L20 7" />
+              </svg>
+              <span className="absolute inset-0 rounded-full ring-2 ring-[#ff2a3a]/40 animate-ping" />
+            </div>
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#ff2a3a]">// Activation complete</div>
+              <h3 className="font-display text-3xl md:text-4xl leading-none mt-1">You're in.</h3>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white text-xl leading-none" aria-label="Close">✕</button>
+        </div>
+
+        <p className="mt-4 text-white/70 text-sm md:text-base">
+          Code <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded">{payload.code}</span> unlocked Netflix on your TV.
+          Redirecting in <span className="text-[#ff2a3a] font-mono">{count}s</span>…
+        </p>
+
+        {/* Account details */}
+        <div className="mt-6 grid sm:grid-cols-2 gap-3">
+          <Detail label="Plan" value={a.plan_name ?? "Premium"} accent />
+          <Detail label="Quality" value={a.video_quality ?? "UHD"} accent />
+          <Detail label="Country" value={`${flagEmoji(a.country)}  ${a.country ?? "Global"}`} />
+          <Detail label="Screens" value={a.max_streams != null ? String(a.max_streams) : "Unlimited"} />
+          <Detail label="Member since" value={a.member_since ?? "—"} />
+          <Detail label="Account" value={maskEmail(a.email)} mono />
+        </div>
+
+        {/* Pipeline footer */}
+        <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-widest text-white/50">
+          <div className="flex items-center gap-3">
+            <span className="text-[#ff2a3a]">◆</span> Cookie verified
+            <span className="text-white/20">·</span>
+            <span className="text-[#ff2a3a]">◆</span> TV linked
+            <span className="text-white/20">·</span>
+            <span className="text-[#ff2a3a]">◆</span> {payload.attempts} attempt{payload.attempts === 1 ? "" : "s"}
+            <span className="text-white/20">·</span>
+            <span>Rotation: {payload.policy.replace("_", " ")}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-5 flex flex-wrap gap-3">
+          <a href={payload.redirectUrl} className="btn-red flex-1 text-center">Open Netflix now →</a>
+          <button onClick={capture} className="btn-ghost">
+            {captured ? "✓ Copied" : "Copy receipt"}
+          </button>
+          <button onClick={onClose} className="btn-ghost">Activate another</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Detail({ label, value, accent, mono }: { label: string; value: string; accent?: boolean; mono?: boolean }) {
+  return (
+    <div className={`rounded-lg border p-3 ${accent ? "border-[#ff2a3a]/30 bg-[#ff2a3a]/5" : "border-white/10 bg-white/[0.03]"}`}>
+      <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">{label}</div>
+      <div className={`mt-1 text-sm ${mono ? "font-mono" : ""} ${accent ? "text-white" : "text-white/85"}`}>{value}</div>
+    </div>
+  );
+}
+

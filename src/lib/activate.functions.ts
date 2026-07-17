@@ -16,7 +16,23 @@ const InputSchema = z.object({
 });
 
 type ActivateResult =
-  | { ok: true; message: string; attempts: number; redirectUrl: string }
+  | {
+      ok: true;
+      message: string;
+      attempts: number;
+      redirectUrl: string;
+      account: {
+        email: string | null;
+        country: string | null;
+        plan_name: string | null;
+        video_quality: string | null;
+        max_streams: number | null;
+        member_since: string | null;
+        payment_method: string | null;
+        name: string | null;
+      };
+      policy: string;
+    }
   | {
       ok: false;
       error:
@@ -30,6 +46,7 @@ type ActivateResult =
       attempts?: number;
       message?: string;
     };
+
 
 function hashIp(ip: string): string {
   const salt = process.env.SUPABASE_PROJECT_ID ?? "emberlord";
@@ -109,12 +126,19 @@ export const submitActivation = createServerFn({ method: "POST" })
       1,
       Math.min(10, parseInt(await getSetting(supabaseAdmin, "max_activation_attempts", "3"), 10)),
     );
+    const rawPolicy = (await getSetting(supabaseAdmin, "cookie_rotation_policy", "round_robin")).toLowerCase();
+    const policy: "round_robin" | "random" | "quality" =
+      rawPolicy === "random" || rawPolicy === "quality" ? (rawPolicy as any) : "round_robin";
 
     let attemptNumber = 0;
     for (attemptNumber = 1; attemptNumber <= maxAttempts; attemptNumber++) {
-      // 5a. Lock an active cookie.
-      const { data: cookieRows, error: pickErr } = await supabaseAdmin.rpc("pick_next_cookie");
+      // 5a. Lock an active cookie via the configured rotation policy.
+      const { data: cookieRows, error: pickErr } = await supabaseAdmin.rpc(
+        "pick_next_cookie_by_policy",
+        { _policy: policy },
+      );
       const cookie = Array.isArray(cookieRows) ? cookieRows[0] : cookieRows;
+
       if (pickErr || !cookie) {
         await supabaseAdmin.from("activation_attempts").insert({
           code,
@@ -211,13 +235,31 @@ export const submitActivation = createServerFn({ method: "POST" })
 
       // 5f. Terminal decisions.
       if (success) {
+        // Fetch stored account metadata for the success screen.
+        const { data: meta } = await supabaseAdmin
+          .from("cookie_pool")
+          .select("email,country,plan_name,video_quality,max_streams,member_since,payment_method,name")
+          .eq("id", cookie.id)
+          .maybeSingle();
         return {
           ok: true,
           attempts: attemptNumber,
-          message: "Activation successful — opening Netflix on your TV.",
+          message: "Activation successful — Netflix is unlocking on your TV.",
           redirectUrl: `https://www.netflix.com/tv8?code=${encodeURIComponent(code)}`,
+          policy,
+          account: {
+            email: meta?.email ?? null,
+            country: meta?.country ?? null,
+            plan_name: meta?.plan_name ?? null,
+            video_quality: meta?.video_quality ?? null,
+            max_streams: meta?.max_streams ?? null,
+            member_since: meta?.member_since ?? null,
+            payment_method: meta?.payment_method ?? null,
+            name: meta?.name ?? null,
+          },
         };
       }
+
       if (outcome.status === "invalid_code" || outcome.status === "expired_code") {
         return {
           ok: false,
