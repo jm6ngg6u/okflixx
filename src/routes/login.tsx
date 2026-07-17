@@ -132,6 +132,26 @@ function LoginPage() {
     return null;
   }
 
+  async function guardOtpRateLimit(kind: "signup" | "recovery"): Promise<boolean> {
+    try {
+      const r = await checkOtp({ data: { email: email.trim(), kind } });
+      if (!r.allowed) {
+        if (r.reason === "cooldown") {
+          setResendCooldown(r.cooldown_remaining || 30);
+          toast.error(`Wait ${r.cooldown_remaining}s before requesting a new code.`);
+        } else {
+          toast.error(`Too many codes requested — try again after ${r.window_minutes} minutes.`);
+        }
+        safeLog({ event: "otp_send", email: email.trim(), success: false, reason: `rate_limit:${r.reason}` });
+        return false;
+      }
+      return true;
+    } catch {
+      // If the rate-limit check itself fails, fall through so the user isn't blocked by an outage.
+      return true;
+    }
+  }
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     const err = validateForm(); if (err) { toast.error(err); return; }
@@ -143,10 +163,12 @@ function LoginPage() {
         options: captchaToken ? { captchaToken } : undefined,
       });
       if (error) throw error;
+      safeLog({ event: "signin", email: email.trim(), success: true });
       toast.success("Signed in.");
       navigate({ to: "/" });
     } catch (e: any) {
       const msg = String(e.message ?? "");
+      safeLog({ event: "signin", email: email.trim(), success: false, reason: msg.slice(0, 180) });
       if (/email not confirmed/i.test(msg)) {
         toast.info("Verify your email first — we'll send a fresh code.");
         await sendOtpEmail();
@@ -163,6 +185,7 @@ function LoginPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     const err = validateForm(); if (err) { toast.error(err); return; }
+    if (!(await guardOtpRateLimit("signup"))) return;
     setBusy(true);
     try {
       const { error } = await supabase.auth.signUp({
@@ -174,11 +197,18 @@ function LoginPage() {
         },
       });
       if (error) throw error;
+      await recordOtp({ data: { email: email.trim(), kind: "signup" } }).catch(() => {});
+      safeLog({ event: "signup", email: email.trim(), success: true });
+      safeLog({ event: "otp_send", email: email.trim(), success: true, reason: "signup" });
       toast.success("Verification code sent — check your email.");
-      setResendCooldown(30);
+      setResendCooldown(60);
+      setOtpFails(0);
+      setOtpLockUntil(null);
       setStage("verify-otp");
     } catch (e: any) {
-      toast.error(e.message ?? "Sign-up failed");
+      const msg = e.message ?? "Sign-up failed";
+      safeLog({ event: "signup", email: email.trim(), success: false, reason: String(msg).slice(0, 180) });
+      toast.error(msg);
       resetCaptcha();
     } finally {
       setBusy(false);
@@ -186,16 +216,23 @@ function LoginPage() {
   }
 
   async function sendOtpEmail() {
-    // Resend a fresh signup confirmation code.
-    await supabase.auth.resend({
+    if (!(await guardOtpRateLimit("signup"))) return;
+    const { error } = await supabase.auth.resend({
       type: "signup",
       email: email.trim(),
       options: captchaToken ? { captchaToken } : undefined,
     });
+    if (!error) {
+      await recordOtp({ data: { email: email.trim(), kind: "signup" } }).catch(() => {});
+      safeLog({ event: "otp_send", email: email.trim(), success: true, reason: "resend-inline" });
+    } else {
+      safeLog({ event: "otp_send", email: email.trim(), success: false, reason: String(error.message).slice(0, 180) });
+    }
   }
 
   async function handleResend() {
     if (resendCooldown > 0) return;
+    if (!(await guardOtpRateLimit("signup"))) return;
     setBusy(true);
     try {
       const { error } = await supabase.auth.resend({
@@ -204,9 +241,12 @@ function LoginPage() {
         options: captchaToken ? { captchaToken } : undefined,
       });
       if (error) throw error;
+      await recordOtp({ data: { email: email.trim(), kind: "signup" } }).catch(() => {});
+      safeLog({ event: "otp_send", email: email.trim(), success: true, reason: "resend" });
       toast.success("New code sent.");
-      setResendCooldown(30);
+      setResendCooldown(60);
     } catch (e: any) {
+      safeLog({ event: "otp_send", email: email.trim(), success: false, reason: String(e.message ?? "").slice(0, 180) });
       toast.error(e.message ?? "Failed to resend");
     } finally {
       setBusy(false);
@@ -215,6 +255,11 @@ function LoginPage() {
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
+    if (otpLockUntil && Date.now() < otpLockUntil) {
+      const s = Math.ceil((otpLockUntil - Date.now()) / 1000);
+      toast.error(`Too many wrong codes — locked for ${s}s.`);
+      return;
+    }
     if (otp.length < 6) { toast.error("Enter the 6-digit code from your email."); return; }
     setBusy(true);
     try {
@@ -224,10 +269,19 @@ function LoginPage() {
         type: "email",
       });
       if (error) throw error;
+      safeLog({ event: "otp_verify", email: email.trim(), success: true });
       toast.success("Email verified — you're signed in.");
       navigate({ to: "/" });
     } catch (e: any) {
-      toast.error(e.message ?? "Invalid or expired code");
+      const next = otpFails + 1;
+      setOtpFails(next);
+      safeLog({ event: "otp_verify", email: email.trim(), success: false, reason: String(e.message ?? "").slice(0, 180), metadata: { attempt: next } });
+      if (next >= MAX_OTP_VERIFY_ATTEMPTS) {
+        setOtpLockUntil(Date.now() + 15 * 60_000);
+        toast.error(`Maximum ${MAX_OTP_VERIFY_ATTEMPTS} attempts reached — locked for 15 minutes.`);
+      } else {
+        toast.error(`${e.message ?? "Invalid or expired code"} (attempt ${next}/${MAX_OTP_VERIFY_ATTEMPTS})`);
+      }
     } finally {
       setBusy(false);
     }
