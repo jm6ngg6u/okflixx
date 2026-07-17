@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Shield, KeyRound, Loader2 } from "lucide-react";
+import { Shield, KeyRound, Loader2, AlertTriangle } from "lucide-react";
 import { logMfaEvent } from "@/lib/mfa.functions";
 
 export const Route = createFileRoute("/auth")({
@@ -18,6 +18,22 @@ export const Route = createFileRoute("/auth")({
 
 type Step = "credentials" | "totp" | "recovery";
 
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 15000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(`${label} timed out. Please retry.`)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("credentials");
@@ -26,27 +42,36 @@ function AuthPage() {
   const [otp, setOtp] = useState("");
   const [recovery, setRecovery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
 
   // If already signed in with aal2 → straight to /admin.
   // If signed in at aal1 with a factor → jump to TOTP step.
   useEffect(() => {
     (async () => {
-      const { data: sess } = await supabase.auth.getSession();
-      if (!sess.session) return;
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal?.currentLevel === "aal2") {
-        navigate({ to: "/admin" });
-        return;
-      }
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
-      if (verified) {
-        setFactorId(verified.id);
-        setStep("totp");
-      } else {
-        // Signed in at aal1 with no factor → send to enrollment
-        navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess.session) return;
+        setStatus("Checking two-factor status…");
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.currentLevel === "aal2") {
+          navigate({ to: "/admin" });
+          return;
+        }
+        const { data: factors } = await supabase.auth.mfa.listFactors();
+        const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
+        if (verified) {
+          setFactorId(verified.id);
+          setStep("totp");
+          setStatus("");
+        } else {
+          // Signed in at aal1 with no factor → send to enrollment
+          navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
+        }
+      } catch (err: any) {
+        setStatus("");
+        setErrorMessage(err?.message ?? "Could not check the current admin session. Please try again.");
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,39 +81,57 @@ function AuthPage() {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
+    setErrorMessage(null);
+    setStatus("Signing in…");
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        }),
+        "Password sign-in",
+      );
       if (error) {
-        await logMfaEvent({
+        void logMfaEvent({
           data: { event: "password_signin_fail", email: email.trim(), success: false, metadata: { reason: error.message } },
         }).catch(() => {});
+        setErrorMessage(error.message);
         toast.error(error.message);
+        setStatus("");
         setBusy(false);
         return;
       }
       if (!data.session) {
+        setErrorMessage("The backend accepted the password but did not return a session. Try again.");
         toast.error("No session returned");
+        setStatus("");
         setBusy(false);
         return;
       }
-      await logMfaEvent({
+      setStatus("Checking authenticator…");
+      void logMfaEvent({
         data: { event: "password_signin_ok", email: email.trim(), success: true },
       }).catch(() => {});
 
-      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const { data: factors, error: factorsError } = await withTimeout(
+        supabase.auth.mfa.listFactors(),
+        "Authenticator check",
+      );
+      if (factorsError) throw factorsError;
       const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
       if (verified) {
         setFactorId(verified.id);
         setStep("totp");
+        setStatus("");
         setBusy(false);
       } else {
+        setStatus("Opening two-factor setup…");
         navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
       }
     } catch (err: any) {
+      setErrorMessage(err?.message ?? "Sign-in failed after password verification. Please retry.");
       toast.error(err?.message ?? "Sign-in failed");
+      setStatus("");
       setBusy(false);
     }
   }
@@ -97,37 +140,53 @@ function AuthPage() {
     e.preventDefault();
     if (busy || !factorId) return;
     setBusy(true);
+    setErrorMessage(null);
+    setStatus("Verifying code…");
     try {
       const code = otp.replace(/\D/g, "");
       if (code.length !== 6) {
         toast.error("Enter the 6-digit code");
+        setStatus("");
         setBusy(false);
         return;
       }
-      const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({ factorId });
+      const { data: ch, error: chErr } = await withTimeout(
+        supabase.auth.mfa.challenge({ factorId }),
+        "Authenticator challenge",
+      );
       if (chErr) throw chErr;
-      const { error: vErr } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: ch.id,
-        code,
-      });
+      const { error: vErr } = await withTimeout(
+        supabase.auth.mfa.verify({
+          factorId,
+          challengeId: ch.id,
+          code,
+        }),
+        "Authenticator verification",
+      );
       if (vErr) {
-        await logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
+        void logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
+        setErrorMessage(vErr.message);
         toast.error(vErr.message);
+        setStatus("");
         setBusy(false);
         return;
       }
-      await logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
+      void logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
+      setStatus("Opening admin panel…");
       toast.success("Verified");
       navigate({ to: "/admin" });
     } catch (err: any) {
+      setErrorMessage(err?.message ?? "Verification failed. Please retry.");
       toast.error(err?.message ?? "Verification failed");
+      setStatus("");
       setBusy(false);
     }
   }
 
   async function handleGoogle() {
     setBusy(true);
+    setErrorMessage(null);
+    setStatus("Opening Google sign-in…");
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin + "/auth",
@@ -135,6 +194,7 @@ function AuthPage() {
       });
       if (result.error) {
         toast.error(result.error.message ?? "Sign-in failed");
+        setStatus("");
         setBusy(false);
         return;
       }
@@ -142,7 +202,9 @@ function AuthPage() {
       // After Google → same MFA flow
       window.location.reload();
     } catch (err: any) {
+      setErrorMessage(err?.message ?? "Sign-in failed");
       toast.error(err?.message ?? "Sign-in failed");
+      setStatus("");
       setBusy(false);
     }
   }
@@ -155,18 +217,23 @@ function AuthPage() {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
+    setErrorMessage(null);
+    setStatus("Checking recovery code…");
     try {
       const { redeemRecoveryCode } = await import("@/lib/mfa.functions");
       const res = await redeemRecoveryCode({ data: { code: recovery } });
       if (!res.ok) {
         toast.error(res.reason === "already_used" ? "This code was already used" : "Invalid recovery code");
+        setStatus("");
         setBusy(false);
         return;
       }
       toast.success("Recovery accepted — enroll a new authenticator");
       navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
     } catch (err: any) {
+      setErrorMessage(err?.message ?? "Recovery failed");
       toast.error(err?.message ?? "Recovery failed");
+      setStatus("");
       setBusy(false);
     }
   }
@@ -190,6 +257,18 @@ function AuthPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          {errorMessage && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100 flex gap-2">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-300" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+          {status && (
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/60 flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-red-300" />
+              <span>{status}</span>
+            </div>
+          )}
           {step === "credentials" && (
             <>
               <form onSubmit={handlePasswordSignIn} className="space-y-3">

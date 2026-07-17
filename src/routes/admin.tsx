@@ -19,6 +19,22 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 15000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(`${label} timed out. Please retry.`)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function AdminLayout() {
   const navigate = useNavigate();
   const [authReady, setAuthReady] = useState(false);
@@ -26,6 +42,7 @@ function AdminLayout() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [mfaReady, setMfaReady] = useState(false);
+  const [gateError, setGateError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const auditedAccessRef = useRef<string | null>(null);
   const qc = useQueryClient();
@@ -34,25 +51,32 @@ function AdminLayout() {
   async function verifyMfa(userIdArg: string | null) {
     if (!userIdArg) return;
     try {
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      setGateError(null);
+      const { data: aal } = await withTimeout(
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+        "Two-factor check",
+      );
       if (aal?.currentLevel === "aal2") {
         setMfaReady(true);
         return;
       }
       // aal1 → need MFA. Send to enroll or challenge depending on factor state.
-      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const { data: factors } = await withTimeout(
+        supabase.auth.mfa.listFactors(),
+        "Authenticator factor check",
+      );
       const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
       setMfaReady(false);
       navigate({ to: "/auth/mfa", search: { mode: verified ? "challenge" : "enroll" } as any });
-    } catch {
+    } catch (err: any) {
       setMfaReady(false);
-      navigate({ to: "/auth" });
+      setGateError(err?.message ?? "Could not verify two-factor status.");
     }
   }
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getUser().then(async ({ data, error }) => {
+    withTimeout(supabase.auth.getUser(), "Session check").then(async ({ data, error }) => {
       if (!mounted) return;
       const user = error ? null : data.user;
       setAuthed(!!user);
@@ -64,6 +88,10 @@ function AdminLayout() {
         return;
       }
       await verifyMfa(user.id);
+    }).catch((err: any) => {
+      if (!mounted) return;
+      setGateError(err?.message ?? "Could not check your admin session.");
+      setAuthReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
@@ -137,6 +165,7 @@ function AdminLayout() {
 
   if (!authReady) return <FullScreen label="Loading session…" />;
   if (!authed) return null;
+  if (gateError) return <GateError message={gateError} onRetry={() => verifyMfa(userId)} onSignOut={signOut} />;
   if (!mfaReady) return <FullScreen label="Verifying two-factor…" />;
   if (role.isLoading) return <FullScreen label="Checking permissions…" />;
   if (role.error || !role.data?.isStaff) {
@@ -248,6 +277,23 @@ function AdminLayout() {
         <main className="p-4 md:p-8 max-w-[1400px] w-full">
           <Outlet />
         </main>
+      </div>
+    </div>
+  );
+}
+
+function GateError({ message, onRetry, onSignOut }: { message: string; onRetry: () => void; onSignOut: () => void }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden text-white">
+      <LiveBackground />
+      <div className="relative z-10 max-w-md text-center space-y-5 glass p-8">
+        <ShieldAlert className="w-12 h-12 mx-auto text-[#ff2a3a]" />
+        <h1 className="font-display text-3xl">Login needs attention</h1>
+        <p className="text-white/60 text-sm">{message}</p>
+        <div className="flex gap-2 justify-center">
+          <Button variant="outline" onClick={onSignOut}>Sign out</Button>
+          <Button className="btn-red" onClick={onRetry}>Retry</Button>
+        </div>
       </div>
     </div>
   );
