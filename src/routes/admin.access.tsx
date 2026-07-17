@@ -46,12 +46,18 @@ function AccessAdminPage() {
   const fetchStats = useServerFn(getAccessStats);
   const runTestKeys = useServerFn(testCaptchaKeys);
   const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
+  const fetchActivationDebug = useServerFn(listActivationCaptchaDebug);
 
   const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
   const [testing, setTesting] = useState(false);
   const captchaLogs = useQuery({
     queryKey: ["captcha-logs"],
     queryFn: () => fetchCaptchaLogs({ data: { limit: 30 } }),
+    refetchInterval: 5000,
+  });
+  const activationDebug = useQuery({
+    queryKey: ["activation-captcha-debug"],
+    queryFn: () => fetchActivationDebug({ data: { limit: 25 } }),
     refetchInterval: 5000,
   });
 
