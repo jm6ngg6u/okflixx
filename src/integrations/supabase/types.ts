@@ -367,8 +367,11 @@ export type Database = {
       }
       proxy_pool: {
         Row: {
+          consecutive_failures: number
           country: string | null
           created_at: string
+          failure_count: number
+          health_score: number
           id: string
           ip: string
           is_locked: boolean
@@ -380,14 +383,19 @@ export type Database = {
           locked_at: string | null
           password: string | null
           port: string
+          quarantined_at: string | null
           raw: string
           scheme: string
+          success_count: number
           total_uses: number
           username: string | null
         }
         Insert: {
+          consecutive_failures?: number
           country?: string | null
           created_at?: string
+          failure_count?: number
+          health_score?: number
           id?: string
           ip: string
           is_locked?: boolean
@@ -399,14 +407,19 @@ export type Database = {
           locked_at?: string | null
           password?: string | null
           port: string
+          quarantined_at?: string | null
           raw: string
           scheme?: string
+          success_count?: number
           total_uses?: number
           username?: string | null
         }
         Update: {
+          consecutive_failures?: number
           country?: string | null
           created_at?: string
+          failure_count?: number
+          health_score?: number
           id?: string
           ip?: string
           is_locked?: boolean
@@ -418,8 +431,10 @@ export type Database = {
           locked_at?: string | null
           password?: string | null
           port?: string
+          quarantined_at?: string | null
           raw?: string
           scheme?: string
+          success_count?: number
           total_uses?: number
           username?: string | null
         }
@@ -491,6 +506,7 @@ export type Database = {
         Args: { _ip_hash: string; _minutes: number }
         Returns: number
       }
+      get_proxy_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -573,6 +589,7 @@ export type Database = {
         }
         Returns: Json
       }
+      unquarantine_proxy: { Args: { _id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "moderator"
