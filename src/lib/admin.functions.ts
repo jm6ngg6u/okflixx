@@ -116,7 +116,7 @@ export const listAttempts = createServerFn({ method: "POST" })
     let q = supabase
       .from("activation_attempts")
       .select(
-        "id, code, result, country, user_agent, created_at, ip_hash, cookie_id, proxy_id, proxy_mode, attempt_number, duration_ms, error_message",
+        "id, code, result, country, user_agent, created_at, ip_hash, cookie_id, proxy_id, proxy_mode, attempt_number, duration_ms, error_message, selection_reason",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
