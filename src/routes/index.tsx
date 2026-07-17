@@ -991,6 +991,10 @@ function HomePage() {
             </div>
           </div>
 
+          {/* LIVE POOL STATUS — mirrors server-side eligibility RPC */}
+          <PoolStatusPanel data={poolStatus.data} loading={poolStatus.isLoading} />
+
+
           <div className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-mono text-white/45 reveal">
             <span>◆ 99.99% Uptime</span>
             <span>◆ AES-256 Encrypted</span>
