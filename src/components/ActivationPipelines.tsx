@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getActivationPipelines } from "@/lib/admin.functions";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getActivationPipelines, getRateLimitStatus, retryActivationAdmin } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Cookie, Globe2, ListChecks, PlayCircle, Server,
-  CheckCircle2, XCircle, Clock, Zap,
+  CheckCircle2, XCircle, Clock, Zap, RefreshCw, ShieldAlert, Loader2, Gauge,
 } from "lucide-react";
 
 type Attempt = {
