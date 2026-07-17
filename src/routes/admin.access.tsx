@@ -257,8 +257,8 @@ function AccessAdminPage() {
                   }}
                 />
               </div>
-              <p className="text-[11px] text-white/40 mt-2">
-                Add secret via project settings: <code className="text-white/70">TURNSTILE_SECRET</code> or <code className="text-white/70">HCAPTCHA_SECRET</code>.
+              <p className="text-[11px] text-white/40 mt-2 leading-relaxed">
+                The site key is public and used by the widget in the browser. The <code className="text-white/70">HCAPTCHA_SECRET</code> / <code className="text-white/70">TURNSTILE_SECRET</code> is stored encrypted in <b>Cloud → Secrets</b>, is only ever read server-side inside <code className="text-white/70">verifyCaptcha</code>, and is never returned to the client, written to logs, or shown in this UI.
               </p>
             </div>
           </div>
