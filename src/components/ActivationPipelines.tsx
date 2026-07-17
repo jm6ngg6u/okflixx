@@ -105,9 +105,12 @@ export function ActivationPipelines() {
     setExpanded((e) => (e[newestKey] === undefined ? { ...e, [newestKey]: true } : e));
   }, [newestKey]);
 
+  const rlData = rl.data;
+  const rlBusy = !!rlData && rlData.total > 0;
+
   return (
     <div className="glass p-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <ListChecks className="w-4 h-4 text-[#ff2a3a]" />
           <div>
@@ -122,6 +125,45 @@ export function ActivationPipelines() {
         </div>
       </div>
 
+      {/* Rate-limit strip */}
+      <div className={`mb-4 rounded-lg border px-3 py-2 flex items-center gap-3 flex-wrap ${
+        rlBusy
+          ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] via-amber-500/[0.03] to-transparent"
+          : "border-white/10 bg-white/[0.02]"
+      }`}>
+        <div className={`w-7 h-7 rounded-md grid place-items-center ${
+          rlBusy ? "bg-amber-500/15 border border-amber-500/30 text-amber-300"
+                 : "bg-white/5 border border-white/10 text-white/40"
+        }`}>
+          <Gauge className="w-3.5 h-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-white/40">
+            rate-limit · last {rlData?.windowMinutes ?? 15}m
+          </div>
+          <div className="text-xs text-white/80 truncate">
+            {rlBusy ? (
+              <>
+                <span className="text-amber-300 font-medium">{rlData.total}</span> blocked ·
+                <span className="text-amber-300 ml-1">{rlData.rate_limited}</span> throttled ·
+                <span className="text-[#ff8a90] ml-1">{rlData.bot_detected}</span> bot ·
+                <span className="text-white/50 ml-1">{rlData.top.length} unique IP hash{rlData.top.length === 1 ? "" : "es"}</span>
+              </>
+            ) : (
+              <span className="text-emerald-300/80">All clear · no blocked traffic in window</span>
+            )}
+          </div>
+        </div>
+        {rlBusy && rlData.top.slice(0, 4).map((ip) => (
+          <span key={ip.ip_hash}
+            className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-100"
+            title={`IP ${ip.ip_hash.slice(0, 16)}… · last ${new Date(ip.last).toLocaleTimeString()}`}>
+            <ShieldAlert className="w-3 h-3" />
+            {ip.ip_hash.slice(0, 8)} · ×{ip.count}
+          </span>
+        ))}
+      </div>
+
       {pipelines.length === 0 ? (
         <div className="text-sm text-white/40 font-mono py-8 text-center">
           {q.isLoading ? "Loading pipelines…" : "No activation runs in the last 30 minutes"}
@@ -134,6 +176,8 @@ export function ActivationPipelines() {
               pipeline={p}
               expanded={!!expanded[p.key]}
               onToggle={() => setExpanded((e) => ({ ...e, [p.key]: !e[p.key] }))}
+              onRetry={() => retryMut.mutate(p.code)}
+              retrying={retryMut.isPending && retryMut.variables === p.code}
             />
           ))}
         </div>
@@ -143,8 +187,8 @@ export function ActivationPipelines() {
 }
 
 function PipelineRow({
-  pipeline, expanded, onToggle,
-}: { pipeline: Pipeline; expanded: boolean; onToggle: () => void }) {
+  pipeline, expanded, onToggle, onRetry, retrying,
+}: { pipeline: Pipeline; expanded: boolean; onToggle: () => void; onRetry: () => void; retrying: boolean }) {
   const final = pipeline.final_result;
   const isSuccess = final === "success";
   const finalIsTerminal = isTerminal(final);
