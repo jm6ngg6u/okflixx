@@ -873,13 +873,8 @@ function HomePage() {
                             Cancel auto-retry
                           </button>
                         )}
-                        <a
-                          href="mailto:support@lovable.dev?subject=TV%20Activation%20Error"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/70 hover:text-white hover:border-white/25 transition"
-                        >
-                          <LifeBuoy className="w-3 h-3" />
-                          Get help
-                        </a>
+
+
                         <button
                           type="button"
                           onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(false); }}
