@@ -36,6 +36,39 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportLovableError } from "@/lib/lovable-error-reporting";
+
+/**
+ * Wrap an admin data-fetch promise so failures are:
+ *  1. Logged to the browser console with structured detail (op name, args,
+ *     message, stack) — makes prod bug reports actionable.
+ *  2. Forwarded to Lovable's error reporter (same channel as the error
+ *     boundary), tagged as a handled fetch failure.
+ * The original error is rethrown so React Query still sees `isError`.
+ */
+async function logAdminFetch<T>(op: string, args: unknown, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const anyErr = err as any;
+    const detail = {
+      op,
+      args,
+      message: anyErr?.message ?? String(err),
+      name: anyErr?.name,
+      status: anyErr?.status ?? anyErr?.response?.status,
+      body: anyErr?.body ?? anyErr?.response?.data,
+      stack: anyErr?.stack,
+      at: new Date().toISOString(),
+    };
+    // eslint-disable-next-line no-console
+    console.error(`[admin.cookies] ${op} failed`, detail);
+    reportLovableError(err, { source: "admin_cookies_fetch", ...detail });
+    throw err;
+  }
+}
+
+
 
 export const Route = createFileRoute("/admin/cookies")({
   head: () => ({ meta: [{ title: "Cookie pool — Admin" }, { name: "robots", content: "noindex" }] }),
@@ -118,31 +151,30 @@ function CookiePoolPage() {
 
   const isAnyChecking = checkingIds.size > 0 || pageCheckProgress !== null;
 
-  const { data, isLoading, isFetching, dataUpdatedAt } = useQuery({
+  const listArgs = { page, pageSize, status: status || undefined, country: country || undefined,
+    q: q || undefined, sort, sortDir, stuckOnly: stuckOnly || undefined };
+  const { data, isLoading, isFetching, dataUpdatedAt, error, isError, refetch } = useQuery({
     queryKey: ["cookies", page, status, country, q, sort, sortDir, stuckOnly],
-    queryFn: () => list({ data: {
-      page, pageSize,
-      status: status || undefined,
-      country: country || undefined,
-      q: q || undefined,
-      sort, sortDir,
-      stuckOnly: stuckOnly || undefined,
-    }}),
-    refetchInterval: isAnyChecking ? 2_000 : LIVE_POLL_MS,
+    queryFn: () => logAdminFetch("listCookies", listArgs, () => list({ data: listArgs })),
+    refetchInterval: (query) => (query.state.error ? false : (isAnyChecking ? 2_000 : LIVE_POLL_MS)),
     placeholderData: (prev) => prev,
+    retry: 1,
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats, error: statsError } = useQuery({
     queryKey: ["cookie-stats"],
-    queryFn: () => statsFn({}),
-    refetchInterval: STATS_POLL_MS,
+    queryFn: () => logAdminFetch("getCookiePoolStats", {}, () => statsFn({})),
+    refetchInterval: (query) => (query.state.error ? false : STATS_POLL_MS),
+    retry: 1,
   });
 
   const { data: countries } = useQuery({
     queryKey: ["cookie-countries"],
-    queryFn: () => listCountries({}),
+    queryFn: () => logAdminFetch("listCookieCountries", {}, () => listCountries({})),
     refetchInterval: 30_000,
+    retry: 1,
   });
+
 
   const rows: any[] = useMemo(() => data?.rows ?? [], [data]);
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / pageSize));
@@ -616,7 +648,45 @@ function CookiePoolPage() {
           )}
         </div>
 
+        {isError && (
+          <div
+            role="alert"
+            className="mx-4 mb-3 rounded-lg border border-red-500/40 bg-gradient-to-r from-red-500/15 to-red-500/5 p-4 flex items-start gap-3"
+          >
+            <AlertTriangle className="w-5 h-5 text-red-300 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-red-100">
+                Couldn't load cookies
+              </div>
+              <div className="text-xs text-red-200/80 mt-1 break-words">
+                {(error as any)?.message || "The cookies request failed. Check your connection or try again."}
+              </div>
+              <div className="text-[10px] text-red-200/50 mt-1 font-mono">
+                op: listCookies · see browser console for full detail
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/20"
+            >
+              {isFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {statsError && !isError && (
+          <div className="mx-4 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Stats temporarily unavailable — table data is still live.
+          </div>
+        )}
+
         <div className="overflow-x-auto">
+
           <table className="w-full text-sm">
             <thead>
               <tr>
