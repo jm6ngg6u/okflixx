@@ -744,11 +744,11 @@ function CookiePoolPage() {
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i}><td colSpan={8} className="p-0"><div className="skeleton-row" /></td></tr>
+                <tr key={i}><td colSpan={9} className="p-0"><div className="skeleton-row" /></td></tr>
               ))}
               {!isLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="state-block">
                       <div className="state-icon"><Cookie className="w-5 h-5" /></div>
                       <div className="state-title">No cookies match these filters</div>
