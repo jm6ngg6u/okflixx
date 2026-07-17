@@ -484,7 +484,6 @@ function LoginPage() {
                     placeholder="000000"
                   />
                 </div>
-                </div>
                 {otpLockUntil && Date.now() < otpLockUntil && (
                   <div className="rounded-md border border-red-500/25 bg-red-500/5 p-2.5 text-[11px] text-red-200">
                     Too many wrong codes. Try again in {Math.ceil((otpLockUntil - Date.now()) / 1000)}s.
