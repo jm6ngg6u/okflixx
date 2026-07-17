@@ -133,6 +133,8 @@ function AdminLayout() {
     { to: "/admin/attempts", label: "Attempts log", icon: ScrollText },
     { to: "/admin/cookies", label: "Cookie pool", icon: Cookie, adminOnly: true },
     { to: "/admin/proxies", label: "Proxy pool", icon: Globe2, adminOnly: true },
+    { to: "/admin/rotation", label: "Rotation policy", icon: Shuffle, adminOnly: true },
+
     { to: "/admin/staff", label: "Staff & roles", icon: Users, adminOnly: true },
     { to: "/admin/security", label: "Security (TOTP)", icon: KeyRound },
     { to: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
