@@ -189,28 +189,28 @@ function ProxiesPage() {
             <Globe2 className="w-5 h-5 text-[#ff2a3a]" />
           </div>
           <div>
-            <h1 className="font-display text-2xl md:text-3xl">Proxy pool</h1>
-            <p className="text-sm text-white/50 max-w-2xl mt-1 flex items-center gap-2">
+            <h1 className="font-display text-2xl md:text-3xl normal-case">Proxy pool</h1>
+            <p className="text-sm text-white/50 max-w-2xl mt-1 flex items-center gap-2 normal-case">
               <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-              Live · concurrent recheck · health scoring · auto-quarantine at 5 fails
+              live · concurrent recheck · health scoring · auto-quarantine at 5 fails
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => checkMut.mutate(undefined)} disabled={jobRunning || checkMut.isPending} className="btn-red">
+          <Button onClick={() => checkMut.mutate(undefined)} disabled={jobRunning || checkMut.isPending} className="btn-red normal-case">
             {jobRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PlayCircle className="w-4 h-4 mr-2" />}
             {jobRunning ? "Rechecking…" : "Recheck all"}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={delInvalidMut.isPending} className="border-red-500/30 text-red-300 hover:bg-red-500/10">
+              <Button variant="outline" disabled={delInvalidMut.isPending} className="border-red-500/30 text-red-300 hover:bg-red-500/10 normal-case">
                 <XCircle className="w-4 h-4 mr-2" /> Remove invalid
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Remove invalid proxies?</AlertDialogTitle>
-                <AlertDialogDescription>Deletes every proxy currently marked invalid. Can't be undone.</AlertDialogDescription>
+                <AlertDialogDescription>Deletes every proxy currently marked invalid (already checked at least once). Never-checked proxies are kept.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -220,7 +220,7 @@ function ProxiesPage() {
           </AlertDialog>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={delAllMut.isPending} className="border-red-500/40 text-red-300 hover:bg-red-500/10">
+              <Button variant="outline" disabled={delAllMut.isPending} className="border-red-500/40 text-red-300 hover:bg-red-500/10 normal-case">
                 <ShieldX className="w-4 h-4 mr-2" /> Clear all
               </Button>
             </AlertDialogTrigger>
@@ -239,15 +239,17 @@ function ProxiesPage() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <StatCard label="Total" value={s?.total ?? 0} icon={<Globe2 className="w-3.5 h-3.5" />} />
-        <StatCard label="Valid" value={s?.valid ?? 0} tone="emerald" icon={<ShieldCheck className="w-3.5 h-3.5" />} />
-        <StatCard label="Invalid" value={s?.invalid ?? 0} tone="red" icon={<XCircle className="w-3.5 h-3.5" />} />
-        <StatCard label="Quarantined" value={s?.quarantined ?? 0} tone="amber" icon={<ShieldAlert className="w-3.5 h-3.5" />} />
-        <StatCard label="Never checked" value={s?.never_checked ?? 0} tone="dim" />
-        <StatCard label="Checked 1h" value={s?.checked_1h ?? 0} tone="dim" icon={<Activity className="w-3.5 h-3.5" />} />
-        <StatCard label="Avg latency" value={s?.avg_latency_ms ? `${s.avg_latency_ms}ms` : "—"} tone="dim" icon={<Zap className="w-3.5 h-3.5" />} />
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <StatCard label="total" value={s?.total ?? 0} icon={<Globe2 className="w-3.5 h-3.5" />} />
+        <StatCard label="valid" value={s?.valid ?? 0} tone="emerald" icon={<ShieldCheck className="w-3.5 h-3.5" />} />
+        <StatCard label="invalid" value={s?.invalid ?? 0} tone="red" icon={<XCircle className="w-3.5 h-3.5" />} />
+        <StatCard label="quarantined" value={s?.quarantined ?? 0} tone="amber" icon={<ShieldAlert className="w-3.5 h-3.5" />} />
+        <StatCard label="unchecked" value={s?.never_checked ?? 0} tone="sky" icon={<RefreshCw className="w-3.5 h-3.5" />} />
+        <StatCard label="checked 1h" value={s?.checked_1h ?? 0} tone="dim" icon={<Activity className="w-3.5 h-3.5" />} />
+        <StatCard label="avg health" value={s?.avg_health != null ? `${Math.round((s.avg_health ?? 0) * 100)}%` : "—"} tone="dim" />
+        <StatCard label="avg latency" value={s?.avg_latency_ms ? `${s.avg_latency_ms}ms` : "—"} tone="dim" icon={<Zap className="w-3.5 h-3.5" />} />
       </div>
+
 
       {/* Live progress strip */}
       {jobRunning && (
