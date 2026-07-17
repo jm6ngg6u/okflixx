@@ -78,16 +78,30 @@ function AccessAdminPage() {
     );
   }, [keys.data, search]);
 
-  // ─── Gate toggles ────────────────────────────────────────────────────
+  // ─── Gate toggles ─ optimistic with rollback ─────────────────────────
+  // Snapshot the current config, patch instantly, then reconcile with the
+  // authoritative server response in `onSettled`. If another admin flipped
+  // the same switch first, the 2s poll + onSettled invalidate resyncs.
   const gateMut = useMutation({
     mutationFn: (patch: any) => saveSettings({ data: patch }),
+    onMutate: async (patch: any) => {
+      await qc.cancelQueries({ queryKey: ["gate-config"] });
+      const previous = qc.getQueryData<any>(["gate-config"]);
+      if (previous) qc.setQueryData(["gate-config"], { ...previous, ...patch });
+      return { previous, patch };
+    },
     onSuccess: (_r, patch) => {
       const [k, v] = Object.entries(patch)[0]!;
-      toast.success("Gate updated", { description: `${prettyKey(k)} · ${v ? "ON" : "OFF"}` });
-      qc.invalidateQueries({ queryKey: ["gate-config"] });
+      const isBool = typeof v === "boolean";
+      toast.success("Gate updated", { description: `${prettyKey(k)} · ${isBool ? (v ? "ON" : "OFF") : String(v)}` });
     },
-    onError: (e: any) => toast.error("Update failed", { description: e?.message ?? "Unknown" }),
+    onError: (e: any, _patch, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["gate-config"], ctx.previous);
+      toast.error("Update failed · rolled back", { description: e?.message ?? "Unknown" });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["gate-config"] }),
   });
+
 
   // ─── Captcha config (site key + provider) ────────────────────────────
   const [siteKeyDraft, setSiteKeyDraft] = useState<string | null>(null);
