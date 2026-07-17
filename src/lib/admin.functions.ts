@@ -554,3 +554,79 @@ export const retryActivationAdmin = createServerFn({ method: "POST" })
 
     return { ok: success, status: outcome.status, policy, duration_ms: dur };
   });
+
+// -------------------- Cookie eligibility rules --------------------
+
+const VALID_STATUSES = ["active", "free", "on_hold", "unknown", "invalid"] as const;
+
+const EligibilityInput = z.object({
+  include_statuses: z.array(z.enum(VALID_STATUSES)).min(1),
+  require_valid: z.boolean(),
+  min_success_rate: z.number().min(0).max(1),
+  min_total_uses: z.number().int().min(0).max(1000),
+});
+
+export const getCookieEligibility = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadEligibility, DEFAULT_ELIGIBILITY } = await import("@/lib/activate.functions");
+    const rules = await loadEligibility(supabaseAdmin);
+    const { data: count } = await supabaseAdmin.rpc("count_eligible_cookies", {
+      _include_statuses: rules.include_statuses,
+      _require_valid: rules.require_valid,
+      _min_success_rate: rules.min_success_rate,
+      _min_total_uses: rules.min_total_uses,
+    });
+    return { rules, defaults: DEFAULT_ELIGIBILITY, eligible: (count as number) ?? 0 };
+  });
+
+export const setCookieEligibility = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => EligibilityInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const value = JSON.stringify(data);
+    await supabaseAdmin.from("app_settings").upsert({ key: "cookie_eligibility", value }, { onConflict: "key" });
+    const { data: count } = await supabaseAdmin.rpc("count_eligible_cookies", {
+      _include_statuses: data.include_statuses,
+      _require_valid: data.require_valid,
+      _min_success_rate: data.min_success_rate,
+      _min_total_uses: data.min_total_uses,
+    });
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "cookie_eligibility.updated",
+      details: { rules: data, eligible_after: count ?? 0 },
+    });
+    return { ok: true, eligible: (count as number) ?? 0 };
+  });
+
+const PreviewInput = z.object({
+  include_statuses: z.array(z.enum(VALID_STATUSES)).min(1),
+  require_valid: z.boolean(),
+  min_success_rate: z.number().min(0).max(1),
+  min_total_uses: z.number().int().min(0).max(1000),
+});
+
+export const previewCookieEligibility = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => PreviewInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: count } = await supabaseAdmin.rpc("count_eligible_cookies", {
+      _include_statuses: data.include_statuses,
+      _require_valid: data.require_valid,
+      _min_success_rate: data.min_success_rate,
+      _min_total_uses: data.min_total_uses,
+    });
+    return { eligible: (count as number) ?? 0 };
+  });
