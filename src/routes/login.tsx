@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getGateConfig } from "@/lib/access-keys.functions";
+import { checkOtpLimit, recordOtpSent, logAuthEvent } from "@/lib/auth-audit.functions";
 import { toast } from "sonner";
 import { LogIn, UserPlus, MailCheck, ShieldCheck, KeyRound, ArrowLeft } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
