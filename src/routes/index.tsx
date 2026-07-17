@@ -468,9 +468,64 @@ function HomePage() {
                 style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
               />
 
-              {/* ---- ACCESS GATES ---- */}
+              {/* ---- ACCESS GATES ---- only visible for gates admin enabled */}
               {anyGate && (
-                <div className="mt-6 space-y-3">
+                <div className="mt-6">
+                  {/* Header strip: live count + progress bar */}
+                  <div className="rounded-t-lg border border-white/10 border-b-0 bg-gradient-to-b from-white/[0.06] to-white/[0.02] px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className={`w-4 h-4 ${allSatisfied ? "text-emerald-400" : "text-[#ff8a90]"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/50">
+                          Security requirements
+                        </div>
+                        <div className="text-sm text-white/90 mt-0.5 truncate">
+                          {allSatisfied
+                            ? "All checks passed — ready to activate."
+                            : `${doneCount} of ${gateItems.length} completed · finish the steps below.`}
+                        </div>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest border ${
+                        allSatisfied
+                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                          : "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${allSatisfied ? "bg-emerald-400" : "bg-[#ff2a3a] animate-pulse"}`} />
+                        {allSatisfied ? "Ready" : "Action needed"}
+                      </span>
+                    </div>
+                    <div className="mt-3 h-1 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className={`h-full transition-[width] duration-500 ease-out ${
+                          allSatisfied ? "bg-gradient-to-r from-emerald-500 to-emerald-300"
+                                       : "bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]"
+                        }`}
+                        style={{ width: `${(doneCount / gateItems.length) * 100}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {gateItems.map((g, i) => (
+                        <span
+                          key={g.key}
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-widest border ${
+                            g.done
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                              : "border-white/10 bg-white/[0.04] text-white/55"
+                          }`}
+                        >
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
+                            g.done ? "bg-emerald-500/30 text-emerald-100" : "bg-white/10 text-white/60"
+                          }`}>
+                            {g.done ? "✓" : i + 1}
+                          </span>
+                          {g.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-b-lg border border-white/10 border-t-0 bg-black/20 p-3 space-y-3">
+
                   {/* Login gate */}
                   {gate.data?.loginRequired && (
                     <div className={`rounded-lg border p-3 flex items-center gap-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
