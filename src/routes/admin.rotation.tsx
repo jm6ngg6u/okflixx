@@ -134,6 +134,11 @@ function RotationPage() {
     onError: (e: any) => toast.error(e?.message ?? "Save failed"),
   });
 
+  const sim = useMutation({
+    mutationFn: async () => simulate({ data: { ...draft, policy: current, limit: 10 } as any }),
+    onError: (e: any) => toast.error(e?.message ?? "Simulation failed"),
+  });
+
   const resetDefaults = () => {
     const d = eligQ.data?.defaults;
     if (!d) return;
