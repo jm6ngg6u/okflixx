@@ -581,3 +581,14 @@ html, body {
 .slo-ring-good  { stroke: #22c55e; }
 .slo-ring-warn  { stroke: #f59e0b; }
 .slo-ring-bad   { stroke: #ff2a3a; }
+
+/* Generic activation progress bar — indeterminate sweep */
+@keyframes activationSweep {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { width: 60%; }
+  100% { transform: translateX(250%); width: 40%; }
+}
+.activation-progress-bar {
+  width: 40%;
+  animation: activationSweep 1.6s ease-in-out infinite;
+}

@@ -7,11 +7,11 @@ import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
-import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
-import { getPublicPoolStatus, getPublicContacts } from "@/lib/settings.functions";
+import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
+import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Copy, LifeBuoy, X, Database, Sparkles, Repeat, Send, Instagram, Phone } from "lucide-react";
+import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
@@ -76,11 +76,7 @@ function useReveal() {
 
 type SuccessPayload = {
   code: string;
-  attempts: number;
-  policy: string;
   redirectUrl: string;
-  gatesPassed: { key: "login" | "key" | "captcha"; label: string; detail: string }[];
-  sessionExpiresAt: number | null;
   account: {
     email: string | null;
     country: string | null;
@@ -102,13 +98,11 @@ function HomePage() {
   const lastSubmitRef = useRef<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
-  // Multi-step progress: idle → checking-login → checking-key → checking-captcha → checking-cookie → activating.
-  type Stage = "idle" | "checking-login" | "checking-key" | "checking-captcha" | "checking-cookie" | "activating";
-  const [stage, setStage] = useState<Stage>("idle");
+  // Single generic in-flight indicator; internal stages are not exposed.
+  const [stage, setStage] = useState<"idle" | "working">("idle");
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
-  const fetchCaptchaHealth = useServerFn(getCaptchaHealth);
 
 
   // Gate config polled every 10s so admin toggles reach the landing page.
@@ -117,26 +111,6 @@ function HomePage() {
     queryFn: () => fetchGate(),
     refetchInterval: 10_000,
     staleTime: 5_000,
-  });
-
-  // Live captcha health for the status banner (5-min rolling window).
-  const captchaHealth = useQuery({
-    queryKey: ["public-captcha-health"],
-    queryFn: () => fetchCaptchaHealth(),
-    refetchInterval: 15_000,
-    enabled: !!gate.data?.captchaRequired,
-  });
-
-  // Live cookie-pool status shown on the landing page. Mirrors the exact RPC
-  // the server picker uses, so what a user sees here is what actually gets
-  // considered when they submit a code. 5s cadence keeps it feeling live
-  // without hammering the server.
-  const fetchPoolStatus = useServerFn(getPublicPoolStatus);
-  const poolStatus = useQuery({
-    queryKey: ["public-pool-status"],
-    queryFn: () => fetchPoolStatus(),
-    refetchInterval: 5_000,
-    staleTime: 2_000,
   });
 
   const [accessKey, setAccessKey] = useState("");
@@ -360,37 +334,24 @@ function HomePage() {
     // Pre-flight gate checks — server is still source of truth, but naming
     // the blocking gate lets the user act immediately.
     if (gateBlocks.needsLogin) {
-      setLoginError("Sign in with Google to continue.");
-      toast.error("Sign-in required", { description: "Use the Sign in button above the code panel." });
+      setLoginError("Please sign in to continue.");
+      toast.error("Sign in required");
       return;
     }
     if (gateBlocks.needsKey) {
-      setKeyError("Redeem your access key before submitting.");
-      toast.error("Access key required", { description: "Paste your key and press Verify." });
+      setKeyError("Please enter your access key.");
+      toast.error("Access key required");
       return;
     }
     if (gateBlocks.needsCaptcha) {
-      setCaptchaError("Complete the human check below.");
-      toast.error("Human check required", { description: "Solve the captcha before submitting." });
+      setCaptchaError("Please complete the verification below.");
+      toast.error("Verification required");
       return;
     }
 
     setLoginError(null); setKeyError(null); setCaptchaError(null); setServiceError(null); setRetryCountdown(0);
     setSubmitting(true);
-
-    // Walk through enabled gates so the user sees a real per-step progress.
-    const g = gate.data;
-    const steps: Stage[] = [];
-    if (g?.loginRequired) steps.push("checking-login");
-    if (g?.accessKeyRequired) steps.push("checking-key");
-    if (g?.captchaRequired) steps.push("checking-captcha");
-    steps.push("checking-cookie");
-    const stageTimers: number[] = [];
-    setStage(steps[0]);
-    for (let i = 1; i < steps.length; i++) {
-      stageTimers.push(window.setTimeout(() => setStage(steps[i]), i * 450));
-    }
-    const activatingTimer = window.setTimeout(() => setStage("activating"), steps.length * 450 + 400);
+    setStage("working");
 
     try {
       const result = await activate({
@@ -407,49 +368,27 @@ function HomePage() {
           authUserId,
         },
       });
-      // Server-minted captcha_pass — cache for follow-up activations.
+      // Cache the server-issued verification pass (internal — not shown to user).
       const cp = (result as any).captchaPass as { token: string; exp: number } | null | undefined;
       if (cp && cp.token) {
         setCaptchaPassToken(cp.token);
         try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
       }
       if (result.ok) {
-        // Snapshot which gates passed for the receipt.
-        const passed: SuccessPayload["gatesPassed"] = [];
-        if (g?.loginRequired) passed.push({ key: "login", label: "Sign-in", detail: authEmail ?? "Signed in" });
-        if (g?.accessKeyRequired) passed.push({
-          key: "key",
-          label: "Access key",
-          detail: sessionToken ? "24-hour session" : "Verified",
-        });
-        if (g?.captchaRequired) passed.push({
-          key: "captcha",
-          label: "Human check",
-          detail: cp?.token ? "Captcha pass · 10 min" : "Verified",
-        });
         setSuccess({
           code,
-          attempts: result.attempts,
-          policy: result.policy,
           redirectUrl: result.redirectUrl,
-          gatesPassed: passed,
-          sessionExpiresAt: cp?.exp ?? null,
           account: result.account,
         });
-      } else if (result.error === "rate_limited") {
-        toast.error("Too many attempts", { description: "Try again in about 10 minutes, or solve the captcha to unlock unlimited activations." });
-      } else if (result.error === "bot_detected") {
-        toast.error("Automated activity detected", { description: "Refresh the page and try again." });
       } else if (result.error === "invalid_code") {
-        toast.error("Invalid TV code", { description: result.message ?? "Check the code shown on your TV and re-enter it." });
+        toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
       } else if (result.error === "maintenance") {
-        toast.error("Service unavailable", { description: result.message ?? "We're briefly down for maintenance — try again shortly." });
+        toast.error("Service temporarily unavailable", { description: "Please try again in a moment." });
       } else if (result.error === "login_required") {
-        setLoginError(result.message ?? "Sign in to activate.");
-        toast.error("Login gate blocked activation", { description: result.message ?? "Sign in with Google to continue." });
+        setLoginError("Please sign in to continue.");
+        toast.error("Sign in required");
       } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
-        const msg = result.message ?? "Captcha check failed. Please retry.";
-        setCaptchaError(msg);
+        setCaptchaError("Verification failed. Please try again.");
         setCaptchaToken("");
         setCaptchaPassToken(null);
         try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
@@ -458,58 +397,38 @@ function HomePage() {
             ? (window as any).hcaptcha : (window as any).turnstile;
           api?.reset?.();
         } catch { /* noop */ }
-        toast.error("Captcha gate blocked activation", { description: "Solve the fresh human check below and try again." });
+        toast.error("Verification failed", { description: "Please complete the check below and try again." });
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
         if (result.error === "access_key_invalid" && sessionToken) {
           localStorage.removeItem(SESSION_KEY);
           setSessionToken(null);
         }
-        setKeyError(result.message ?? "Access key required.");
-        toast.error("Access-key gate blocked activation", {
-          description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
-        });
-      } else if (result.error === "no_cookie") {
-        const errCode = `NC-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+        setKeyError("Please enter a valid access key.");
+        toast.error("Access key required");
+      } else if (result.error === "no_cookie" || result.error === "exhausted") {
         setServiceError({
-          kind: "no_cookie",
-          message: result.message ?? "Cookie pool is empty. Our team has been alerted — try again in a moment.",
-          code: errCode,
-          at: Date.now(),
-        });
-        setRetryCountdown(30);
-        setAutoRetry(true);
-        toast.error("Cookie pool empty", {
-          description: `No active cookies available. Auto-retry in 30s · ${errCode}`,
-        });
-      } else if (result.error === "exhausted") {
-        const errCode = `EX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-        setServiceError({
-          kind: "exhausted",
-          message: result.message ?? "We tried several cookies and none activated this code.",
-          attempts: result.attempts,
-          code: errCode,
+          kind: result.error === "no_cookie" ? "no_cookie" : "exhausted",
+          message: "We couldn't activate your TV right now. Please try again in a moment.",
+          code: "",
           at: Date.now(),
         });
         setRetryCountdown(20);
         setAutoRetry(true);
-        toast.error("Activation exhausted", {
-          description: `Attempted ${result.attempts ?? "several"} cookies. Auto-retry in 20s · ${errCode}`,
-        });
+        toast.error("Activation failed", { description: "Please try again in a moment." });
       } else {
-        toast.error("Server hiccup", { description: "Try again in a moment." });
+        // Generic bucket: rate_limited, bot_detected, unknown → same message.
+        toast.error("Activation failed", { description: "Please try again in a moment." });
       }
     } catch (err) {
       console.error(err);
-      toast.error("Network error", { description: "Check your connection and try again." });
+      toast.error("Activation failed", { description: "Please check your connection and try again." });
     } finally {
-      stageTimers.forEach((t) => window.clearTimeout(t));
-      window.clearTimeout(activatingTimer);
       setStage("idle");
-
       setSubmitting(false);
     }
   };
   handleActivateRef.current = handleActivate;
+
 
 
   const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
@@ -729,50 +648,8 @@ function HomePage() {
                         )}
                       </div>
                       <p className="text-[11px] text-white/45 leading-snug mb-2">
-                        {captchaPassToken
-                          ? "You have a captcha pass — no need to solve again for the next few minutes."
-                          : "Solve the challenge once. Successful checks unlock a 10-minute pass on this device."}
+                        Please complete the check below to continue.
                       </p>
-
-
-
-                      {/* Live captcha status banner */}
-                      {captchaHealth.data && captchaHealth.data.status !== "idle" && (
-                        <div
-                          className={`mb-2 rounded-md border px-3 py-2 text-[11px] flex items-center gap-2 ${
-                            captchaHealth.data.status === "healthy"
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
-                              : captchaHealth.data.status === "degraded"
-                                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
-                                : "border-red-500/30 bg-red-500/10 text-red-100"
-                          }`}
-                        >
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              captchaHealth.data.status === "healthy"
-                                ? "bg-emerald-400 animate-pulse"
-                                : captchaHealth.data.status === "degraded"
-                                  ? "bg-amber-400 animate-pulse"
-                                  : "bg-red-400 animate-pulse"
-                            }`}
-                          />
-                          <span className="font-medium">
-                            {captchaHealth.data.status === "healthy"
-                              ? "Captcha service healthy"
-                              : captchaHealth.data.status === "degraded"
-                                ? "Captcha service degraded"
-                                : "Captcha service disrupted"}
-                          </span>
-                          <span className="text-white/50 font-mono">
-                            {Math.round(captchaHealth.data.successRate * 100)}% ok · {captchaHealth.data.total} tries / {captchaHealth.data.windowMinutes}m
-                          </span>
-                          {captchaHealth.data.status !== "healthy" && captchaHealth.data.lastFailureReason && (
-                            <span className="ml-auto text-white/60 truncate max-w-[180px]" title={captchaHealth.data.lastFailureReason}>
-                              {captchaHealth.data.lastFailureReason}
-                            </span>
-                          )}
-                        </div>
-                      )}
 
                       <div
                         ref={captchaWidgetRef}
@@ -780,7 +657,6 @@ function HomePage() {
                       />
                       {captchaError && (
                         <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-200">
-                          <span className="font-mono uppercase tracking-widest text-red-300/80 mr-2">Reason</span>
                           {captchaError}
                         </div>
                       )}
@@ -789,29 +665,15 @@ function HomePage() {
                   </div>
                 </div>
               )}
-              {/* Per-step activation progress — visible during submit */}
+              {/* Generic in-flight indicator — no internal stage names */}
               {submitting && (
                 <div className="mt-6 rounded-lg border border-[#ff2a3a]/30 bg-[#ff2a3a]/5 p-3">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-[#ff8a90] mb-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    {stage === "checking-login" ? "Verifying sign-in"
-                      : stage === "checking-key" ? "Verifying access key"
-                      : stage === "checking-captcha" ? "Verifying human check"
-                      : stage === "checking-cookie" ? "Verifying cookie pool"
-                      : stage === "activating" ? "Activating on Netflix"
-                      : "Working"}
+                    Activating your TV
                   </div>
                   <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] transition-[width] duration-500 ease-out"
-                      style={{
-                        width: stage === "checking-login" ? "20%"
-                          : stage === "checking-key" ? "40%"
-                          : stage === "checking-captcha" ? "60%"
-                          : stage === "checking-cookie" ? "80%"
-                          : stage === "activating" ? "95%" : "10%",
-                      }}
-                    />
+                    <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] activation-progress-bar" />
                   </div>
                 </div>
               )}
@@ -820,35 +682,18 @@ function HomePage() {
                 <div
                   role="alert"
                   aria-live="polite"
-                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4 shadow-[0_0_0_1px_rgba(255,42,58,0.15)_inset]"
+                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4"
                 >
                   <div className="flex items-start gap-3">
                     <div className="shrink-0 w-8 h-8 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
                       <AlertCircle className="w-4 h-4 text-[#ff8a90]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
-                          {serviceError.kind === "no_cookie" ? "Cookie pool empty" : "Activation exhausted"}
-                        </span>
-                        {serviceError.attempts != null && (
-                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/50">
-                            · {serviceError.attempts} attempts
-                          </span>
-                        )}
-
-
+                      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
+                        Activation failed
                       </div>
                       <p className="mt-2 text-sm text-white/90 leading-relaxed">
-                        {serviceError.kind === "no_cookie"
-                          ? "The activation pool is momentarily empty — every active cookie is locked in another request or being refreshed."
-                          : `We tried ${serviceError.attempts ?? "several"} cookies and none accepted your code. This usually means cookies expired mid-request.`}
-                      </p>
-                      <p className="mt-1.5 text-xs text-white/60">
-                        <span className="font-mono uppercase tracking-widest text-white/40">Next step · </span>
-                        {serviceError.kind === "no_cookie"
-                          ? "Wait a few seconds — cookies auto-unlock. Your TV code stays valid, no need to re-enter it."
-                          : "Keep the same TV code visible and let us retry with a fresh cookie."}
+                        We couldn't activate your TV right now. Please try again in a moment.
                       </p>
                       <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <button
@@ -858,23 +703,8 @@ function HomePage() {
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <RotateCcw className={`w-3 h-3 ${retryCountdown > 0 && autoRetry ? "animate-spin-slow" : ""}`} />
-                          {retryCountdown > 0
-                            ? (autoRetry ? `Auto-retry in ${retryCountdown}s` : `Retry in ${retryCountdown}s`)
-                            : "Retry now"}
+                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Try again"}
                         </button>
-                        {retryCountdown > 0 && autoRetry && (
-                          <button
-                            type="button"
-                            onClick={() => setAutoRetry(false)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/15 bg-white/[0.04] text-white/80 hover:text-white hover:border-white/30 transition"
-                            title="Cancel auto-retry"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancel auto-retry
-                          </button>
-                        )}
-
-
                         <button
                           type="button"
                           onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(false); }}
@@ -894,14 +724,9 @@ function HomePage() {
                 disabled={submitting}
                 className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {stage === "checking-login" ? "◆ Verifying sign-in…"
-                  : stage === "checking-key" ? "◆ Verifying access key…"
-                  : stage === "checking-captcha" ? "◆ Verifying human check…"
-                  : stage === "checking-cookie" ? "◆ Verifying cookie…"
-                  : stage === "activating" ? "◆ Activating on Netflix…"
-                  : submitting ? "Working…"
-                  : "Activate Now →"}
+                {submitting ? "Activating…" : "Activate Now →"}
               </button>
+
 
 
               <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
@@ -1181,32 +1006,13 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
     return () => window.clearTimeout(t);
   }, [count, payload.redirectUrl]);
 
-  const expiresLabel = useMemo(() => {
-    if (!payload.sessionExpiresAt) return null;
-    const ms = payload.sessionExpiresAt - Date.now();
-    if (ms <= 0) return "expired";
-    const m = Math.max(1, Math.round(ms / 60000));
-    return m >= 60 ? `${Math.round(m / 60)}h` : `${m}m`;
-  }, [payload.sessionExpiresAt]);
-
   const capture = async () => {
     try {
-      // Best-effort: copy a text receipt to clipboard so the user has proof.
       const a = payload.account;
-      const gateLines = payload.gatesPassed.length
-        ? [`Gates passed: ${payload.gatesPassed.map((g) => `${g.label} (${g.detail})`).join(", ")}`]
-        : [];
-      const expLine = payload.sessionExpiresAt
-        ? [`Session expires: ${new Date(payload.sessionExpiresAt).toLocaleString()}`]
-        : [];
       const lines = [
         `EMBERLORD · Netflix TV Activation`,
         `Code: ${payload.code}`,
         `Time: ${new Date().toLocaleString()}`,
-        `Attempts: ${payload.attempts}`,
-        `Policy: ${payload.policy}`,
-        ...gateLines,
-        ...expLine,
         `Plan: ${a.plan_name ?? "Premium"} · ${a.video_quality ?? "UHD"}`,
         `Country: ${a.country ?? "—"}`,
         `Screens: ${a.max_streams ?? "—"}`,
@@ -1214,10 +1020,10 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
       ].join("\n");
       await navigator.clipboard.writeText(lines);
       setCaptured(true);
-      toast.success("Receipt copied to clipboard");
+      toast.success("Receipt copied");
       window.setTimeout(() => setCaptured(false), 2000);
     } catch {
-      toast.error("Clipboard blocked — screenshot the panel instead.");
+      toast.error("Clipboard unavailable");
     }
   };
 
@@ -1246,7 +1052,6 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
         ref={cardRef}
         className="relative w-full max-w-2xl glass p-8 md:p-10 border border-[#ff2a3a]/30 shadow-[0_0_0_1px_rgba(255,42,58,0.25),0_30px_120px_-20px_rgba(255,42,58,0.55)] animate-in zoom-in-95 duration-300"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-[#ff2a3a] to-[#b0060f] flex items-center justify-center shadow-[0_0_40px_rgba(255,42,58,0.6)]">
@@ -1264,11 +1069,10 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
         </div>
 
         <p className="mt-4 text-white/70 text-sm md:text-base">
-          Code <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded">{payload.code}</span> unlocked Netflix on your TV.
+          Your TV is now connected to Netflix using code <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded">{payload.code}</span>.
           Redirecting in <span className="text-[#ff2a3a] font-mono">{count}s</span>…
         </p>
 
-        {/* Account details */}
         <div className="mt-6 grid sm:grid-cols-2 gap-3">
           <Detail label="Plan" value={a.plan_name ?? "Premium"} accent />
           <Detail label="Quality" value={a.video_quality ?? "UHD"} accent />
@@ -1278,24 +1082,6 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
           <Detail label="Account" value={maskEmail(a.email)} mono />
         </div>
 
-
-
-
-
-        {/* Pipeline footer */}
-        <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-widest text-white/50">
-          <div className="flex items-center gap-3">
-            <span className="text-[#ff2a3a]">◆</span> Cookie verified
-            <span className="text-white/20">·</span>
-            <span className="text-[#ff2a3a]">◆</span> TV linked
-            <span className="text-white/20">·</span>
-            <span className="text-[#ff2a3a]">◆</span> {payload.attempts} attempt{payload.attempts === 1 ? "" : "s"}
-            <span className="text-white/20">·</span>
-            <span>Rotation: {payload.policy.replace("_", " ")}</span>
-          </div>
-        </div>
-
-        {/* Actions */}
         <div className="mt-5 flex flex-wrap gap-3">
           <a href={payload.redirectUrl} className="btn-red flex-1 text-center">Open Netflix now →</a>
           <button onClick={capture} className="btn-ghost">
@@ -1317,99 +1103,5 @@ function Detail({ label, value, accent, mono }: { label: string; value: string; 
   );
 }
 
-type PoolStatusData = {
-  eligible: number; fresh: number; used: number; total: number;
-  policy: "round_robin" | "random" | "quality"; maxAttempts: number; updatedAt: number;
-} | undefined;
-
-function PoolStatusPanel({ data, loading }: { data: PoolStatusData; loading: boolean }) {
-  const policyLabel = data?.policy === "quality" ? "Quality · highest success first"
-    : data?.policy === "random" ? "Random · pick from pool"
-    : "Round-robin · least-recently-used";
-  const policyIcon = data?.policy === "quality" ? Sparkles
-    : data?.policy === "random" ? Repeat
-    : Database;
-  const PolicyIcon = policyIcon;
-  const eligible = data?.eligible ?? 0;
-  const fresh = data?.fresh ?? 0;
-  const used = data?.used ?? 0;
-  const total = data?.total ?? 0;
-  const freshPct = total > 0 ? Math.round((fresh / total) * 100) : 0;
-  const usedPct = total > 0 ? Math.round((used / total) * 100) : 0;
-  const healthy = eligible > 0;
-
-  return (
-    <div className="mt-10 reveal">
-      <div className="glass p-5 md:p-6">
-        <div className="flex items-start gap-4 flex-wrap">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${healthy ? "border-emerald-500/30 bg-emerald-500/10" : "border-[#ff2a3a]/30 bg-[#ff2a3a]/10"}`}>
-            <Database className={`w-4 h-4 ${healthy ? "text-emerald-300" : "text-[#ff8a90]"}`} />
-          </div>
-          <div className="flex-1 min-w-[220px]">
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">
-              Cookie pool · live
-            </div>
-            <div className="font-display text-xl mt-0.5">
-              {loading ? "Checking availability…"
-                : healthy ? <>{eligible.toLocaleString()} eligible <span className="text-white/40 text-sm font-mono">/ {total.toLocaleString()} total</span></>
-                : "No eligible cookies right now"}
-            </div>
-            <div className="mt-1 text-xs text-white/50 flex items-center gap-1.5 flex-wrap font-mono">
-              <span className={`w-1.5 h-1.5 rounded-full ${healthy ? "bg-emerald-400 animate-pulse" : "bg-[#ff2a3a] animate-pulse"}`} />
-              <span>{healthy ? "Ready to activate" : "Retry runs automatically"}</span>
-              <span className="text-white/25">·</span>
-              <span>refresh every 5s</span>
-              {data?.maxAttempts && (
-                <>
-                  <span className="text-white/25">·</span>
-                  <span>fallback tries up to {data.maxAttempts} cookies</span>
-                </>
-              )}
-            </div>
-          </div>
-          <div className={`shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-[11px] font-mono uppercase tracking-widest ${healthy ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-[#ff2a3a]/30 bg-[#ff2a3a]/10 text-[#ff8a90]"}`}>
-            <PolicyIcon className="w-3.5 h-3.5" />
-            {data?.policy?.replace("_", " ") ?? "…"}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 mt-5">
-          <PoolTile label="Eligible" value={eligible} tone={healthy ? "success" : "danger"} sub="server pick set" />
-          <PoolTile label="Fresh · 0 uses" value={fresh} tone="primary" sub={`${freshPct}% of pool`} />
-          <PoolTile label="Used" value={used} tone="muted" sub={`${usedPct}% of pool`} />
-        </div>
-
-        <div className="mt-4 h-1.5 rounded-full bg-white/5 overflow-hidden flex">
-          <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]" style={{ width: `${freshPct}%` }} />
-          <div className="h-full bg-white/20" style={{ width: `${usedPct}%` }} />
-        </div>
-        <div className="mt-2 text-[10px] font-mono uppercase tracking-widest text-white/35 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#ff2a3a]" /> Fresh</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-white/25" /> Used</span>
-          <span className="text-white/25">·</span>
-          <span>Mode: {policyLabel}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PoolTile({ label, value, sub, tone }: {
-  label: string; value: number; sub?: string; tone: "primary" | "success" | "danger" | "muted";
-}) {
-  const toneMap = {
-    primary: "text-[#ff8a90]",
-    success: "text-emerald-300",
-    danger:  "text-[#ff8a90]",
-    muted:   "text-white/70",
-  } as const;
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-      <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-white/40">{label}</div>
-      <div className={`mt-1 font-display text-2xl leading-none tabular-nums ${toneMap[tone]}`}>{value.toLocaleString()}</div>
-      {sub && <div className="mt-1 text-[10px] font-mono text-white/40 tabular-nums">{sub}</div>}
-    </div>
-  );
-}
 
 
