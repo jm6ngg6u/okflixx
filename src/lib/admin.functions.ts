@@ -347,3 +347,168 @@ export const getActivationPipelines = createServerFn({ method: "POST" })
 
     return { pipelines };
   });
+
+// -------------------- Rate-limit status --------------------
+
+/**
+ * Snapshot of activation traffic that got rate-limited or bot-blocked recently.
+ * Powers the "rate-limit strip" on the activation pipeline panel so operators
+ * can see when a spike is being shed rather than served.
+ */
+const RateLimitInput = z.object({
+  windowMinutes: z.number().int().min(1).max(120).default(15),
+});
+
+export const getRateLimitStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => RateLimitInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+
+    const since = new Date(Date.now() - data.windowMinutes * 60_000).toISOString();
+    const { data: rows, error } = await supabase
+      .from("activation_attempts")
+      .select("id, code, result, ip_hash, country, created_at")
+      .in("result", ["rate_limited", "bot_detected"])
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) throw error;
+
+    const byIp = new Map<string, { ip_hash: string; count: number; last: string; countries: Set<string> }>();
+    let rate_limited = 0;
+    let bot_detected = 0;
+    for (const r of (rows ?? []) as any[]) {
+      if (r.result === "rate_limited") rate_limited++;
+      else if (r.result === "bot_detected") bot_detected++;
+      const key = r.ip_hash ?? "unknown";
+      const b = byIp.get(key) ?? { ip_hash: key, count: 0, last: r.created_at, countries: new Set<string>() };
+      b.count += 1;
+      if (r.country) b.countries.add(r.country);
+      if (new Date(r.created_at) > new Date(b.last)) b.last = r.created_at;
+      byIp.set(key, b);
+    }
+    const top = Array.from(byIp.values())
+      .map((b) => ({ ip_hash: b.ip_hash, count: b.count, last: b.last, countries: Array.from(b.countries) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    return {
+      windowMinutes: data.windowMinutes,
+      total: (rows ?? []).length,
+      rate_limited,
+      bot_detected,
+      top,
+    };
+  });
+
+// -------------------- Admin-triggered activation retry --------------------
+
+const RetryInput = z.object({
+  code: z.string().regex(/^[A-Z0-9]{8}$/i).transform((s) => s.toUpperCase()),
+});
+
+/**
+ * Manually run one activation attempt for a given TV code, bypassing the
+ * anti-bot honeypot + IP rate-limit (this is admin-triggered, not user
+ * traffic). Uses the same cookie/proxy rotation policy as the public flow.
+ * Marked with an "admin_retry" flag in the attempt row so it's distinguishable
+ * from organic traffic.
+ */
+export const retryActivationAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => RetryInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { activateTVViaWorker, isCookieDead } = await import("@/lib/worker.server");
+
+    const code = data.code;
+    const { data: policyRow } = await supabaseAdmin
+      .from("app_settings").select("value").eq("key", "cookie_rotation_policy").maybeSingle();
+    const rawPolicy = String(policyRow?.value ?? "round_robin").toLowerCase();
+    const policy: "round_robin" | "random" | "quality" =
+      rawPolicy === "random" || rawPolicy === "quality" ? (rawPolicy as any) : "round_robin";
+
+    const { data: cookieRows, error: pickErr } = await supabaseAdmin.rpc(
+      "pick_next_cookie_by_policy",
+      { _policy: policy },
+    );
+    const cookie = Array.isArray(cookieRows) ? cookieRows[0] : cookieRows;
+    if (pickErr || !cookie) {
+      await supabaseAdmin.from("activation_attempts").insert({
+        code, result: "no_cookie", ip_hash: `admin:${userId}`,
+        user_agent: "admin-retry", country: null, proxy_mode: false, attempt_number: 1,
+      });
+      return { ok: false, status: "no_cookie" as const, message: "Cookie pool empty." };
+    }
+
+    const { data: proxyModeRow } = await supabaseAdmin
+      .from("app_settings").select("value").eq("key", "proxy_mode").maybeSingle();
+    const proxyMode = proxyModeRow?.value === "1";
+    let proxyRow: any = null;
+    if (proxyMode) {
+      const { data: pr } = await supabaseAdmin.rpc("pick_next_proxy");
+      proxyRow = Array.isArray(pr) ? pr[0] : pr;
+    }
+    const proxyPayload = proxyRow ? {
+      scheme: proxyRow.scheme, ip: proxyRow.ip, port: proxyRow.port,
+      username: proxyRow.username ?? null, password: proxyRow.password ?? null,
+    } : null;
+
+    const t0 = Date.now();
+    const outcome = await activateTVViaWorker({
+      code,
+      cookies: cookie.cookies_json as { name: string; value: string; domain?: string }[],
+      proxy: proxyPayload,
+    });
+    const dur = Date.now() - t0;
+
+    await supabaseAdmin.from("activation_attempts").insert({
+      code, result: outcome.status, ip_hash: `admin:${userId}`,
+      user_agent: "admin-retry", country: null,
+      cookie_id: cookie.id, proxy_id: proxyRow?.id ?? null,
+      proxy_mode: proxyMode, attempt_number: 1,
+      duration_ms: outcome.duration_ms ?? dur,
+      error_message: (outcome as any).error ?? null,
+    });
+
+    const success = outcome.status === "success";
+    if (isCookieDead(outcome.status)) {
+      await supabaseAdmin.rpc("mark_cookie_invalid", {
+        _id: cookie.id, _reason: ((outcome as any).error ?? outcome.status) as string,
+      });
+    } else if (outcome.status === "free" || outcome.status === "on_hold") {
+      await supabaseAdmin.from("cookie_pool").update({
+        status: outcome.status, is_valid: false, is_locked: false, locked_at: null,
+        last_used_at: new Date().toISOString(),
+        last_error: ((outcome as any).error ?? outcome.status) as string,
+      }).eq("id", cookie.id);
+    } else {
+      await supabaseAdmin.rpc("release_cookie", {
+        _id: cookie.id, _success: success,
+        _outcome: success ? undefined : outcome.status,
+      });
+    }
+    if (proxyRow) {
+      await supabaseAdmin.rpc("release_proxy", {
+        _id: proxyRow.id,
+        _success: outcome.status !== "worker_error",
+        _err: outcome.status === "worker_error" ? ((outcome as any).error as string) : undefined,
+      });
+    }
+
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId, action: "activation.admin_retry",
+      details: { code, status: outcome.status, cookie_id: cookie.id, proxy_id: proxyRow?.id ?? null, duration_ms: dur, policy },
+    });
+
+    return { ok: success, status: outcome.status, policy, duration_ms: dur };
+  });
