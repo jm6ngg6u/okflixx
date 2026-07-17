@@ -1093,11 +1093,6 @@ function ContactStrip() {
     if (kind === "instagram") return Instagram;
     return Phone;
   };
-  const colorFor = (kind: string) => {
-    if (kind === "telegram") return "#229ED9";
-    if (kind === "instagram") return "#E1306C";
-    return "#25D366";
-  };
 
   if (!q.data?.enabled || channels.length === 0) {
     if (!debugOn) return null;
@@ -1120,43 +1115,34 @@ function ContactStrip() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
-        {channels.map((c) => {
-          const Icon = iconFor(c.kind);
-          const color = colorFor(c.kind);
-          const hasName = !!(c.name && c.name.trim());
-          const aria = hasName ? c.name : c.kind;
-          return (
-            <a
-              key={c.kind}
-              href={c.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={aria}
-              title={aria}
-              className={
-                hasName
-                  ? "group inline-flex items-center gap-2 rounded-full border bg-black/40 backdrop-blur px-3 py-1.5 transition hover:bg-black/60"
-                  : "group inline-flex items-center justify-center rounded-full border bg-black/40 backdrop-blur transition hover:bg-black/60 w-10 h-10"
-              }
-              style={{ borderColor: `${color}55` }}
-            >
-              <span
-                className={`${hasName ? "w-7 h-7" : "w-6 h-6"} rounded-full flex items-center justify-center icon-glow`}
-                style={{ background: `${color}22`, border: `1px solid ${color}66`, color, ["--glow-color" as any]: color }}
-              >
-                <Icon className={hasName ? "w-3.5 h-3.5" : "w-4 h-4"} />
-              </span>
-              {hasName && (
-                <span className="text-[11px] font-mono uppercase tracking-widest text-white/70">{c.name}</span>
-              )}
-            </a>
-          );
-        })}
-      </div>
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {channels.map((c) => {
+        const Icon = iconFor(c.kind);
+        const hasName = !!(c.name && c.name.trim());
+        const aria = hasName ? c.name : c.kind;
+        return (
+          <a
+            key={c.kind}
+            href={c.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={aria}
+            title={aria}
+            className={
+              hasName
+                ? "group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-white/70 hover:text-white hover:border-[#ff2a3a]/40 hover:bg-[#ff2a3a]/[0.06] transition"
+                : "group inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/70 hover:text-[#ff2a3a] hover:border-[#ff2a3a]/40 hover:bg-[#ff2a3a]/[0.06] transition w-9 h-9"
+            }
+          >
+            <Icon className={hasName ? "w-3.5 h-3.5" : "w-4 h-4"} strokeWidth={2} />
+            {hasName && (
+              <span className="text-[11px] font-mono uppercase tracking-widest">{c.name}</span>
+            )}
+          </a>
+        );
+      })}
       {debugOn && q.data?.debug && (
-        <div className="mx-auto max-w-2xl rounded-md border border-white/10 bg-black/60 text-[10px] text-white/60 font-mono p-2">
+        <div className="w-full mx-auto max-w-2xl rounded-md border border-white/10 bg-black/60 text-[10px] text-white/60 font-mono p-2">
           debug: {q.data.debug.channels.filter((c: any) => c.visible).map((c: any) => `${c.kind}=${c.display}`).join(" · ")}
         </div>
       )}
