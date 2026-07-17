@@ -1,7 +1,7 @@
 // Shared logic for the cookie/proxy auto-check jobs.
 // Used by both the /api/public/hooks/* cron routes and the admin "Run now" server fns.
 
-import { recordJobStart, recordJobFinish, recordJobProgress } from "@/lib/cron.server";
+import { recordJobStart, recordJobFinish, recordJobProgress, readJobControl } from "@/lib/cron.server";
 
 type CookieRunResult = {
   ok: boolean;
@@ -78,6 +78,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
 
     let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, deleted = 0;
     const reasons: Record<string, number> = {};
+    let control: "stop" | "cancel" | null = null;
 
     for (const r of rows ?? []) {
       let proxyPayload: any = null;
@@ -116,13 +117,26 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
           checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
         });
       }
+      // Cooperative stop/cancel: poll every 3 items to keep DB load light.
+      if (checked % 3 === 0) {
+        control = await readJobControl(jobId);
+        if (control) break;
+      }
+    }
+    if (control === "cancel") {
+      const summary = { checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons, cancelled: true };
+      await recordJobFinish(jobId, false, summary, "Cancelled by admin");
+      return { ok: false, error: "cancelled", ...summary };
     }
     await recordJobProgress(jobId, {
       phase: "cleanup", total: rows?.length ?? 0,
       checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
+      stopped: control === "stop" || undefined,
     });
 
-    const cleanupOn = map.autocheck_cleanup !== "0";
+    // Cleanup is skipped when the admin pressed Stop mid-run — we save what
+    // was checked but do not sweep the pool. Cancel already returned above.
+    const cleanupOn = map.autocheck_cleanup !== "0" && control !== "stop";
     let removed_invalid = 0, removed_free = 0, removed_on_hold = 0, removed_duplicates = 0;
     if (cleanupOn) {
       const { count: invCount } = await supabaseAdmin
@@ -157,8 +171,14 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       deleted = removed_invalid + removed_free + removed_on_hold + removed_duplicates;
     }
 
-    const summary = { checked, active, invalid, on_hold, free, deleted, removed_invalid, removed_free, removed_on_hold, removed_duplicates, proxy_mode: proxyMode, reasons };
+    const summary = {
+      checked, active, invalid, on_hold, free, deleted,
+      removed_invalid, removed_free, removed_on_hold, removed_duplicates,
+      proxy_mode: proxyMode, reasons,
+      stopped: control === "stop" || undefined,
+    };
     await recordJobFinish(jobId, true, summary);
+    // On stop, still advance the cursor: partial work counts as a run.
     await supabaseAdmin.from("app_settings").upsert({
       key: "cookies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
@@ -213,6 +233,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
 
     let ok = 0, dead = 0;
     const reasons: Record<string, number> = {};
+    let control: "stop" | "cancel" | null = null;
     for (const p of rows ?? []) {
       const res = await checkProxyViaWorker({
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
@@ -232,19 +253,32 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
           phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, reasons,
         });
       }
+      if (done % 4 === 0) {
+        control = await readJobControl(jobId);
+        if (control) break;
+      }
+    }
+    if (control === "cancel") {
+      const summary = { checked: ok + dead, ok_count: ok, dead, reasons, cancelled: true };
+      await recordJobFinish(jobId, false, summary, "Cancelled by admin");
+      return { ok: false, error: "cancelled", ...summary };
     }
     await recordJobProgress(jobId, {
-      phase: "cleanup", total: rows?.length ?? 0, checked: (rows ?? []).length, ok_count: ok, dead, reasons,
+      phase: "cleanup", total: rows?.length ?? 0, checked: ok + dead, ok_count: ok, dead, reasons,
+      stopped: control === "stop" || undefined,
     });
 
     let removed_invalid = 0;
-    if (map.proxy_autocheck_cleanup !== "0") {
+    if (map.proxy_autocheck_cleanup !== "0" && control !== "stop") {
       const { count: c } = await supabaseAdmin
         .from("proxy_pool").select("id", { count: "exact", head: true }).eq("is_valid", false);
       await supabaseAdmin.from("proxy_pool").delete().eq("is_valid", false);
       removed_invalid = c ?? 0;
     }
-    const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid, reasons };
+    const summary = {
+      checked: ok + dead, ok_count: ok, dead, removed_invalid, reasons,
+      stopped: control === "stop" || undefined,
+    };
     await recordJobFinish(jobId, true, summary);
     await supabaseAdmin.from("app_settings").upsert({
       key: "proxies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),

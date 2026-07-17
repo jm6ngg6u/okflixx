@@ -475,6 +475,7 @@ async function runProxyRecheck(supabaseAdmin: any, ids: string[] | null, jobId: 
   const total = list.length;
   let done = 0, valid = 0, invalid = 0;
   const started = Date.now();
+  let control: "stop" | "cancel" | null = null;
 
   await supabaseAdmin.from("job_runs").update({
     progress: { total, done: 0, valid: 0, invalid: 0, phase: "running" },
@@ -483,7 +484,7 @@ async function runProxyRecheck(supabaseAdmin: any, ids: string[] | null, jobId: 
   const CONCURRENCY = 12;
   let cursor = 0;
   async function worker() {
-    while (cursor < list.length) {
+    while (cursor < list.length && !control) {
       const idx = cursor++;
       const p = list[idx];
       try {
@@ -499,17 +500,36 @@ async function runProxyRecheck(supabaseAdmin: any, ids: string[] | null, jobId: 
           progress: { total, done, valid, invalid, phase: "running", eta_sec, rate: Number(rate.toFixed(2)) },
         }).eq("id", jobId);
       }
+      // Poll control every 4 items per worker. First one to see it flips
+      // the shared flag, other workers exit at the top of the loop.
+      if (!control && done % 4 === 0) {
+        const { data: cRow } = await supabaseAdmin
+          .from("job_runs").select("control").eq("id", jobId).maybeSingle();
+        const v = (cRow as any)?.control;
+        if (v === "stop" || v === "cancel") control = v;
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, list.length) }, worker));
 
+  if (control === "cancel") {
+    await supabaseAdmin.from("job_runs").update({
+      finished_at: new Date().toISOString(),
+      ok: false,
+      error: "Cancelled by admin",
+      summary: { total, valid, invalid, checked: done, cancelled: true },
+      progress: { total, done, valid, invalid, phase: "cancelled" },
+    }).eq("id", jobId);
+    return { valid, invalid, total, cancelled: true };
+  }
+
   await supabaseAdmin.from("job_runs").update({
     finished_at: new Date().toISOString(),
     ok: true,
-    summary: { total, valid, invalid },
-    progress: { total, done: total, valid, invalid, phase: "done" },
+    summary: { total, valid, invalid, checked: done, stopped: control === "stop" || undefined },
+    progress: { total, done, valid, invalid, phase: control === "stop" ? "stopped" : "done" },
   }).eq("id", jobId);
-  return { valid, invalid, total };
+  return { valid, invalid, total, stopped: control === "stop" };
 }
 
 export const checkAllProxies = createServerFn({ method: "POST" })

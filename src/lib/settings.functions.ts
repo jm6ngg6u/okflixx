@@ -133,7 +133,7 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
     if (!isAdmin && !isMod) throw new Error("Forbidden");
     const { data, error } = await supabase
       .from("job_runs")
-      .select("id, job, started_at, finished_at, ok, summary, progress, error")
+      .select("id, job, started_at, finished_at, ok, summary, progress, error, control")
       .order("started_at", { ascending: false })
       .limit(20);
     if (error) throw error;
@@ -160,4 +160,34 @@ export const runProxiesAutocheckNow = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden");
     const { runProxiesAutocheck } = await import("@/lib/autocheck.server");
     return await runProxiesAutocheck(true);
+  });
+
+/**
+ * Admin: signal a running job to stop (save partial results) or cancel (discard).
+ * Stop => the loop finishes the current item, runs cleanup, and persists a summary
+ * with `stopped: true`. Cancel => the loop aborts, cleanup is skipped, and the
+ * run cursor (`*_last_run_at`) is NOT updated so the job re-runs at the next tick.
+ */
+export const requestJobControl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ id: z.string().uuid(), action: z.enum(["stop", "cancel"]) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("job_runs").select("id, job, finished_at").eq("id", data.id).maybeSingle();
+    if (!row) throw new Error("Job not found");
+    if (row.finished_at) throw new Error("Job already finished");
+    await supabaseAdmin.from("job_runs").update({ control: data.action }).eq("id", data.id);
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: data.action === "stop" ? "job.stop_requested" : "job.cancel_requested",
+      target: row.job,
+      details: { job_id: data.id },
+    });
+    return { ok: true, action: data.action };
   });

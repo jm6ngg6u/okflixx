@@ -1,9 +1,14 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
-import { listRecentJobRuns, listSettings } from "@/lib/settings.functions";
+import { useEffect, useRef, useState } from "react";
+import { listRecentJobRuns, listSettings, requestJobControl } from "@/lib/settings.functions";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw, Square, Ban, OctagonAlert } from "lucide-react";
 import { toast } from "sonner";
 
 type JobRow = {
@@ -15,6 +20,7 @@ type JobRow = {
   summary: any;
   progress: any;
   error: string | null;
+  control?: "stop" | "cancel" | null;
 };
 
 const JOB_META: Record<string, { label: string; icon: any }> = {
@@ -228,11 +234,42 @@ function RunningRow({ row }: { row: JobRow }) {
   const Icon = meta.icon;
   const p = row.progress ?? {};
   const total = p.total ?? 0;
-  const done = p.checked ?? 0;
+  const done = p.checked ?? p.done ?? 0;
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+
+  const control = useServerFn(requestJobControl);
+  const qc = useQueryClient();
+  const [confirm, setConfirm] = useState<null | "stop" | "cancel">(null);
+  const [pending, setPending] = useState<null | "stop" | "cancel">(null);
+  const requested: "stop" | "cancel" | null =
+    (row as any).control === "stop" || (row as any).control === "cancel"
+      ? (row as any).control
+      : null;
+
+  async function submit(action: "stop" | "cancel") {
+    setConfirm(null);
+    setPending(action);
+    try {
+      await control({ data: { id: row.id, action } });
+      toast.message(action === "stop" ? "Stop requested" : "Cancel requested", {
+        description: action === "stop"
+          ? "Job will finish the current item and save progress."
+          : "Job will abort and progress will be discarded.",
+      });
+      qc.invalidateQueries({ queryKey: ["job-runs"] });
+    } catch (e: any) {
+      toast.error("Could not send signal", { description: String(e?.message ?? e) });
+      setPending(null);
+    }
+  }
+
+  const stopColor = "border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20";
+  const cancelColor = "border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20";
+  const disabled = !!pending || !!requested;
+
   return (
     <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Loader2 className="w-3.5 h-3.5 text-emerald-300 animate-spin shrink-0" />
           <Icon className="w-3.5 h-3.5 text-white/60 shrink-0" />
@@ -242,16 +279,77 @@ function RunningRow({ row }: { row: JobRow }) {
               {p.phase}
             </Badge>
           )}
+          {requested && (
+            <Badge variant="outline" className={requested === "stop"
+              ? "bg-amber-500/15 border-amber-500/40 text-amber-200 text-[10px] uppercase"
+              : "bg-red-500/15 border-red-500/40 text-red-200 text-[10px] uppercase"}>
+              {requested === "stop" ? "Stopping…" : "Cancelling…"}
+            </Badge>
+          )}
         </div>
-        <span className="text-xs text-white/50 font-mono shrink-0">{fmtDuration(row.started_at, null)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-white/50 font-mono">{fmtDuration(row.started_at, null)}</span>
+          <Button
+            size="sm" variant="outline" disabled={disabled}
+            onClick={() => setConfirm("stop")}
+            className={`h-7 px-2 text-[11px] gap-1 ${stopColor} disabled:opacity-40`}
+            title="Stop and save partial progress"
+          >
+            <Square className="w-3 h-3" /> Stop
+          </Button>
+          <Button
+            size="sm" variant="outline" disabled={disabled}
+            onClick={() => setConfirm("cancel")}
+            className={`h-7 px-2 text-[11px] gap-1 ${cancelColor} disabled:opacity-40`}
+            title="Cancel and discard progress"
+          >
+            <Ban className="w-3 h-3" /> Cancel
+          </Button>
+        </div>
       </div>
       <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full transition-all ${requested === "cancel"
+            ? "bg-gradient-to-r from-red-400 to-red-500"
+            : requested === "stop"
+              ? "bg-gradient-to-r from-amber-400 to-amber-500"
+              : "bg-gradient-to-r from-emerald-400 to-emerald-500"}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <div className="flex items-center justify-between mt-2 text-[11px] text-white/60 font-mono">
         <span>{done}/{total} • {pct}%</span>
-        <span className="truncate ml-3">{row.job === "cookies-autocheck" ? cookieSummaryLine(p) : row.job === "proxies-autocheck" ? proxySummaryLine(p) : ""}</span>
+        <span className="truncate ml-3">{row.job === "cookies-autocheck" ? cookieSummaryLine(p) : row.job.startsWith("prox") ? proxySummaryLine(p) : ""}</span>
       </div>
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent className="bg-[#0b0b0d] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 font-display">
+              <OctagonAlert className={`w-5 h-5 ${confirm === "cancel" ? "text-red-400" : "text-amber-400"}`} />
+              {confirm === "stop" ? "Stop and save progress?" : "Cancel and discard progress?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70 leading-relaxed">
+              {confirm === "stop" ? (
+                <>The job will finish the current item, skip the cleanup sweep, and save everything that was checked so far. Safe to resume later.</>
+              ) : (
+                <>The job will abort at the next checkpoint. Cleanup is skipped, the run cursor is <span className="text-white">not</span> advanced, and this run is marked <span className="text-red-300">cancelled</span>. Rows already updated cannot be reverted.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 hover:bg-white/10">Back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirm && submit(confirm)}
+              className={confirm === "cancel"
+                ? "bg-red-500/90 hover:bg-red-500 text-white border-0"
+                : "bg-amber-500/90 hover:bg-amber-500 text-black border-0"}
+            >
+              {confirm === "stop" ? "Stop and save" : "Cancel run"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -259,7 +357,9 @@ function RunningRow({ row }: { row: JobRow }) {
 function HistoryRow({ row }: { row: JobRow }) {
   const meta = JOB_META[row.job] ?? { label: row.job, icon: Activity };
   const Icon = meta.icon;
-  const ok = row.ok !== false;
+  const cancelled = !!row.summary?.cancelled;
+  const stopped = !!row.summary?.stopped;
+  const ok = row.ok !== false && !cancelled;
   let a = "";
   let b = "";
   if (row.job === "cookies-autocheck") {
@@ -270,13 +370,23 @@ function HistoryRow({ row }: { row: JobRow }) {
   } else if (row.job === "auto-cleanup") {
     a = cleanupSummaryLine(row.summary);
   }
+  const StatusIcon = cancelled ? Ban : stopped ? Square : ok ? CheckCircle2 : XCircle;
+  const statusColor = cancelled ? "text-red-300" : stopped ? "text-amber-300" : ok ? "text-emerald-300" : "text-red-300";
   return (
     <div className="flex items-start gap-3 rounded-md border border-white/5 bg-white/[0.02] p-3">
-      {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-300 mt-0.5 shrink-0" /> : <XCircle className="w-4 h-4 text-red-300 mt-0.5 shrink-0" />}
+      <StatusIcon className={`w-4 h-4 mt-0.5 shrink-0 ${statusColor}`} />
       <Icon className="w-3.5 h-3.5 text-white/50 mt-1 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-medium truncate">{meta.label}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="text-sm font-medium truncate">{meta.label}</div>
+            {cancelled && (
+              <Badge variant="outline" className="bg-red-500/15 border-red-500/40 text-red-200 text-[10px] uppercase">Cancelled</Badge>
+            )}
+            {stopped && !cancelled && (
+              <Badge variant="outline" className="bg-amber-500/15 border-amber-500/40 text-amber-200 text-[10px] uppercase">Stopped</Badge>
+            )}
+          </div>
           <div className="text-[11px] text-white/40 font-mono shrink-0">
             {new Date(row.finished_at ?? row.started_at).toLocaleString()} · {fmtDuration(row.started_at, row.finished_at)}
           </div>

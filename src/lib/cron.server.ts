@@ -46,3 +46,12 @@ export async function recordJobProgress(id: string | null, progress: Record<stri
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   await supabaseAdmin.from("job_runs").update({ progress }).eq("id", id);
 }
+
+/** Read the current control signal for a job. */
+export async function readJobControl(id: string | null): Promise<"stop" | "cancel" | null> {
+  if (!id) return null;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.from("job_runs").select("control").eq("id", id).maybeSingle();
+  const v = (data as any)?.control;
+  return v === "stop" || v === "cancel" ? v : null;
+}
