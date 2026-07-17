@@ -625,68 +625,8 @@ function HomePage() {
               {/* ---- ACCESS GATES ---- only visible for gates admin enabled */}
               {anyGate && (
                 <div className="mt-6">
-                  {/* Header strip: live count + progress bar */}
-                  <div className="rounded-t-lg border border-white/10 border-b-0 bg-gradient-to-b from-white/[0.06] to-white/[0.02] px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className={`w-4 h-4 ${allSatisfied ? "text-emerald-400" : "text-[#ff8a90]"}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/50">
-                          Security requirements
-                        </div>
-                        <div className="text-sm text-white/90 mt-0.5 truncate">
-                          {allSatisfied
-                            ? "All checks passed — ready to activate."
-                            : `${doneCount} of ${gateItems.length} completed · finish the steps below.`}
-                        </div>
-                      </div>
-                      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest border ${
-                        allSatisfied
-                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                          : "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${allSatisfied ? "bg-emerald-400" : "bg-[#ff2a3a] animate-pulse"}`} />
-                        {allSatisfied ? "Ready" : "Action needed"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={resetAttempt}
-                        disabled={submitting}
-                        title="Clear captcha, key session and re-run enabled gates"
-                        className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/70 hover:text-white hover:border-white/20 hover:bg-white/[0.08] transition disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <RotateCcw className="w-3 h-3" /> Reset
-                      </button>
+                  {/* Header strip removed per request */}
 
-                    </div>
-                    <div className="mt-3 h-1 rounded-full bg-white/5 overflow-hidden">
-                      <div
-                        className={`h-full transition-[width] duration-500 ease-out ${
-                          allSatisfied ? "bg-gradient-to-r from-emerald-500 to-emerald-300"
-                                       : "bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]"
-                        }`}
-                        style={{ width: `${(doneCount / gateItems.length) * 100}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {gateItems.map((g, i) => (
-                        <span
-                          key={g.key}
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-widest border ${
-                            g.done
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                              : "border-white/10 bg-white/[0.04] text-white/55"
-                          }`}
-                        >
-                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
-                            g.done ? "bg-emerald-500/30 text-emerald-100" : "bg-white/10 text-white/60"
-                          }`}>
-                            {g.done ? "✓" : i + 1}
-                          </span>
-                          {g.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
 
                   <div className="rounded-b-lg border border-white/10 border-t-0 bg-black/20 p-3 space-y-3">
 
@@ -896,23 +836,8 @@ function HomePage() {
                             · {serviceError.attempts} attempts
                           </span>
                         )}
-                        <span className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-white/40">
-                          Code
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(
-                                `${serviceError.code} · ${serviceError.kind} · ${new Date(serviceError.at).toISOString()}${serviceError.attempts != null ? ` · attempts=${serviceError.attempts}` : ""}`,
-                              ).then(() => toast.success("Error code copied", { description: "Share this with support." }))
-                                .catch(() => toast.error("Copy failed"));
-                            }}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/[0.04] text-white/80 hover:text-white hover:border-white/25 transition"
-                            title="Copy error code"
-                          >
-                            {serviceError.code}
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </span>
+
+
                       </div>
                       <p className="mt-2 text-sm text-white/90 leading-relaxed">
                         {serviceError.kind === "no_cookie"
@@ -948,13 +873,8 @@ function HomePage() {
                             Cancel auto-retry
                           </button>
                         )}
-                        <a
-                          href="mailto:support@lovable.dev?subject=TV%20Activation%20Error"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/70 hover:text-white hover:border-white/25 transition"
-                        >
-                          <LifeBuoy className="w-3 h-3" />
-                          Get help
-                        </a>
+
+
                         <button
                           type="button"
                           onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(false); }}
@@ -991,8 +911,8 @@ function HomePage() {
             </div>
           </div>
 
-          {/* LIVE POOL STATUS — mirrors server-side eligibility RPC */}
-          <PoolStatusPanel data={poolStatus.data} loading={poolStatus.isLoading} />
+
+
 
 
           <div className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-mono text-white/45 reveal">
@@ -1277,33 +1197,8 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
           <Detail label="Account" value={maskEmail(a.email)} mono />
         </div>
 
-        {/* Gates passed receipt — only when at least one gate ran */}
-        {payload.gatesPassed.length > 0 && (
-          <div className="mt-5 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
-            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-300 mb-2">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Security checks passed
-              {expiresLabel && (
-                <span className="ml-auto normal-case tracking-normal text-[11px] text-emerald-100/80">
-                  Session valid for <span className="font-mono text-white">{expiresLabel}</span>
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {payload.gatesPassed.map((g) => (
-                <span
-                  key={g.key}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-100"
-                >
-                  <CheckCircle2 className="w-3 h-3 text-emerald-300" />
-                  <span className="font-mono uppercase tracking-widest text-[10px] text-emerald-200/80">{g.label}</span>
-                  <span className="text-emerald-100/80">·</span>
-                  <span>{g.detail}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+
+
 
 
         {/* Pipeline footer */}
