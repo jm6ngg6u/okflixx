@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
   runCookiesAutocheckNow, runProxiesAutocheckNow,
+  listSettings, setSetting, toggleProxyMode, setMaintenance,
+  runCookiesAutocheckNow, runProxiesAutocheckNow, getPublicContacts,
 } from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
