@@ -163,11 +163,42 @@ export const submitActivation = createServerFn({ method: "POST" })
         return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
       }
       const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
-      const { verifyCaptcha } = await import("@/lib/access-keys.functions");
-      const v = await verifyCaptcha(provider, data.captchaToken, rawIp);
+      const { verifyCaptcha, detectCaptchaTokenProvider } = await import("@/lib/access-keys.functions");
+
+      // Guard: if the widget on the page was rendered for the other provider,
+      // reject early with a clear reason instead of a confusing siteverify error.
+      const widgetProvider = data.captchaWidgetProvider ?? null;
+      const tokenProvider = detectCaptchaTokenProvider(data.captchaToken);
+      const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
+      if (declared && declared !== provider) {
+        console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
+        return {
+          ok: false,
+          error: "captcha_invalid",
+          message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
+        };
+      }
+
+      const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
+        purpose: "activate",
+        ipHash,
+        userAgent,
+      });
       if (!v.ok) {
-        console.warn("[captcha] verify failed", { provider, reason: v.reason, tokenLen: data.captchaToken?.length ?? 0 });
-        return { ok: false, error: "captcha_invalid", message: `Captcha check failed (${v.reason || "unknown"}). Please retry.` };
+        const codes = (v.errorCodes ?? []).join(", ");
+        console.warn("[captcha] verify failed", {
+          provider,
+          reason: v.reason,
+          errorCodes: v.errorCodes,
+          hostname: v.hostname,
+          tokenLen: data.captchaToken?.length ?? 0,
+        });
+        const human = humanCaptchaReason(v.reason, v.errorCodes);
+        return {
+          ok: false,
+          error: "captcha_invalid",
+          message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
+        };
       }
     }
     if (accessKeyRequired) {
