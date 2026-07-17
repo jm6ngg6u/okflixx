@@ -9,6 +9,29 @@ import {
   CheckCircle2, XCircle, Clock, Zap, RefreshCw, ShieldAlert, Loader2, Gauge, Info, Filter,
 } from "lucide-react";
 
+type SelectionReason = {
+  policy?: string;
+  filters?: {
+    include_statuses?: string[];
+    require_valid?: boolean;
+    min_success_rate?: number;
+    min_total_uses?: number;
+  };
+  eligible_at_pick?: number | null;
+  admin_retry?: boolean;
+  outcome?: string;
+  cookie?: {
+    status?: string | null;
+    is_valid?: boolean | null;
+    total_uses?: number;
+    success_count?: number;
+    fail_count?: number;
+    success_rate?: number | null;
+    last_used_at?: string | null;
+  };
+  why?: string;
+};
+
 type Attempt = {
   id: string;
   n: number;
@@ -19,6 +42,7 @@ type Attempt = {
   proxy_mode: boolean;
   error: string | null;
   at: string;
+  selection_reason: SelectionReason | null;
 };
 type Pipeline = {
   key: string;
