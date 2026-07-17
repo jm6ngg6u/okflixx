@@ -135,6 +135,10 @@ function AdminLayout() {
     { to: "/admin/proxies", label: "Proxy pool", icon: Globe2, adminOnly: true },
     { to: "/admin/rotation", label: "Rotation policy", icon: Shuffle, adminOnly: true },
     { to: "/admin/access", label: "Access gates", icon: KeyRound, adminOnly: true },
+    { to: "/admin/audit", label: "Auth audit", icon: FileClock },
+
+
+
 
 
     { to: "/admin/staff", label: "Staff & roles", icon: Users, adminOnly: true },
