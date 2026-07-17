@@ -66,6 +66,7 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
       "captcha_site_key",
       "maintenance_enabled",
       "maintenance_message",
+      "user_daily_activation_limit",
     ]);
   const m: Record<string, string> = {};
   for (const row of data ?? []) m[row.key] = row.value;
@@ -77,6 +78,7 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
     captchaSiteKey: m.captcha_site_key || "",
     maintenance: m.maintenance_enabled === "1",
     maintenanceMessage: m.maintenance_message || "",
+    userDailyActivationLimit: Math.max(1, parseInt(m.user_daily_activation_limit || "10", 10)),
   };
 });
 
