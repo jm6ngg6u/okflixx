@@ -114,23 +114,64 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const keys = [
     "contact_enabled",
-    "contact_tg_name", "contact_tg_username",
-    "contact_ig_name", "contact_ig_username",
-    "contact_wa_name", "contact_wa_number",
+    "contact_tg_enabled", "contact_tg_name", "contact_tg_username",
+    "contact_ig_enabled", "contact_ig_name", "contact_ig_username",
+    "contact_wa_enabled", "contact_wa_name", "contact_wa_number",
   ];
-  const { data } = await supabaseAdmin.from("app_settings").select("key,value").in("key", keys);
+  const { data } = await supabaseAdmin.from("app_settings").select("key,value,updated_at").in("key", keys);
   const m: Record<string, string> = {};
-  for (const r of data ?? []) m[r.key] = r.value;
-  const enabled = m.contact_enabled === "1";
-  if (!enabled) return { enabled: false, channels: [] as Array<{ kind: string; name: string; handle: string; href: string }> };
-  const channels: Array<{ kind: string; name: string; handle: string; href: string }> = [];
-  const tg = (m.contact_tg_username ?? "").replace(/^@/, "").trim();
-  if (tg) channels.push({ kind: "telegram", name: (m.contact_tg_name ?? "Telegram").trim() || "Telegram", handle: `@${tg}`, href: `https://t.me/${tg}` });
-  const ig = (m.contact_ig_username ?? "").replace(/^@/, "").trim();
-  if (ig) channels.push({ kind: "instagram", name: (m.contact_ig_name ?? "Instagram").trim() || "Instagram", handle: `@${ig}`, href: `https://instagram.com/${ig}` });
-  const waRaw = (m.contact_wa_number ?? "").replace(/[^\d+]/g, "").replace(/^\+/, "").trim();
-  if (waRaw) channels.push({ kind: "whatsapp", name: (m.contact_wa_name ?? "WhatsApp").trim() || "WhatsApp", handle: `+${waRaw}`, href: `https://wa.me/${waRaw}` });
-  return { enabled: true, channels };
+  let updatedAt = 0;
+  for (const r of data ?? []) {
+    m[r.key] = r.value;
+    const t = (r as any).updated_at ? Date.parse((r as any).updated_at) : 0;
+    if (t > updatedAt) updatedAt = t;
+  }
+  const masterEnabled = m.contact_enabled === "1";
+  // Per-channel enable: default ON when key absent (backward compat).
+  const tgOn = (m.contact_tg_enabled ?? "1") === "1";
+  const igOn = (m.contact_ig_enabled ?? "1") === "1";
+  const waOn = (m.contact_wa_enabled ?? "1") === "1";
+
+  const normUser = (v: string) => {
+    let u = (v ?? "").trim();
+    u = u.replace(/^https?:\/\/(t\.me|telegram\.me|instagram\.com|www\.instagram\.com)\//i, "");
+    u = u.replace(/^@+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
+    return u.replace(/[^A-Za-z0-9_.]/g, "");
+  };
+  const normPhone = (v: string) =>
+    (v ?? "").trim().replace(/[^\d+]/g, "").replace(/\+/g, "");
+
+  const tg = normUser(m.contact_tg_username ?? "");
+  const ig = normUser(m.contact_ig_username ?? "");
+  const wa = normPhone(m.contact_wa_number ?? "");
+
+  const all = [
+    { kind: "telegram", enabled: tgOn, name: (m.contact_tg_name ?? "").trim() || "Telegram", raw: m.contact_tg_username ?? "", handleNorm: tg, handle: tg ? `@${tg}` : "", href: tg ? `https://t.me/${tg}` : "" },
+    { kind: "instagram", enabled: igOn, name: (m.contact_ig_name ?? "").trim() || "Instagram", raw: m.contact_ig_username ?? "", handleNorm: ig, handle: ig ? `@${ig}` : "", href: ig ? `https://instagram.com/${ig}` : "" },
+    { kind: "whatsapp", enabled: waOn, name: (m.contact_wa_name ?? "").trim() || "WhatsApp", raw: m.contact_wa_number ?? "", handleNorm: wa, handle: wa ? `+${wa}` : "", href: wa ? `https://wa.me/${wa}` : "" },
+  ];
+  const channels = all
+    .filter((c) => masterEnabled && c.enabled && !!c.handleNorm)
+    .map(({ kind, name, handle, href }) => ({ kind, name, handle, href }));
+
+  return {
+    enabled: masterEnabled,
+    channels,
+    debug: {
+      masterEnabled,
+      updatedAt: updatedAt || null,
+      channels: all.map((c) => ({
+        kind: c.kind,
+        enabled: c.enabled,
+        rawHandle: c.raw,
+        normalizedHandle: c.handleNorm,
+        display: c.handle,
+        href: c.href,
+        visible: masterEnabled && c.enabled && !!c.handleNorm,
+        reason: !masterEnabled ? "master_off" : !c.enabled ? "channel_off" : !c.handleNorm ? "empty_or_invalid_handle" : "ok",
+      })),
+    },
+  };
 });
 
 export const getPublicStatus = createServerFn({ method: "GET" }).handler(async () => {
