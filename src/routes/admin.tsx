@@ -137,6 +137,7 @@ function AdminLayout() {
 
   if (!authReady) return <FullScreen label="Loading session…" />;
   if (!authed) return null;
+  if (!mfaReady) return <FullScreen label="Verifying two-factor…" />;
   if (role.isLoading) return <FullScreen label="Checking permissions…" />;
   if (role.error || !role.data?.isStaff) {
     return (
