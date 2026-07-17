@@ -671,24 +671,35 @@ function HomePage() {
                         )}
                       </div>
                       {!sessionToken ? (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={accessKey}
-                            onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
-                            placeholder="NFX-XXXX-XXXX-XXXX"
-                            className="flex-1 bg-black/40 border border-white/10 rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#ff2a3a]/60"
-                            autoComplete="off"
-                          />
-                          <button
-                            type="button"
-                            onClick={redeemKey}
-                            disabled={redeeming || !accessKey.trim()}
-                            className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
-                          >
-                            {redeeming ? "Checking…" : "Verify"}
-                          </button>
-                        </div>
+                        <>
+                          <p className="text-[11px] text-white/45 leading-snug mb-2">
+                            Paste the key you received, then press Verify. Session and one-time keys are supported.
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={accessKey}
+                              onChange={(e) => { setAccessKey(e.target.value.toUpperCase()); if (keyError) setKeyError(null); }}
+                              placeholder="NFX-XXXX-XXXX-XXXX"
+                              className={`flex-1 bg-black/40 border rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none ${keyError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-[#ff2a3a]/60"}`}
+                              autoComplete="off"
+                            />
+                            <button
+                              type="button"
+                              onClick={redeemKey}
+                              disabled={redeeming || !accessKey.trim()}
+                              className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
+                            >
+                              {redeeming ? "Checking…" : "Verify"}
+                            </button>
+                          </div>
+                          {keyError && (
+                            <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-200">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <span>{keyError}</span>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <button
                           type="button"
@@ -698,6 +709,7 @@ function HomePage() {
                           Lock session
                         </button>
                       )}
+
                     </div>
                   )}
 
