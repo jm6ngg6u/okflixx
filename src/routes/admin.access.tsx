@@ -24,7 +24,7 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
-  testCaptchaKeys, listCaptchaLogs,
+  testCaptchaKeys, listCaptchaLogs, listActivationCaptchaDebug,
 } from "@/lib/access-keys.functions";
 
 export const Route = createFileRoute("/admin/access")({
