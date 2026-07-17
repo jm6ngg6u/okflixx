@@ -446,6 +446,78 @@ export const listCaptchaLogs = createServerFn({ method: "POST" })
   });
 
 // ==========================================================================
+// ADMIN — activation attempts joined to the closest captcha verify entry
+// (matched by ip_hash + time window). Read-only debug view.
+// ==========================================================================
+export const listActivationCaptchaDebug = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ limit: z.number().int().min(1).max(100).default(25) }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: attempts, error } = await supabaseAdmin
+      .from("activation_attempts")
+      .select("id, created_at, code, result, ip_hash, error_message, duration_ms")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (error) throw error;
+
+    const rows = attempts ?? [];
+    if (rows.length === 0) return { rows: [] };
+
+    // Fetch a wide window of recent captcha verifies and match in JS.
+    const minTs = new Date(new Date(rows[rows.length - 1].created_at).getTime() - 90_000).toISOString();
+    const { data: verifies } = await supabaseAdmin
+      .from("captcha_verify_log")
+      .select("id, created_at, provider, success, reason, error_codes, http_status, latency_ms, token_prefix, token_length, ip_hash, purpose")
+      .eq("purpose", "activate")
+      .gte("created_at", minTs)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const vs = verifies ?? [];
+    const merged = rows.map((a) => {
+      const at = new Date(a.created_at).getTime();
+      // Match by ip_hash within ±60s, closest by time.
+      let best: (typeof vs)[number] | null = null;
+      let bestDelta = Infinity;
+      for (const v of vs) {
+        if (v.ip_hash !== a.ip_hash) continue;
+        const delta = Math.abs(new Date(v.created_at).getTime() - at);
+        if (delta > 60_000) continue;
+        if (delta < bestDelta) { best = v; bestDelta = delta; }
+      }
+      return {
+        attempt_id: a.id,
+        attempt_created_at: a.created_at,
+        code: a.code,
+        result: a.result,
+        error_message: a.error_message,
+        duration_ms: a.duration_ms,
+        captcha: best
+          ? {
+              id: best.id,
+              provider: best.provider,
+              success: best.success,
+              reason: best.reason,
+              error_codes: best.error_codes ?? [],
+              http_status: best.http_status,
+              latency_ms: best.latency_ms,
+              token_prefix: best.token_prefix,
+              token_length: best.token_length,
+              delta_ms: bestDelta,
+            }
+          : null,
+      };
+    });
+
+    return { rows: merged };
+  });
+
+// ==========================================================================
 // ADMIN — gate settings
 // ==========================================================================
 const GateSettingsInput = z.object({
