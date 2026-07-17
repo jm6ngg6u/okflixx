@@ -337,6 +337,25 @@ html, body {
   50% { filter: drop-shadow(0 0 22px rgba(255,80,95,1)) drop-shadow(0 0 40px rgba(229,9,20,0.8)); transform: scale(1.06); }
 }
 
+/* Contact icon continuous glow — uses --glow-color set inline */
+.icon-glow {
+  animation: iconGlowPulse 1.6s ease-in-out infinite;
+  transition: transform 0.2s ease;
+}
+.icon-glow:hover { transform: scale(1.12); }
+@keyframes iconGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 6px color-mix(in oklab, var(--glow-color, #ff2a3a) 55%, transparent),
+                0 0 14px color-mix(in oklab, var(--glow-color, #ff2a3a) 25%, transparent);
+    filter: drop-shadow(0 0 4px color-mix(in oklab, var(--glow-color, #ff2a3a) 50%, transparent));
+  }
+  50% {
+    box-shadow: 0 0 14px color-mix(in oklab, var(--glow-color, #ff2a3a) 85%, transparent),
+                0 0 30px color-mix(in oklab, var(--glow-color, #ff2a3a) 55%, transparent);
+    filter: drop-shadow(0 0 10px color-mix(in oklab, var(--glow-color, #ff2a3a) 80%, transparent));
+  }
+}
+
 /* Big shining word sitting behind the logo */
 .logo-bg-shine {
   background: linear-gradient(90deg, #ff2a3a 0%, #ffffff 20%, #ff5361 40%, #b0060f 60%, #ffffff 80%, #ff2a3a 100%);

@@ -8,10 +8,10 @@ import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
-import { getPublicPoolStatus } from "@/lib/settings.functions";
+import { getPublicPoolStatus, getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Copy, LifeBuoy, X, Database, Sparkles, Repeat } from "lucide-react";
+import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Copy, LifeBuoy, X, Database, Sparkles, Repeat, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
@@ -1054,22 +1054,84 @@ function HomePage() {
 
       {/* FOOTER */}
       <footer className="relative border-t border-white/5 py-10 px-6 md:px-12 bg-black/40 backdrop-blur">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Emberlord" className="h-7 w-7 object-contain" width={28} height={28} loading="lazy" />
-            <span className="font-display text-lg">EMBER<span className="text-[#ff2a3a]">LORD</span></span>
-          </div>
-          <div className="font-mono text-xs uppercase tracking-widest text-white/40">© 2026 · Encrypted · Everywhere</div>
-          <div className="flex gap-6 text-xs text-white/40">
-            <a href="#" className="hover:text-white">Privacy</a>
-            <a href="#" className="hover:text-white">Terms</a>
-            <a href="#" className="hover:text-white">Help</a>
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+          <ContactStrip />
+          <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <img src={logo} alt="Emberlord" className="h-7 w-7 object-contain" width={28} height={28} loading="lazy" />
+              <span className="font-display text-lg">EMBER<span className="text-[#ff2a3a]">LORD</span></span>
+            </div>
+            <div className="font-mono text-xs uppercase tracking-widest text-white/40">© 2026 · Encrypted · Everywhere</div>
+            <div className="flex gap-6 text-xs text-white/40">
+              <a href="#" className="hover:text-white">Privacy</a>
+              <a href="#" className="hover:text-white">Terms</a>
+              <a href="#" className="hover:text-white">Help</a>
+            </div>
           </div>
         </div>
       </footer>
     </div>
   );
 }
+
+function ContactStrip() {
+  const fetchContacts = useServerFn(getPublicContacts);
+  const q = useQuery({
+    queryKey: ["public-contacts"],
+    queryFn: () => fetchContacts(),
+    refetchInterval: 15000,
+    staleTime: 10000,
+  });
+  const channels = q.data?.channels ?? [];
+  if (!q.data?.enabled || channels.length === 0) return null;
+
+  const iconFor = (kind: string) => {
+    if (kind === "telegram") return Send;
+    if (kind === "instagram") return Instagram;
+    return Phone;
+  };
+  const colorFor = (kind: string) => {
+    if (kind === "telegram") return "#229ED9";
+    if (kind === "instagram") return "#E1306C";
+    return "#25D366";
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-white/40">// Contact</div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {channels.map((c) => {
+          const Icon = iconFor(c.kind);
+          const color = colorFor(c.kind);
+          return (
+            <a
+              key={c.kind}
+              href={c.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2.5 rounded-full border bg-black/40 backdrop-blur px-3.5 py-2 transition hover:bg-black/60"
+              style={{ borderColor: `${color}55` }}
+              aria-label={`${c.name} — ${c.handle}`}
+            >
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center icon-glow"
+                style={{ background: `${color}22`, border: `1px solid ${color}66`, color, ["--glow-color" as any]: color }}
+              >
+                <Icon className="w-4 h-4" />
+              </span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-white/50">{c.name}</span>
+                <span className="text-xs text-white/90 font-medium">{c.handle}</span>
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 
 function flagEmoji(cc: string | null): string {
   if (!cc || cc.length !== 2) return "🌐";
