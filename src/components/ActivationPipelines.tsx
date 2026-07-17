@@ -446,45 +446,81 @@ function StageRail({
 function AttemptRow({ attempt, totalAttempts }: { attempt: Attempt; totalAttempts: number }) {
   const isSuccess = attempt.result === "success";
   const tone = isSuccess ? "text-emerald-400" : "text-[#ff8a90]";
+  const r = attempt.selection_reason;
   return (
-    <div className="grid grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 text-[11px] font-mono px-2 py-1.5 rounded bg-white/[0.02] border border-white/5">
-      <span className="text-white/40 tabular-nums">#{attempt.n}/{totalAttempts}</span>
-      <span className={`w-1.5 h-1.5 rounded-full ${isSuccess ? "bg-emerald-400" : "bg-[#ff2a3a]"}`} />
-      <span className="min-w-0 flex items-center gap-2 flex-wrap">
-        <span className={`px-1.5 py-0.5 rounded border text-[10px] ${
-          isSuccess
-            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-            : "bg-[#ff2a3a]/10 text-[#ff8a90] border-[#ff2a3a]/30"
-        }`}>
-          {(attempt.result ?? "pending").replace(/_/g, " ")}
+    <div className="rounded bg-white/[0.02] border border-white/5">
+      <div className="grid grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 text-[11px] font-mono px-2 py-1.5">
+        <span className="text-white/40 tabular-nums">#{attempt.n}/{totalAttempts}</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${isSuccess ? "bg-emerald-400" : "bg-[#ff2a3a]"}`} />
+        <span className="min-w-0 flex items-center gap-2 flex-wrap">
+          <span className={`px-1.5 py-0.5 rounded border text-[10px] ${
+            isSuccess
+              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+              : "bg-[#ff2a3a]/10 text-[#ff8a90] border-[#ff2a3a]/30"
+          }`}>
+            {(attempt.result ?? "pending").replace(/_/g, " ")}
+          </span>
+          {attempt.cookie_id && (
+            <span className="text-white/40 inline-flex items-center gap-1">
+              <Cookie className="w-3 h-3" /> {attempt.cookie_id.slice(0, 8)}
+            </span>
+          )}
+          {attempt.proxy_id ? (
+            <span className="text-white/40 inline-flex items-center gap-1">
+              <Globe2 className="w-3 h-3" /> {attempt.proxy_id.slice(0, 8)}
+            </span>
+          ) : attempt.proxy_mode ? (
+            <span className="text-white/30 inline-flex items-center gap-1">
+              <Globe2 className="w-3 h-3" /> proxy fallback → direct
+            </span>
+          ) : null}
+          {r?.admin_retry && (
+            <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200">
+              admin
+            </span>
+          )}
+          {attempt.error && (
+            <span className="text-[#ff8a90]/70 truncate max-w-[240px]" title={attempt.error}>
+              · {attempt.error}
+            </span>
+          )}
         </span>
-        {attempt.cookie_id && (
-          <span className="text-white/40 inline-flex items-center gap-1">
-            <Cookie className="w-3 h-3" /> {attempt.cookie_id.slice(0, 8)}
-          </span>
-        )}
-        {attempt.proxy_id ? (
-          <span className="text-white/40 inline-flex items-center gap-1">
-            <Globe2 className="w-3 h-3" /> {attempt.proxy_id.slice(0, 8)}
-          </span>
-        ) : attempt.proxy_mode ? (
-          <span className="text-white/30 inline-flex items-center gap-1">
-            <Globe2 className="w-3 h-3" /> proxy fallback → direct
-          </span>
-        ) : null}
-        {attempt.error && (
-          <span className="text-[#ff8a90]/70 truncate max-w-[240px]" title={attempt.error}>
-            · {attempt.error}
-          </span>
-        )}
-      </span>
-      <span className={`tabular-nums ${tone}`}>
-        {fmtMs(attempt.duration_ms)}
-      </span>
-      <span className="text-white/30 inline-flex items-center gap-1 tabular-nums">
-        <Clock className="w-3 h-3" />
-        {new Date(attempt.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-      </span>
+        <span className={`tabular-nums ${tone}`}>
+          {fmtMs(attempt.duration_ms)}
+        </span>
+        <span className="text-white/30 inline-flex items-center gap-1 tabular-nums">
+          <Clock className="w-3 h-3" />
+          {new Date(attempt.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+        </span>
+      </div>
+      {r && (r.why || r.cookie) && (
+        <div className="px-2 pb-2 pt-1 -mt-1 border-t border-white/5 grid grid-cols-[auto_1fr] gap-2 items-start">
+          <Info className="w-3 h-3 text-sky-300/70 mt-0.5" />
+          <div className="min-w-0 text-[10px] font-mono">
+            {r.why && (
+              <div className="text-white/70">
+                <span className="text-sky-300">{r.policy?.replace("_", " ") ?? "policy"}</span> · {r.why}
+              </div>
+            )}
+            {r.cookie && (
+              <div className="mt-0.5 flex flex-wrap gap-x-3 text-white/40">
+                <span>status <span className="text-white/70">{r.cookie.status ?? "—"}</span></span>
+                <span>uses <span className="text-white/70">{r.cookie.total_uses ?? 0}</span></span>
+                <span>success <span className="text-emerald-300">{r.cookie.success_count ?? 0}</span></span>
+                <span>fail <span className="text-[#ff8a90]">{r.cookie.fail_count ?? 0}</span></span>
+                <span>rate <span className={
+                  (r.cookie.success_rate ?? 0) >= 70 ? "text-emerald-300"
+                    : (r.cookie.success_rate ?? 0) >= 30 ? "text-amber-300"
+                    : (r.cookie.total_uses ?? 0) > 0 ? "text-rose-300" : "text-white/50"
+                }>{r.cookie.success_rate != null ? `${r.cookie.success_rate}%` : "—"}</span></span>
+                {typeof r.eligible_at_pick === "number" && (
+                  <span>pool <span className="text-white/70">{r.eligible_at_pick}</span></span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
