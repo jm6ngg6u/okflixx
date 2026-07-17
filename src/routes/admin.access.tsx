@@ -49,6 +49,18 @@ function AccessAdminPage() {
   const runTestKeys = useServerFn(testCaptchaKeys);
   const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
   const fetchActivationDebug = useServerFn(listActivationCaptchaDebug);
+  const exportCsv = useServerFn(exportCaptchaLogsCsv);
+  const fetchRetention = useServerFn(getCaptchaRetention);
+  const saveRetention = useServerFn(setCaptchaRetention);
+  const purgeNow = useServerFn(purgeCaptchaLogsNow);
+
+  const retention = useQuery({
+    queryKey: ["captcha-retention"],
+    queryFn: () => fetchRetention(),
+    refetchInterval: 15000,
+  });
+  const [retDays, setRetDays] = useState<string>("");
+  const [failLimit, setFailLimit] = useState<string>("");
 
   const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
   const [testing, setTesting] = useState(false);
