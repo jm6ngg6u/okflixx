@@ -272,6 +272,7 @@ export const submitActivation = createServerFn({ method: "POST" })
           message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
         };
       }
+      captchaPassed = true;
     }
     if (accessKeyRequired) {
       const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
