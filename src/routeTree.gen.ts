@@ -20,6 +20,7 @@ import { Route as BgPreviewAuroraRouteImport } from './routes/bg-preview.aurora'
 import { Route as AdminStaffRouteImport } from './routes/admin.staff'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSecurityRouteImport } from './routes/admin.security'
+import { Route as AdminRotationRouteImport } from './routes/admin.rotation'
 import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminBackgroundSongRouteImport } from './routes/admin.background-song'
@@ -86,6 +87,11 @@ const AdminSecurityRoute = AdminSecurityRouteImport.update({
   path: '/security',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRotationRoute = AdminRotationRouteImport.update({
+  id: '/rotation',
+  path: '/rotation',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProxiesRoute = AdminProxiesRouteImport.update({
   id: '/proxies',
   path: '/proxies',
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
+  '/admin/rotation': typeof AdminRotationRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
+  '/admin/rotation': typeof AdminRotationRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
@@ -196,6 +204,7 @@ export interface FileRoutesById {
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
+  '/admin/rotation': typeof AdminRotationRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/admin/background-song'
     | '/admin/cookies'
     | '/admin/proxies'
+    | '/admin/rotation'
     | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/admin/background-song'
     | '/admin/cookies'
     | '/admin/proxies'
+    | '/admin/rotation'
     | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/admin/background-song'
     | '/admin/cookies'
     | '/admin/proxies'
+    | '/admin/rotation'
     | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
@@ -377,6 +389,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSecurityRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/rotation': {
+      id: '/admin/rotation'
+      path: '/rotation'
+      fullPath: '/admin/rotation'
+      preLoaderRoute: typeof AdminRotationRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/proxies': {
       id: '/admin/proxies'
       path: '/proxies'
@@ -455,6 +474,7 @@ interface AdminRouteChildren {
   AdminBackgroundSongRoute: typeof AdminBackgroundSongRoute
   AdminCookiesRoute: typeof AdminCookiesRoute
   AdminProxiesRoute: typeof AdminProxiesRoute
+  AdminRotationRoute: typeof AdminRotationRoute
   AdminSecurityRoute: typeof AdminSecurityRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminStaffRoute: typeof AdminStaffRoute
@@ -466,6 +486,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBackgroundSongRoute: AdminBackgroundSongRoute,
   AdminCookiesRoute: AdminCookiesRoute,
   AdminProxiesRoute: AdminProxiesRoute,
+  AdminRotationRoute: AdminRotationRoute,
   AdminSecurityRoute: AdminSecurityRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminStaffRoute: AdminStaffRoute,
