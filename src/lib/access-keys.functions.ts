@@ -5,12 +5,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
-import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
 
-// --- utilities ---
-function sha256(v: string): string {
-  return createHash("sha256").update(v).digest("hex");
+// --- utilities (Web Crypto — works on Cloudflare Workers, Node, and won't
+// pull node:crypto into the client bundle when this module is scanned by
+// the server-fn plugin) ---
+async function sha256(v: string): Promise<string> {
+  const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function randomBytes(n: number): Uint8Array {
+  const a = new Uint8Array(n);
+  globalThis.crypto.getRandomValues(a);
+  return a;
+}
+function toBase64Url(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function ipSalt(): string {
@@ -25,6 +37,7 @@ function generateKeyCode(): string {
   for (let i = 0; i < 12; i++) chars.push(ALPHABET[bytes[i] % ALPHABET.length]);
   return `NFX-${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}-${chars.slice(8, 12).join("")}`;
 }
+
 
 function normalizeCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, "");
@@ -80,15 +93,15 @@ export const redeemAccessKey = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const code = normalizeCode(data.code);
-    const codeHash = sha256(code);
-    const fpHash = sha256(data.fingerprint);
+    const codeHash = await sha256(code);
+    const fpHash = await sha256(data.fingerprint);
 
     const rawIp =
       getRequestHeader("cf-connecting-ip") ??
       getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim() ??
       getRequestIP({ xForwardedFor: true }) ??
       "unknown";
-    const ipHash = sha256(`${ipSalt()}:${rawIp}`);
+    const ipHash = await sha256(`${ipSalt()}:${rawIp}`);
     const userAgent = getRequestHeader("user-agent")?.slice(0, 500) ?? null;
 
     const { data: rows, error } = await supabaseAdmin.rpc("consume_access_key", {
@@ -115,8 +128,8 @@ export const redeemAccessKey = createServerFn({ method: "POST" })
 
     // For session_24h keys, issue an opaque token bound to IP+FP.
     if (row.key_type === "session_24h") {
-      const token = `sess_${randomBytes(24).toString("base64url")}`;
-      const tokenHash = sha256(token);
+      const token = `sess_${toBase64Url(randomBytes(24))}`;
+      const tokenHash = await sha256(token);
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       await supabaseAdmin.from("access_sessions").insert({
         session_token_hash: tokenHash,
@@ -125,6 +138,7 @@ export const redeemAccessKey = createServerFn({ method: "POST" })
         fingerprint_hash: fpHash,
         expires_at: expiresAt,
       });
+
       return {
         ok: true as const,
         keyType: "session_24h" as const,
@@ -157,11 +171,11 @@ export async function verifyAccessCredentials(
   | { ok: true; keyId: string | null; via: "key" | "session" }
   | { ok: false; reason: string }
 > {
-  const fpHash = sha256(opts.fingerprint);
+  const fpHash = await sha256(opts.fingerprint);
 
   // Prefer session token if present (24h mode).
   if (opts.sessionToken) {
-    const tokenHash = sha256(opts.sessionToken);
+    const tokenHash = await sha256(opts.sessionToken);
     const { data: sess } = await supabaseAdmin
       .from("access_sessions")
       .select("id, key_id, ip_hash, fingerprint_hash, expires_at")
@@ -184,10 +198,11 @@ export async function verifyAccessCredentials(
   if (opts.code) {
     const code = normalizeCode(opts.code);
     const { data: rows } = await supabaseAdmin.rpc("consume_access_key", {
-      _code_hash: sha256(code),
+      _code_hash: await sha256(code),
       _ip_hash: opts.ipHash,
       _fingerprint_hash: fpHash,
     });
+
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (!row?.ok) return { ok: false, reason: row?.reason ?? "invalid_key" };
     return { ok: true, keyId: row.key_id, via: "key" };
@@ -286,7 +301,7 @@ export const createAccessKeys = createServerFn({ method: "POST" })
     const generated: { code: string; id: string }[] = [];
     for (let i = 0; i < data.quantity; i++) {
       const code = generateKeyCode();
-      const codeHash = sha256(code);
+      const codeHash = await sha256(code);
       const { data: row, error } = await supabaseAdmin
         .from("access_keys")
         .insert({
