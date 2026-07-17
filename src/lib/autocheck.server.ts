@@ -1,7 +1,7 @@
 // Shared logic for the cookie/proxy auto-check jobs.
 // Used by both the /api/public/hooks/* cron routes and the admin "Run now" server fns.
 
-import { recordJobStart, recordJobFinish, recordJobProgress, readJobControl } from "@/lib/cron.server";
+import { recordJobStart, recordJobFinish, recordJobProgress, readJobControl, isJobRunning } from "@/lib/cron.server";
 
 type CookieRunResult = {
   ok: boolean;
