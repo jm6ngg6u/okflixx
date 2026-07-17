@@ -449,16 +449,17 @@ function ProxiesPage() {
   );
 }
 
-function StatCard({ label, value, tone = "default", icon }: { label: string; value: any; tone?: "default" | "emerald" | "red" | "amber" | "dim"; icon?: React.ReactNode }) {
+function StatCard({ label, value, tone = "default", icon }: { label: string; value: any; tone?: "default" | "emerald" | "red" | "amber" | "dim" | "sky"; icon?: React.ReactNode }) {
   const toneCls =
     tone === "emerald" ? "text-emerald-300" :
     tone === "red" ? "text-red-300" :
     tone === "amber" ? "text-amber-300" :
+    tone === "sky" ? "text-sky-300" :
     tone === "dim" ? "text-white/70" :
     "text-white";
   return (
     <div className="glass p-3 rounded-lg">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40">
+      <div className="flex items-center gap-1.5 text-[11px] tracking-wide text-white/45 normal-case">
         {icon}
         {label}
       </div>
@@ -466,3 +467,4 @@ function StatCard({ label, value, tone = "default", icon }: { label: string; val
     </div>
   );
 }
+
