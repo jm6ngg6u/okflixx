@@ -483,6 +483,7 @@ function CookiePoolPage() {
       {/* KPI health strip */}
       <PoolHealthStrip
         stats={stats}
+        avgHealth={rows.length > 0 ? Math.round(rows.reduce((acc, r) => acc + healthScore(r), 0) / rows.length) : null}
         onFilterStatus={(s) => { setStatus(s); setPage(0); }}
         onFilterStuck={() => { setStuckOnly(true); setStatus(""); setCountry(""); setPage(0); }}
       />
