@@ -165,7 +165,8 @@ export const submitActivation = createServerFn({ method: "POST" })
       const { verifyCaptcha } = await import("@/lib/access-keys.functions");
       const v = await verifyCaptcha(provider, data.captchaToken, rawIp);
       if (!v.ok) {
-        return { ok: false, error: "captcha_invalid", message: "Captcha check failed. Please retry." };
+        console.warn("[captcha] verify failed", { provider, reason: v.reason, tokenLen: data.captchaToken?.length ?? 0 });
+        return { ok: false, error: "captcha_invalid", message: `Captcha check failed (${v.reason || "unknown"}). Please retry.` };
       }
     }
     if (accessKeyRequired) {
