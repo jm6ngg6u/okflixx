@@ -488,9 +488,46 @@ export const retryActivationAdmin = createServerFn({ method: "POST" })
       await supabaseAdmin.from("activation_attempts").insert({
         code, result: "no_cookie", ip_hash: `admin:${userId}`,
         user_agent: "admin-retry", country: null, proxy_mode: false, attempt_number: 1,
+        selection_reason: { policy, filters: eligibility, outcome: "no_eligible_cookie", admin_retry: true },
       });
-      return { ok: false, status: "no_cookie" as const, message: "Cookie pool empty." };
+      return { ok: false, status: "no_cookie" as const, message: "No eligible cookies match your rotation rules." };
     }
+
+    // Selection reasoning (matches the public flow).
+    const { data: pickedStats } = await supabaseAdmin
+      .from("cookie_pool")
+      .select("status, is_valid, total_uses, success_count, fail_count, last_used_at")
+      .eq("id", cookie.id).maybeSingle();
+    const { data: eligibleCount } = await supabaseAdmin.rpc("count_eligible_cookies", {
+      _include_statuses: eligibility.include_statuses,
+      _require_valid: eligibility.require_valid,
+      _min_success_rate: eligibility.min_success_rate,
+      _min_total_uses: eligibility.min_total_uses,
+    });
+    const uses = pickedStats?.total_uses ?? 0;
+    const succ = pickedStats?.success_count ?? 0;
+    const sr = uses > 0 ? Math.round((succ / uses) * 1000) / 10 : null;
+    const selectionReason = {
+      policy,
+      filters: eligibility,
+      eligible_at_pick: (eligibleCount as number) ?? null,
+      admin_retry: true,
+      cookie: {
+        status: pickedStats?.status ?? null,
+        is_valid: pickedStats?.is_valid ?? null,
+        total_uses: uses,
+        success_count: succ,
+        fail_count: pickedStats?.fail_count ?? 0,
+        success_rate: sr,
+        last_used_at: pickedStats?.last_used_at ?? null,
+      },
+      why:
+        policy === "quality"
+          ? sr != null ? `Highest-scoring cookie: ${sr}% success across ${uses} uses` : `Unused cookie — grace period`
+          : policy === "random"
+            ? `Random pick from ${eligibleCount ?? "?"} eligible cookie(s)`
+            : uses === 0 ? `Least-recently-used: never used before` : `Least-recently-used across ${eligibleCount ?? "?"} eligible cookie(s)`,
+    };
 
     const { data: proxyModeRow } = await supabaseAdmin
       .from("app_settings").select("value").eq("key", "proxy_mode").maybeSingle();
@@ -520,6 +557,7 @@ export const retryActivationAdmin = createServerFn({ method: "POST" })
       proxy_mode: proxyMode, attempt_number: 1,
       duration_ms: outcome.duration_ms ?? dur,
       error_message: (outcome as any).error ?? null,
+      selection_reason: selectionReason,
     });
 
     const success = outcome.status === "success";
