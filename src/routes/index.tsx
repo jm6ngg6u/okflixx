@@ -842,6 +842,59 @@ function HomePage() {
                 </div>
               )}
 
+              {serviceError && !submitting && (
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4 shadow-[0_0_0_1px_rgba(255,42,58,0.15)_inset]"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
+                      <AlertCircle className="w-4 h-4 text-[#ff8a90]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
+                          {serviceError.kind === "no_cookie" ? "Cookie pool empty" : "Activation exhausted"}
+                        </span>
+                        {serviceError.attempts != null && (
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/50">
+                            · {serviceError.attempts} attempts
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-white/85 leading-relaxed">
+                        {serviceError.message}
+                      </p>
+                      <p className="mt-1 text-xs text-white/50">
+                        {serviceError.kind === "no_cookie"
+                          ? "All active cookies are locked or being refreshed. Your code is still valid — just retry."
+                          : "This can happen when cookies expire mid-request. Retrying picks a fresh one."}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setServiceError(null); setRetryCountdown(0); handleActivate(); }}
+                          disabled={retryCountdown > 0}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Retry now"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setServiceError(null); setRetryCountdown(0); }}
+                          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:border-white/20 transition"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
               <button
                 onClick={handleActivate}
                 disabled={submitting}
