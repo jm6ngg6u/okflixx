@@ -357,7 +357,9 @@ function RunningRow({ row }: { row: JobRow }) {
 function HistoryRow({ row }: { row: JobRow }) {
   const meta = JOB_META[row.job] ?? { label: row.job, icon: Activity };
   const Icon = meta.icon;
-  const ok = row.ok !== false;
+  const cancelled = !!row.summary?.cancelled;
+  const stopped = !!row.summary?.stopped;
+  const ok = row.ok !== false && !cancelled;
   let a = "";
   let b = "";
   if (row.job === "cookies-autocheck") {
@@ -368,13 +370,23 @@ function HistoryRow({ row }: { row: JobRow }) {
   } else if (row.job === "auto-cleanup") {
     a = cleanupSummaryLine(row.summary);
   }
+  const StatusIcon = cancelled ? Ban : stopped ? Square : ok ? CheckCircle2 : XCircle;
+  const statusColor = cancelled ? "text-red-300" : stopped ? "text-amber-300" : ok ? "text-emerald-300" : "text-red-300";
   return (
     <div className="flex items-start gap-3 rounded-md border border-white/5 bg-white/[0.02] p-3">
-      {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-300 mt-0.5 shrink-0" /> : <XCircle className="w-4 h-4 text-red-300 mt-0.5 shrink-0" />}
+      <StatusIcon className={`w-4 h-4 mt-0.5 shrink-0 ${statusColor}`} />
       <Icon className="w-3.5 h-3.5 text-white/50 mt-1 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-medium truncate">{meta.label}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="text-sm font-medium truncate">{meta.label}</div>
+            {cancelled && (
+              <Badge variant="outline" className="bg-red-500/15 border-red-500/40 text-red-200 text-[10px] uppercase">Cancelled</Badge>
+            )}
+            {stopped && !cancelled && (
+              <Badge variant="outline" className="bg-amber-500/15 border-amber-500/40 text-amber-200 text-[10px] uppercase">Stopped</Badge>
+            )}
+          </div>
           <div className="text-[11px] text-white/40 font-mono shrink-0">
             {new Date(row.finished_at ?? row.started_at).toLocaleString()} · {fmtDuration(row.started_at, row.finished_at)}
           </div>
