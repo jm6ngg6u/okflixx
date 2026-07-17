@@ -314,39 +314,40 @@ function ProxiesPage() {
       {/* Table + filters */}
       <div className="glass overflow-hidden">
         <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between flex-wrap gap-3">
-          <div className="font-display text-lg">Proxies <span className="text-white/40 text-sm">({data?.count ?? 0})</span></div>
+          <div className="font-display text-lg normal-case">Proxies <span className="text-white/40 text-sm">({data?.count ?? 0})</span></div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
               <Input
-                placeholder="Search ip / raw…"
+                placeholder="search ip / raw…"
                 value={filters.search}
                 onChange={(e) => { setFilters({ ...filters, search: e.target.value }); setPage(0); }}
-                className="pl-8 h-8 w-52 bg-white/5 border-white/10 text-xs"
+                className="pl-8 h-8 w-52 bg-white/5 border-white/10 text-xs normal-case placeholder:normal-case"
               />
             </div>
             <Select value={filters.status} onValueChange={(v: any) => { setFilters({ ...filters, status: v }); setPage(0); }}>
-              <SelectTrigger className="h-8 w-36 bg-white/5 border-white/10 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All status</SelectItem>
-                <SelectItem value="valid">Valid</SelectItem>
-                <SelectItem value="invalid">Invalid</SelectItem>
-                <SelectItem value="quarantined">Quarantined</SelectItem>
-                <SelectItem value="never_checked">Never checked</SelectItem>
+              <SelectTrigger className="h-8 w-40 bg-[#0b0b0d] border-white/10 text-xs normal-case"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[#0b0b0d] border-white/10">
+                <SelectItem value="all" className="normal-case">all status</SelectItem>
+                <SelectItem value="valid" className="normal-case">valid ({s?.valid ?? 0})</SelectItem>
+                <SelectItem value="invalid" className="normal-case">invalid ({s?.invalid ?? 0})</SelectItem>
+                <SelectItem value="quarantined" className="normal-case">quarantined ({s?.quarantined ?? 0})</SelectItem>
+                <SelectItem value="never_checked" className="normal-case">unchecked ({s?.never_checked ?? 0})</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filters.scheme} onValueChange={(v: any) => { setFilters({ ...filters, scheme: v }); setPage(0); }}>
-              <SelectTrigger className="h-8 w-32 bg-white/5 border-white/10 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All schemes</SelectItem>
-                <SelectItem value="http">http</SelectItem>
-                <SelectItem value="https">https</SelectItem>
-                <SelectItem value="socks5">socks5</SelectItem>
-                <SelectItem value="socks4">socks4</SelectItem>
+              <SelectTrigger className="h-8 w-32 bg-[#0b0b0d] border-white/10 text-xs normal-case"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[#0b0b0d] border-white/10">
+                <SelectItem value="all" className="normal-case">all schemes</SelectItem>
+                <SelectItem value="http" className="normal-case">http</SelectItem>
+                <SelectItem value="https" className="normal-case">https</SelectItem>
+                <SelectItem value="socks5" className="normal-case">socks5</SelectItem>
+                <SelectItem value="socks4" className="normal-case">socks4</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
+
 
         {/* Bulk toolbar */}
         {selected.size > 0 && (
