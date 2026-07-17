@@ -123,6 +123,8 @@ function HomePage() {
   return (
     <div className="relative min-h-screen text-white">
       <LiveBackground />
+      {success && <SuccessOverlay payload={success} onClose={() => setSuccess(null)} />}
+
       <ClickRipple />
       <BackgroundSong />
 
