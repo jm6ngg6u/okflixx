@@ -8,7 +8,7 @@ import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
-import { getPublicPoolStatus } from "@/lib/settings.functions";
+import { getPublicPoolStatus, getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Copy, LifeBuoy, X, Database, Sparkles, Repeat } from "lucide-react";
