@@ -42,8 +42,14 @@ function LoginPage() {
   const [otpLockUntil, setOtpLockUntil] = useState<number | null>(null);
   const MAX_OTP_VERIFY_ATTEMPTS = 5;
 
-  const safeLog = (payload: Parameters<typeof logAuthEvent>[0] extends { data: infer T } ? T : any) => {
-    logEvent({ data: payload as any }).catch(() => { /* swallow */ });
+  const safeLog = (payload: {
+    event: "signin" | "signup" | "otp_send" | "otp_verify" | "password_reset";
+    email?: string;
+    success: boolean;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+  }) => {
+    logEvent({ data: payload }).catch(() => { /* swallow */ });
   };
 
   // Captcha state (respects the same gate config as landing).
