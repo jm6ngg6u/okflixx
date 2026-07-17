@@ -121,6 +121,61 @@ export const getPublicStatus = createServerFn({ method: "GET" }).handler(async (
   };
 });
 
+/**
+ * Public pool-status snapshot for the landing page. Anon-safe — exposes only
+ * counts and the currently-active rotation policy, never cookie contents or
+ * emails. Uses the same RPCs and eligibility settings as the real activation
+ * picker (`pick_next_cookie_filtered`), so what a user sees here is what the
+ * server will actually consider when they submit a code.
+ */
+export const getPublicPoolStatus = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { loadEligibility } = await import("@/lib/activate.functions");
+
+  const [settingsRes, freshRes, usedRes, totalRes] = await Promise.all([
+    supabaseAdmin
+      .from("app_settings")
+      .select("key,value")
+      .in("key", ["cookie_rotation_policy", "max_activation_attempts"]),
+    supabaseAdmin
+      .from("cookie_pool")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active").eq("is_valid", true).eq("total_uses", 0),
+    supabaseAdmin
+      .from("cookie_pool")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active").eq("is_valid", true).gt("total_uses", 0),
+    supabaseAdmin
+      .from("cookie_pool")
+      .select("id", { count: "exact", head: true }),
+  ]);
+
+  const map: Record<string, string> = {};
+  for (const row of settingsRes.data ?? []) map[row.key] = row.value;
+  const rawPolicy = (map.cookie_rotation_policy ?? "round_robin").toLowerCase();
+  const policy: "round_robin" | "random" | "quality" =
+    rawPolicy === "random" || rawPolicy === "quality" ? (rawPolicy as any) : "round_robin";
+  const maxAttempts = Math.max(1, Math.min(10, parseInt(map.max_activation_attempts ?? "3", 10) || 3));
+
+  const eligibility = await loadEligibility(supabaseAdmin);
+  const { data: eligibleCount } = await supabaseAdmin.rpc("count_eligible_cookies", {
+    _include_statuses: eligibility.include_statuses,
+    _require_valid: eligibility.require_valid,
+    _min_success_rate: eligibility.min_success_rate,
+    _min_total_uses: eligibility.min_total_uses,
+  });
+
+  return {
+    eligible: (eligibleCount as number | null) ?? 0,
+    fresh: freshRes.count ?? 0,
+    used: usedRes.count ?? 0,
+    total: totalRes.count ?? 0,
+    policy,
+    maxAttempts,
+    updatedAt: Date.now(),
+  };
+});
+
 /** Latest scheduled-job runs, for the admin live-jobs panel. */
 export const listRecentJobRuns = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
