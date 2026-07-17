@@ -257,8 +257,8 @@ function AccessAdminPage() {
                   }}
                 />
               </div>
-              <p className="text-[11px] text-white/40 mt-2">
-                Add secret via project settings: <code className="text-white/70">TURNSTILE_SECRET</code> or <code className="text-white/70">HCAPTCHA_SECRET</code>.
+              <p className="text-[11px] text-white/40 mt-2 leading-relaxed">
+                The site key is public and used by the widget in the browser. The <code className="text-white/70">HCAPTCHA_SECRET</code> / <code className="text-white/70">TURNSTILE_SECRET</code> is stored encrypted in <b>Cloud → Secrets</b>, is only ever read server-side inside <code className="text-white/70">verifyCaptcha</code>, and is never returned to the client, written to logs, or shown in this UI.
               </p>
             </div>
           </div>
@@ -464,9 +464,25 @@ function AccessAdminPage() {
                       <td className="px-3 py-2 text-white/60">{new Date(r.created_at).toLocaleTimeString()}</td>
                       <td className="px-3 py-2 text-white/70">{r.provider}<span className="text-white/30 ml-1">/{r.purpose}</span></td>
                       <td className="px-3 py-2">
-                        <span className={r.success ? "text-emerald-300" : "text-red-300"}>
-                          {r.success ? "ok" : (r.reason ?? "fail")}
-                        </span>
+                        {(() => {
+                          const codes: string[] = r.error_codes ?? [];
+                          const diagnosticOk =
+                            r.purpose === "admin_test" &&
+                            !r.success &&
+                            (codes.includes("invalid-input-response") ||
+                              codes.includes("missing-input-response"));
+                          if (r.success) return <span className="text-emerald-300">ok</span>;
+                          if (diagnosticOk)
+                            return (
+                              <span
+                                className="text-emerald-300"
+                                title="Diagnostic probe sends a dummy token; providers reply invalid-input-response when the secret is valid — this is the expected healthy result."
+                              >
+                                healthy probe
+                              </span>
+                            );
+                          return <span className="text-red-300">{r.reason ?? "fail"}</span>;
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-white/50 font-mono">{(r.error_codes ?? []).join(", ") || "—"}</td>
                       <td className="px-3 py-2 text-white/40 font-mono">
@@ -477,6 +493,19 @@ function AccessAdminPage() {
                   )))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Code legend — explains admin_test vs activate results */}
+            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 text-[11px] space-y-1.5">
+              <div className="font-mono uppercase tracking-widest text-white/50">What these codes mean</div>
+              <div className="grid md:grid-cols-2 gap-x-4 gap-y-1 text-white/70">
+                <div><span className="text-emerald-300 font-mono">healthy probe</span> — admin test with dummy token; provider replied <code className="text-white/50">invalid-input-response</code>. This confirms your secret is valid. <span className="text-white/40">Fix: none needed.</span></div>
+                <div><span className="text-red-300 font-mono">sitekey-secret-mismatch</span> — site key and secret belong to different projects/accounts. <span className="text-white/40">Fix: regenerate both from the same hCaptcha project.</span></div>
+                <div><span className="text-red-300 font-mono">invalid-input-secret</span> — the secret stored in <code className="text-white/50">HCAPTCHA_SECRET</code> is wrong or revoked. <span className="text-white/40">Fix: rotate it via Cloud → Secrets.</span></div>
+                <div><span className="text-red-300 font-mono">timeout-or-duplicate</span> — the user's captcha token expired (older than ~2 min) or was already used. <span className="text-white/40">Fix: user just needs to re-solve; not a config issue.</span></div>
+                <div><span className="text-red-300 font-mono">rate_limited</span> — this IP tripped the failure cap. <span className="text-white/40">Fix: raise <code className="text-white/50">captcha_fail_limit_per_10min</code> above if legitimate traffic is being blocked.</span></div>
+                <div><span className="text-red-300 font-mono">captcha_network_*</span> — could not reach hCaptcha/Turnstile from the server. <span className="text-white/40">Fix: transient — retry; check provider status page if it persists.</span></div>
+              </div>
             </div>
           </div>
         </div>
