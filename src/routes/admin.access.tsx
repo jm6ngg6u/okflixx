@@ -78,16 +78,30 @@ function AccessAdminPage() {
     );
   }, [keys.data, search]);
 
-  // ─── Gate toggles ────────────────────────────────────────────────────
+  // ─── Gate toggles ─ optimistic with rollback ─────────────────────────
+  // Snapshot the current config, patch instantly, then reconcile with the
+  // authoritative server response in `onSettled`. If another admin flipped
+  // the same switch first, the 2s poll + onSettled invalidate resyncs.
   const gateMut = useMutation({
     mutationFn: (patch: any) => saveSettings({ data: patch }),
+    onMutate: async (patch: any) => {
+      await qc.cancelQueries({ queryKey: ["gate-config"] });
+      const previous = qc.getQueryData<any>(["gate-config"]);
+      if (previous) qc.setQueryData(["gate-config"], { ...previous, ...patch });
+      return { previous, patch };
+    },
     onSuccess: (_r, patch) => {
       const [k, v] = Object.entries(patch)[0]!;
-      toast.success("Gate updated", { description: `${prettyKey(k)} · ${v ? "ON" : "OFF"}` });
-      qc.invalidateQueries({ queryKey: ["gate-config"] });
+      const isBool = typeof v === "boolean";
+      toast.success("Gate updated", { description: `${prettyKey(k)} · ${isBool ? (v ? "ON" : "OFF") : String(v)}` });
     },
-    onError: (e: any) => toast.error("Update failed", { description: e?.message ?? "Unknown" }),
+    onError: (e: any, _patch, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["gate-config"], ctx.previous);
+      toast.error("Update failed · rolled back", { description: e?.message ?? "Unknown" });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["gate-config"] }),
   });
+
 
   // ─── Captcha config (site key + provider) ────────────────────────────
   const [siteKeyDraft, setSiteKeyDraft] = useState<string | null>(null);
@@ -154,15 +168,70 @@ function AccessAdminPage() {
     });
   }
   const bulkDelete = useMutation({
-    mutationFn: () => removeKeys({ data: { ids: Array.from(selected) } }),
+    mutationFn: (ids: string[]) => removeKeys({ data: { ids } }),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: ["access-keys"] });
+      const prevLists = qc.getQueriesData<any>({ queryKey: ["access-keys"] });
+      const idSet = new Set(ids);
+      for (const [key, val] of prevLists) {
+        if (val?.rows) qc.setQueryData(key, { ...val, rows: val.rows.filter((r: any) => !idSet.has(r.id)) });
+      }
+      return { prevLists };
+    },
     onSuccess: (r: any) => {
       toast.success(`${r.deleted} key(s) deleted`);
       setSelected(new Set());
+    },
+    onError: (e: any, _ids, ctx) => {
+      if (ctx?.prevLists) for (const [key, val] of ctx.prevLists) qc.setQueryData(key, val);
+      toast.error("Bulk delete failed · rolled back", { description: e?.message ?? "" });
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["access-keys"] });
       qc.invalidateQueries({ queryKey: ["access-stats"] });
     },
-    onError: (e: any) => toast.error("Bulk delete failed", { description: e?.message ?? "" }),
   });
+
+  // Per-row: enable/disable and delete — both optimistic.
+  const toggleKeyMut = useMutation({
+    mutationFn: (v: { id: string; disabled: boolean }) => toggleKey({ data: v }),
+    onMutate: async ({ id, disabled }) => {
+      await qc.cancelQueries({ queryKey: ["access-keys"] });
+      const prev = qc.getQueriesData<any>({ queryKey: ["access-keys"] });
+      for (const [key, val] of prev) {
+        if (val?.rows) qc.setQueryData(key, { ...val, rows: val.rows.map((r: any) => r.id === id ? { ...r, disabled } : r) });
+      }
+      return { prev };
+    },
+    onSuccess: (_r, v) => toast.success(v.disabled ? "Key disabled" : "Key enabled"),
+    onError: (e: any, _v, ctx) => {
+      if (ctx?.prev) for (const [key, val] of ctx.prev) qc.setQueryData(key, val);
+      toast.error("Toggle failed · rolled back", { description: e?.message ?? "" });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["access-keys"] }),
+  });
+
+  const deleteKeyMut = useMutation({
+    mutationFn: (id: string) => removeKeys({ data: { ids: [id] } }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["access-keys"] });
+      const prev = qc.getQueriesData<any>({ queryKey: ["access-keys"] });
+      for (const [key, val] of prev) {
+        if (val?.rows) qc.setQueryData(key, { ...val, rows: val.rows.filter((r: any) => r.id !== id) });
+      }
+      return { prev };
+    },
+    onSuccess: () => toast.success("Key deleted"),
+    onError: (e: any, _id, ctx) => {
+      if (ctx?.prev) for (const [key, val] of ctx.prev) qc.setQueryData(key, val);
+      toast.error("Delete failed · rolled back", { description: e?.message ?? "" });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["access-keys"] });
+      qc.invalidateQueries({ queryKey: ["access-stats"] });
+    },
+  });
+
 
   const c = config.data;
   const anyGateOn = !!(c?.accessKeyRequired || c?.captchaRequired || c?.loginRequired);
@@ -494,7 +563,7 @@ function AccessAdminPage() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => bulkDelete.mutate()}>Delete</AlertDialogAction>
+                    <AlertDialogAction onClick={() => bulkDelete.mutate(Array.from(selected))}>Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -563,12 +632,7 @@ function AccessAdminPage() {
                         <Button
                           size="sm" variant="outline" className="h-7 px-2"
                           title={r.disabled ? "Enable key" : "Disable key"}
-                          onClick={() => {
-                            toggleKey({ data: { id: r.id, disabled: !r.disabled } }).then(() => {
-                              toast.success(r.disabled ? "Key enabled" : "Key disabled");
-                              qc.invalidateQueries({ queryKey: ["access-keys"] });
-                            }).catch((e: any) => toast.error("Toggle failed", { description: e?.message }));
-                          }}
+                          onClick={() => toggleKeyMut.mutate({ id: r.id, disabled: !r.disabled })}
                         >
                           <Ban className="w-3 h-3" />
                         </Button>
@@ -576,16 +640,11 @@ function AccessAdminPage() {
                           size="sm" variant="outline"
                           className="h-7 px-2 text-red-300 border-red-500/30 hover:bg-red-500/10"
                           title="Delete key"
-                          onClick={() => {
-                            removeKeys({ data: { ids: [r.id] } }).then(() => {
-                              toast.success("Key deleted");
-                              qc.invalidateQueries({ queryKey: ["access-keys"] });
-                              qc.invalidateQueries({ queryKey: ["access-stats"] });
-                            }).catch((e: any) => toast.error("Delete failed", { description: e?.message }));
-                          }}
+                          onClick={() => deleteKeyMut.mutate(r.id)}
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
+
                       </div>
                     </td>
                   </tr>
@@ -776,12 +835,20 @@ function UserOverridesPanel() {
 
   const removeMut = useMutation({
     mutationFn: (userId: string) => removeFn({ data: { userId } }),
-    onSuccess: () => {
-      toast.success("Override removed", { description: "User falls back to the global limit" });
-      qc.invalidateQueries({ queryKey: ["user-overrides"] });
+    onMutate: async (userId) => {
+      await qc.cancelQueries({ queryKey: ["user-overrides"] });
+      const prev = qc.getQueryData<any>(["user-overrides"]);
+      if (prev?.rows) qc.setQueryData(["user-overrides"], { ...prev, rows: prev.rows.filter((r: any) => r.user_id !== userId) });
+      return { prev };
     },
-    onError: (e: any) => toast.error("Remove failed", { description: e?.message ?? "" }),
+    onSuccess: () => toast.success("Override removed", { description: "User falls back to the global limit" }),
+    onError: (e: any, _u, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["user-overrides"], ctx.prev);
+      toast.error("Remove failed · rolled back", { description: e?.message ?? "" });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["user-overrides"] }),
   });
+
 
   const rows = (q.data?.rows ?? []) as Array<{
     user_id: string; daily_limit: number; note: string | null; updated_at: string; email: string | null;
