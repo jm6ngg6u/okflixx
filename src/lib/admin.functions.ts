@@ -670,3 +670,95 @@ export const previewCookieEligibility = createServerFn({ method: "POST" })
     });
     return { eligible: (count as number) ?? 0 };
   });
+
+// -------------------- Dry-run selection simulator --------------------
+
+const SimulateInput = z.object({
+  include_statuses: z.array(z.string()).min(1),
+  require_valid: z.boolean(),
+  min_success_rate: z.number().min(0).max(1),
+  min_total_uses: z.number().int().min(0).max(1000),
+  policy: z.enum(["round_robin", "random", "quality"]).optional(),
+  limit: z.number().int().min(1).max(25).default(10),
+});
+
+/**
+ * Non-destructive: simulates cookie selection with the given eligibility rules
+ * + rotation policy. Returns the winner cookie, top N preview, and how many
+ * cookies are skipped per filter reason. Does NOT lock any cookie.
+ */
+export const simulateCookieSelection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => SimulateInput.parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let policy = data.policy;
+    if (!policy) {
+      const { data: row } = await supabaseAdmin
+        .from("app_settings").select("value").eq("key", "cookie_rotation_policy").maybeSingle();
+      const raw = String(row?.value ?? "round_robin").toLowerCase();
+      policy = (raw === "random" || raw === "quality" ? raw : "round_robin") as any;
+    }
+
+    const { data: result, error } = await supabaseAdmin.rpc("simulate_cookie_selection", {
+      _policy: policy,
+      _include_statuses: data.include_statuses,
+      _require_valid: data.require_valid,
+      _min_success_rate: data.min_success_rate,
+      _min_total_uses: data.min_total_uses,
+      _limit: data.limit,
+    });
+    if (error) throw error;
+    return result as any;
+  });
+
+// -------------------- Retry pre-check --------------------
+
+/**
+ * Cheap read used by the retry button in the pipelines panel to render a
+ * "will this actually run?" strip before firing. Returns eligible-cookie
+ * count, current policy, and whether the pool has any winners at all.
+ */
+export const getRetryPrecheck = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: isAdmin }, { data: isMod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadEligibility } = await import("@/lib/activate.functions");
+
+    const [{ data: policyRow }, { data: proxyModeRow }, eligibility] = await Promise.all([
+      supabaseAdmin.from("app_settings").select("value").eq("key", "cookie_rotation_policy").maybeSingle(),
+      supabaseAdmin.from("app_settings").select("value").eq("key", "proxy_mode").maybeSingle(),
+      loadEligibility(supabaseAdmin),
+    ]);
+    const raw = String(policyRow?.value ?? "round_robin").toLowerCase();
+    const policy = (raw === "random" || raw === "quality" ? raw : "round_robin") as
+      "round_robin" | "random" | "quality";
+
+    const { data: eligible } = await supabaseAdmin.rpc("count_eligible_cookies", {
+      _include_statuses: eligibility.include_statuses,
+      _require_valid: eligibility.require_valid,
+      _min_success_rate: eligibility.min_success_rate,
+      _min_total_uses: eligibility.min_total_uses,
+    });
+
+    return {
+      policy,
+      proxy_mode: proxyModeRow?.value === "1",
+      eligible: (eligible as number) ?? 0,
+      eligibility,
+      can_retry: ((eligible as number) ?? 0) > 0,
+      reason: ((eligible as number) ?? 0) > 0
+        ? null
+        : "No cookies match your rotation eligibility rules — loosen the filters or add cookies to the pool.",
+    };
+  });
