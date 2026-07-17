@@ -967,6 +967,18 @@ function CookiePoolPage() {
           {detail && <CookieDetailView detail={detail} />}
         </DialogContent>
       </Dialog>
+
+      {/* Advanced cleanup dialog */}
+      <AdvancedCleanupDialog
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        countries={countries ?? []}
+        onDone={() => {
+          qc.invalidateQueries({ queryKey: ["cookies"] });
+          qc.invalidateQueries({ queryKey: ["cookie-stats"] });
+          qc.invalidateQueries({ queryKey: ["cookie-countries"] });
+        }}
+      />
     </div>
   );
 }
