@@ -648,50 +648,8 @@ function HomePage() {
                         )}
                       </div>
                       <p className="text-[11px] text-white/45 leading-snug mb-2">
-                        {captchaPassToken
-                          ? "You have a captcha pass — no need to solve again for the next few minutes."
-                          : "Solve the challenge once. Successful checks unlock a 10-minute pass on this device."}
+                        Please complete the check below to continue.
                       </p>
-
-
-
-                      {/* Live captcha status banner */}
-                      {captchaHealth.data && captchaHealth.data.status !== "idle" && (
-                        <div
-                          className={`mb-2 rounded-md border px-3 py-2 text-[11px] flex items-center gap-2 ${
-                            captchaHealth.data.status === "healthy"
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
-                              : captchaHealth.data.status === "degraded"
-                                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
-                                : "border-red-500/30 bg-red-500/10 text-red-100"
-                          }`}
-                        >
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              captchaHealth.data.status === "healthy"
-                                ? "bg-emerald-400 animate-pulse"
-                                : captchaHealth.data.status === "degraded"
-                                  ? "bg-amber-400 animate-pulse"
-                                  : "bg-red-400 animate-pulse"
-                            }`}
-                          />
-                          <span className="font-medium">
-                            {captchaHealth.data.status === "healthy"
-                              ? "Captcha service healthy"
-                              : captchaHealth.data.status === "degraded"
-                                ? "Captcha service degraded"
-                                : "Captcha service disrupted"}
-                          </span>
-                          <span className="text-white/50 font-mono">
-                            {Math.round(captchaHealth.data.successRate * 100)}% ok · {captchaHealth.data.total} tries / {captchaHealth.data.windowMinutes}m
-                          </span>
-                          {captchaHealth.data.status !== "healthy" && captchaHealth.data.lastFailureReason && (
-                            <span className="ml-auto text-white/60 truncate max-w-[180px]" title={captchaHealth.data.lastFailureReason}>
-                              {captchaHealth.data.lastFailureReason}
-                            </span>
-                          )}
-                        </div>
-                      )}
 
                       <div
                         ref={captchaWidgetRef}
@@ -699,7 +657,6 @@ function HomePage() {
                       />
                       {captchaError && (
                         <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-200">
-                          <span className="font-mono uppercase tracking-widest text-red-300/80 mr-2">Reason</span>
                           {captchaError}
                         </div>
                       )}
@@ -708,29 +665,15 @@ function HomePage() {
                   </div>
                 </div>
               )}
-              {/* Per-step activation progress — visible during submit */}
+              {/* Generic in-flight indicator — no internal stage names */}
               {submitting && (
                 <div className="mt-6 rounded-lg border border-[#ff2a3a]/30 bg-[#ff2a3a]/5 p-3">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-[#ff8a90] mb-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    {stage === "checking-login" ? "Verifying sign-in"
-                      : stage === "checking-key" ? "Verifying access key"
-                      : stage === "checking-captcha" ? "Verifying human check"
-                      : stage === "checking-cookie" ? "Verifying cookie pool"
-                      : stage === "activating" ? "Activating on Netflix"
-                      : "Working"}
+                    Activating your TV
                   </div>
                   <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] transition-[width] duration-500 ease-out"
-                      style={{
-                        width: stage === "checking-login" ? "20%"
-                          : stage === "checking-key" ? "40%"
-                          : stage === "checking-captcha" ? "60%"
-                          : stage === "checking-cookie" ? "80%"
-                          : stage === "activating" ? "95%" : "10%",
-                      }}
-                    />
+                    <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] activation-progress-bar" />
                   </div>
                 </div>
               )}
@@ -739,35 +682,18 @@ function HomePage() {
                 <div
                   role="alert"
                   aria-live="polite"
-                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4 shadow-[0_0_0_1px_rgba(255,42,58,0.15)_inset]"
+                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4"
                 >
                   <div className="flex items-start gap-3">
                     <div className="shrink-0 w-8 h-8 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
                       <AlertCircle className="w-4 h-4 text-[#ff8a90]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
-                          {serviceError.kind === "no_cookie" ? "Cookie pool empty" : "Activation exhausted"}
-                        </span>
-                        {serviceError.attempts != null && (
-                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/50">
-                            · {serviceError.attempts} attempts
-                          </span>
-                        )}
-
-
+                      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
+                        Activation failed
                       </div>
                       <p className="mt-2 text-sm text-white/90 leading-relaxed">
-                        {serviceError.kind === "no_cookie"
-                          ? "The activation pool is momentarily empty — every active cookie is locked in another request or being refreshed."
-                          : `We tried ${serviceError.attempts ?? "several"} cookies and none accepted your code. This usually means cookies expired mid-request.`}
-                      </p>
-                      <p className="mt-1.5 text-xs text-white/60">
-                        <span className="font-mono uppercase tracking-widest text-white/40">Next step · </span>
-                        {serviceError.kind === "no_cookie"
-                          ? "Wait a few seconds — cookies auto-unlock. Your TV code stays valid, no need to re-enter it."
-                          : "Keep the same TV code visible and let us retry with a fresh cookie."}
+                        We couldn't activate your TV right now. Please try again in a moment.
                       </p>
                       <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <button
@@ -777,23 +703,8 @@ function HomePage() {
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <RotateCcw className={`w-3 h-3 ${retryCountdown > 0 && autoRetry ? "animate-spin-slow" : ""}`} />
-                          {retryCountdown > 0
-                            ? (autoRetry ? `Auto-retry in ${retryCountdown}s` : `Retry in ${retryCountdown}s`)
-                            : "Retry now"}
+                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Try again"}
                         </button>
-                        {retryCountdown > 0 && autoRetry && (
-                          <button
-                            type="button"
-                            onClick={() => setAutoRetry(false)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/15 bg-white/[0.04] text-white/80 hover:text-white hover:border-white/30 transition"
-                            title="Cancel auto-retry"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancel auto-retry
-                          </button>
-                        )}
-
-
                         <button
                           type="button"
                           onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(false); }}
@@ -813,14 +724,9 @@ function HomePage() {
                 disabled={submitting}
                 className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {stage === "checking-login" ? "◆ Verifying sign-in…"
-                  : stage === "checking-key" ? "◆ Verifying access key…"
-                  : stage === "checking-captcha" ? "◆ Verifying human check…"
-                  : stage === "checking-cookie" ? "◆ Verifying cookie…"
-                  : stage === "activating" ? "◆ Activating on Netflix…"
-                  : submitting ? "Working…"
-                  : "Activate Now →"}
+                {submitting ? "Activating…" : "Activate Now →"}
               </button>
+
 
 
               <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
