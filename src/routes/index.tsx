@@ -476,7 +476,12 @@ function HomePage() {
                         ref={captchaWidgetRef}
                         className="min-h-[78px]"
                       />
-
+                      {captchaError && (
+                        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-200">
+                          <span className="font-mono uppercase tracking-widest text-red-300/80 mr-2">Reason</span>
+                          {captchaError}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
