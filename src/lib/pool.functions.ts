@@ -540,6 +540,12 @@ export const checkAllProxies = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Same-job guard: a second proxy_recheck can't race an in-flight one.
+    // Cookie and proxy autochecks are unaffected — different job names.
+    const { isJobRunning } = await import("@/lib/cron.server");
+    if (await isJobRunning("proxy_recheck")) {
+      return { jobId: null, valid: 0, invalid: 0, total: 0, skipped: "already_running" as const };
+    }
     const { data: job, error: jerr } = await supabaseAdmin.from("job_runs").insert({
       job: "proxy_recheck",
       started_at: new Date().toISOString(),
