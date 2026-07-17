@@ -269,6 +269,7 @@ function HomePage() {
           accessKey: accessKey || null,
           accessSessionToken: sessionToken,
           captchaToken: captchaToken || null,
+          captchaWidgetProvider: captchaWidgetProviderRef.current,
           fingerprint: fingerprint || null,
           authUserId,
         },
