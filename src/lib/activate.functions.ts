@@ -47,7 +47,12 @@ type ActivateResult =
         | "maintenance"
         | "no_cookie"
         | "exhausted"
-        | "server_error";
+        | "server_error"
+        | "access_key_required"
+        | "access_key_invalid"
+        | "captcha_required"
+        | "captcha_invalid"
+        | "login_required";
       attempts?: number;
       message?: string;
     };
