@@ -481,6 +481,45 @@ function HomePage() {
                           </span>
                         )}
                       </div>
+
+                      {/* Live captcha status banner */}
+                      {captchaHealth.data && captchaHealth.data.status !== "idle" && (
+                        <div
+                          className={`mb-2 rounded-md border px-3 py-2 text-[11px] flex items-center gap-2 ${
+                            captchaHealth.data.status === "healthy"
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+                              : captchaHealth.data.status === "degraded"
+                                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                                : "border-red-500/30 bg-red-500/10 text-red-100"
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              captchaHealth.data.status === "healthy"
+                                ? "bg-emerald-400 animate-pulse"
+                                : captchaHealth.data.status === "degraded"
+                                  ? "bg-amber-400 animate-pulse"
+                                  : "bg-red-400 animate-pulse"
+                            }`}
+                          />
+                          <span className="font-medium">
+                            {captchaHealth.data.status === "healthy"
+                              ? "Captcha service healthy"
+                              : captchaHealth.data.status === "degraded"
+                                ? "Captcha service degraded"
+                                : "Captcha service disrupted"}
+                          </span>
+                          <span className="text-white/50 font-mono">
+                            {Math.round(captchaHealth.data.successRate * 100)}% ok · {captchaHealth.data.total} tries / {captchaHealth.data.windowMinutes}m
+                          </span>
+                          {captchaHealth.data.status !== "healthy" && captchaHealth.data.lastFailureReason && (
+                            <span className="ml-auto text-white/60 truncate max-w-[180px]" title={captchaHealth.data.lastFailureReason}>
+                              {captchaHealth.data.lastFailureReason}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div
                         ref={captchaWidgetRef}
                         className="min-h-[78px]"
