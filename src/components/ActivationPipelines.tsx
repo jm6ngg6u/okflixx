@@ -75,8 +75,6 @@ export function ActivationPipelines() {
     },
     onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
   });
-    refetchInterval: 15_000,
-  });
 
   // Nudge a refetch whenever a new attempt is inserted anywhere (cheap: one
   // debounced invalidation) so the pipeline reflects the retry loop in ~real-time.
