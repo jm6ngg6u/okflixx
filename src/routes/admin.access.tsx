@@ -44,6 +44,16 @@ function AccessAdminPage() {
   const removeKeys = useServerFn(deleteAccessKeys);
   const fetchRedemptions = useServerFn(listRedemptions);
   const fetchStats = useServerFn(getAccessStats);
+  const runTestKeys = useServerFn(testCaptchaKeys);
+  const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
+
+  const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
+  const [testing, setTesting] = useState(false);
+  const captchaLogs = useQuery({
+    queryKey: ["captcha-logs"],
+    queryFn: () => fetchCaptchaLogs({ data: { limit: 30 } }),
+    refetchInterval: 5000,
+  });
 
   const config = useQuery({
     queryKey: ["gate-config"],
