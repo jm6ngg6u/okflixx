@@ -22,6 +22,28 @@ export const Route = createFileRoute("/admin/attempts")({
   component: AttemptsPage,
 });
 
+type SelectionReason = {
+  policy?: string;
+  filters?: {
+    include_statuses?: string[];
+    require_valid?: boolean;
+    min_success_rate?: number;
+    min_total_uses?: number;
+  };
+  eligible_at_pick?: number | null;
+  cookie?: {
+    status?: string | null;
+    is_valid?: boolean | null;
+    total_uses?: number;
+    success_count?: number;
+    fail_count?: number;
+    success_rate?: number | null;
+    last_used_at?: string | null;
+  };
+  why?: string;
+  outcome?: string;
+};
+
 type Attempt = {
   id: string;
   code: string | null;
@@ -36,6 +58,7 @@ type Attempt = {
   attempt_number: number | null;
   duration_ms: number | null;
   error_message: string | null;
+  selection_reason: SelectionReason | null;
 };
 
 const RESULTS = [
