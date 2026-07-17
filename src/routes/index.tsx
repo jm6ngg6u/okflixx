@@ -421,7 +421,7 @@ function HomePage() {
                         )}
                       </div>
                       {!authUserId && (
-                        <Link to="/auth" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
+                        <Link to="/login" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
                       )}
                     </div>
                   )}
