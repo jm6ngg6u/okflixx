@@ -127,8 +127,11 @@ function HomePage() {
   });
 
   const [accessKey, setAccessKey] = useState("");
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
   // Sent on subsequent activations so the user doesn't have to re-solve for
   // every retry / new code within the window. Server enforces expiry + binding.
