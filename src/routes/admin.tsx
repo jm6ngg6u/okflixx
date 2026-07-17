@@ -8,7 +8,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
-  Shield, ShieldAlert, KeyRound, Menu, X, Music4, Shuffle,
+  Shield, ShieldAlert, KeyRound, Menu, X, Music4, Shuffle, FileClock,
 
 } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
