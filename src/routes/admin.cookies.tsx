@@ -839,6 +839,26 @@ function CookiePoolPage() {
                         <span className="text-red-400/80">{r.fail_count ?? 0}</span>
                       </div>
                     </td>
+                    <td className="min-w-[110px]">
+                      {(() => {
+                        const h = healthScore(r);
+                        const tone = healthTone(h);
+                        return (
+                          <div className="flex flex-col gap-1" title={`Health: ${h}/100 · ${tone.label}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`font-mono text-xs tabular-nums font-semibold ${tone.text}`}>{h}</span>
+                              <span className="text-[9px] uppercase tracking-widest text-white/40">{tone.label}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                              <div
+                                className={`h-full bg-gradient-to-r ${tone.bar} transition-all duration-500`}
+                                style={{ width: `${h}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="text-white/60 text-xs">
                       <div className="font-mono">{fmtRel(r.last_checked_at)}</div>
                       <div className="mt-0.5 flex flex-wrap gap-1 items-center">
