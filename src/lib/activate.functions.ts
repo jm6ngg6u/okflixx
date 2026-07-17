@@ -9,6 +9,23 @@ import { z } from "zod";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
+function humanCaptchaReason(reason?: string, codes?: string[]): string {
+  const c = new Set(codes ?? []);
+  if (c.has("invalid-input-secret")) return "server secret was rejected — rotate it in project secrets";
+  if (c.has("missing-input-secret")) return "server secret is not configured";
+  if (c.has("invalid-input-response")) return "the widget token is invalid or already used";
+  if (c.has("missing-input-response")) return "no widget token was submitted";
+  if (c.has("timeout-or-duplicate")) return "the widget token expired — solve the captcha again";
+  if (c.has("bad-request")) return "the request was malformed";
+  if (c.has("sitekey-secret-mismatch")) return "site key and secret belong to different projects";
+  if (c.has("hostname-mismatch")) return "this domain isn't allowed on the site key";
+  if (!reason) return "unknown provider error";
+  if (reason.startsWith("captcha_network")) return "couldn't reach the captcha provider";
+  if (reason === "captcha_secret_missing") return "server secret is not configured";
+  if (reason === "empty_token") return "no widget token was submitted";
+  return reason.replace(/_/g, " ");
+}
+
 const InputSchema = z.object({
   code: z.string().length(8),
   website: z.string().max(0).optional().default(""),
@@ -16,6 +33,7 @@ const InputSchema = z.object({
   accessKey: z.string().max(64).optional().nullable(),
   accessSessionToken: z.string().max(128).optional().nullable(),
   captchaToken: z.string().max(4096).optional().nullable(),
+  captchaWidgetProvider: z.enum(["turnstile", "hcaptcha"]).optional().nullable(),
   fingerprint: z.string().max(256).optional().nullable(),
   authUserId: z.string().uuid().optional().nullable(),
 });
@@ -162,11 +180,42 @@ export const submitActivation = createServerFn({ method: "POST" })
         return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
       }
       const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
-      const { verifyCaptcha } = await import("@/lib/access-keys.functions");
-      const v = await verifyCaptcha(provider, data.captchaToken, rawIp);
+      const { verifyCaptcha, detectCaptchaTokenProvider } = await import("@/lib/access-keys.functions");
+
+      // Guard: if the widget on the page was rendered for the other provider,
+      // reject early with a clear reason instead of a confusing siteverify error.
+      const widgetProvider = data.captchaWidgetProvider ?? null;
+      const tokenProvider = detectCaptchaTokenProvider(data.captchaToken);
+      const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
+      if (declared && declared !== provider) {
+        console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
+        return {
+          ok: false,
+          error: "captcha_invalid",
+          message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
+        };
+      }
+
+      const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
+        purpose: "activate",
+        ipHash,
+        userAgent,
+      });
       if (!v.ok) {
-        console.warn("[captcha] verify failed", { provider, reason: v.reason, tokenLen: data.captchaToken?.length ?? 0 });
-        return { ok: false, error: "captcha_invalid", message: `Captcha check failed (${v.reason || "unknown"}). Please retry.` };
+        const codes = (v.errorCodes ?? []).join(", ");
+        console.warn("[captcha] verify failed", {
+          provider,
+          reason: v.reason,
+          errorCodes: v.errorCodes,
+          hostname: v.hostname,
+          tokenLen: data.captchaToken?.length ?? 0,
+        });
+        const human = humanCaptchaReason(v.reason, v.errorCodes);
+        return {
+          ok: false,
+          error: "captcha_invalid",
+          message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
+        };
       }
     }
     if (accessKeyRequired) {

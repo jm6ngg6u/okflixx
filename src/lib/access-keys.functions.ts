@@ -213,17 +213,78 @@ export async function verifyAccessCredentials(
 
 // ==========================================================================
 // INTERNAL — Cloudflare Turnstile / hCaptcha server-side verify.
+// Returns detailed diagnostics AND writes a redacted log row so admins
+// can inspect failure reasons in /admin/access without exposing the
+// user's raw captcha token or the server-side secret.
 // ==========================================================================
+export type CaptchaVerifyResult = {
+  ok: boolean;
+  reason?: string;
+  errorCodes?: string[];
+  hostname?: string | null;
+  challengeTs?: string | null;
+  httpStatus?: number;
+  latencyMs?: number;
+};
+
 export async function verifyCaptcha(
   provider: "turnstile" | "hcaptcha",
   token: string,
   remoteIp?: string,
-): Promise<{ ok: boolean; reason?: string }> {
+  logMeta?: {
+    purpose?: "activate" | "admin_test";
+    ipHash?: string | null;
+    userAgent?: string | null;
+  },
+): Promise<CaptchaVerifyResult> {
   const secret =
     provider === "hcaptcha"
       ? process.env.HCAPTCHA_SECRET
       : process.env.TURNSTILE_SECRET;
-  if (!secret) return { ok: false, reason: "captcha_secret_missing" };
+  const started = Date.now();
+  const purpose = logMeta?.purpose ?? "activate";
+  const tokenLen = token?.length ?? 0;
+  const tokenPrefix = (token ?? "").slice(0, 6);
+
+  const writeLog = async (row: {
+    success: boolean;
+    reason?: string;
+    error_codes?: string[];
+    http_status?: number | null;
+    hostname?: string | null;
+    challenge_ts?: string | null;
+  }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("captcha_verify_log").insert({
+        provider,
+        purpose,
+        success: row.success,
+        error_codes: row.error_codes ?? [],
+        reason: row.reason ?? null,
+        http_status: row.http_status ?? null,
+        latency_ms: Date.now() - started,
+        token_length: tokenLen,
+        token_prefix: tokenPrefix || null,
+        hostname: row.hostname ?? null,
+        challenge_ts: row.challenge_ts ?? null,
+        ip_hash: logMeta?.ipHash ?? null,
+        user_agent: logMeta?.userAgent ?? null,
+      });
+    } catch (e) {
+      console.warn("[captcha] log insert failed", (e as any)?.message);
+    }
+  };
+
+  if (!secret) {
+    await writeLog({ success: false, reason: "captcha_secret_missing" });
+    return { ok: false, reason: "captcha_secret_missing" };
+  }
+  if (!token) {
+    await writeLog({ success: false, reason: "empty_token", error_codes: ["missing-input-response"] });
+    return { ok: false, reason: "empty_token", errorCodes: ["missing-input-response"] };
+  }
+
   const url =
     provider === "hcaptcha"
       ? "https://hcaptcha.com/siteverify"
@@ -232,13 +293,157 @@ export async function verifyCaptcha(
   if (remoteIp) body.set("remoteip", remoteIp);
   try {
     const res = await fetch(url, { method: "POST", body });
-    const j = (await res.json()) as { success?: boolean; "error-codes"?: string[] };
-    if (!j.success) return { ok: false, reason: (j["error-codes"] || []).join(",") || "captcha_failed" };
-    return { ok: true };
+    const j = (await res.json()) as {
+      success?: boolean;
+      "error-codes"?: string[];
+      hostname?: string;
+      challenge_ts?: string;
+    };
+    const errorCodes = j["error-codes"] || [];
+    const hostname = j.hostname ?? null;
+    const challengeTs = j.challenge_ts ?? null;
+    const latencyMs = Date.now() - started;
+    if (!j.success) {
+      const reason = errorCodes.join(",") || "captcha_failed";
+      await writeLog({
+        success: false,
+        reason,
+        error_codes: errorCodes,
+        http_status: res.status,
+        hostname,
+        challenge_ts: challengeTs,
+      });
+      return { ok: false, reason, errorCodes, hostname, challengeTs, httpStatus: res.status, latencyMs };
+    }
+    await writeLog({
+      success: true,
+      reason: "ok",
+      error_codes: [],
+      http_status: res.status,
+      hostname,
+      challenge_ts: challengeTs,
+    });
+    return { ok: true, hostname, challengeTs, httpStatus: res.status, latencyMs };
   } catch (e: any) {
-    return { ok: false, reason: `captcha_network:${e?.message ?? "err"}` };
+    const reason = `captcha_network:${e?.message ?? "err"}`;
+    await writeLog({ success: false, reason });
+    return { ok: false, reason };
   }
 }
+
+// Best-effort widget-token provider detection so we can reject requests
+// where the client widget was rendered for one provider but the admin
+// panel is configured for the other (a common cause of mysterious
+// "captcha check failed" reports). Server continues to trust siteverify
+// as the source of truth for authentication.
+export function detectCaptchaTokenProvider(
+  token: string | null | undefined,
+): "turnstile" | "hcaptcha" | "unknown" {
+  const t = (token ?? "").trim();
+  if (!t) return "unknown";
+  if (t.startsWith("P0_") || t.startsWith("P1_") || t.startsWith("P2_")) return "hcaptcha";
+  if (t.startsWith("10000000-aaaa")) return "hcaptcha"; // hCaptcha test-key token
+  if (t.startsWith("XXXX.DUMMY")) return "turnstile"; // Turnstile test-key dummy token
+  if (t.startsWith("0.") || t.startsWith("1.") || t.startsWith("2.")) return "turnstile";
+  return "unknown";
+}
+
+// ==========================================================================
+// ADMIN — Test captcha keys with a synthetic siteverify probe.
+// Providers return `invalid-input-response` for a dummy token when the
+// secret is valid, and `invalid-input-secret` when the secret is bad.
+// ==========================================================================
+export const testCaptchaKeys = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await supabaseAdmin
+      .from("app_settings")
+      .select("key,value")
+      .in("key", ["captcha_provider", "captcha_site_key"]);
+    const m: Record<string, string> = {};
+    for (const r of rows ?? []) m[r.key] = r.value;
+    const provider = ((m.captcha_provider || "turnstile") as "turnstile" | "hcaptcha");
+    const siteKey = m.captcha_site_key || "";
+    const secretName = provider === "hcaptcha" ? "HCAPTCHA_SECRET" : "TURNSTILE_SECRET";
+    const secretPresent =
+      provider === "hcaptcha" ? !!process.env.HCAPTCHA_SECRET : !!process.env.TURNSTILE_SECRET;
+
+    const checks: Array<{ label: string; ok: boolean; detail: string }> = [];
+    checks.push({
+      label: "Site key configured",
+      ok: !!siteKey,
+      detail: siteKey ? `${siteKey.slice(0, 8)}…` : "empty",
+    });
+    checks.push({
+      label: `${secretName} configured`,
+      ok: secretPresent,
+      detail: secretPresent ? "present" : "missing",
+    });
+
+    if (!secretPresent) {
+      return { provider, siteKey, ok: false, summary: `Secret ${secretName} is not set.`, checks };
+    }
+
+    const probe = await verifyCaptcha(provider, "diagnostic-probe-token", undefined, {
+      purpose: "admin_test",
+    });
+    const codes = probe.errorCodes ?? [];
+    const invalidSecret = codes.includes("invalid-input-secret");
+    const invalidToken =
+      codes.includes("invalid-input-response") || codes.includes("missing-input-response");
+
+    let ok = false;
+    let summary = "";
+    if (invalidSecret) {
+      summary = `Secret ${secretName} was rejected by ${provider}. Rotate it in project secrets.`;
+    } else if (invalidToken) {
+      ok = true;
+      summary = `Secret verified live with ${provider}. Site key '${siteKey.slice(0, 8)}…' — solve a widget to confirm end-to-end.`;
+    } else if (probe.reason?.startsWith("captcha_network")) {
+      summary = `Network error reaching ${provider}: ${probe.reason}`;
+    } else {
+      summary = `Unexpected response from ${provider}: ${probe.reason ?? "unknown"}`;
+    }
+    checks.push({
+      label: "Live siteverify handshake",
+      ok,
+      detail: codes.length ? codes.join(", ") : probe.reason ?? "no response",
+    });
+
+    return {
+      provider,
+      siteKey,
+      ok,
+      summary,
+      checks,
+      errorCodes: codes,
+      latencyMs: probe.latencyMs ?? null,
+    };
+  });
+
+// ==========================================================================
+// ADMIN — recent captcha verify log entries (already redacted).
+// ==========================================================================
+export const listCaptchaLogs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ limit: z.number().int().min(1).max(200).default(50) }).parse(d ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("captcha_verify_log")
+      .select(
+        "id, created_at, provider, purpose, success, error_codes, reason, http_status, latency_ms, token_length, token_prefix, hostname, challenge_ts",
+      )
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (error) throw error;
+    return { rows: rows ?? [] };
+  });
 
 // ==========================================================================
 // ADMIN — gate settings

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   KeyRound, Plus, Copy, ShieldCheck, ShieldAlert, Ban, Trash2, Infinity as Inf,
-  UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle,
+  UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle, Play, Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
+  testCaptchaKeys, listCaptchaLogs,
 } from "@/lib/access-keys.functions";
 
 export const Route = createFileRoute("/admin/access")({
@@ -43,6 +44,16 @@ function AccessAdminPage() {
   const removeKeys = useServerFn(deleteAccessKeys);
   const fetchRedemptions = useServerFn(listRedemptions);
   const fetchStats = useServerFn(getAccessStats);
+  const runTestKeys = useServerFn(testCaptchaKeys);
+  const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
+
+  const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
+  const [testing, setTesting] = useState(false);
+  const captchaLogs = useQuery({
+    queryKey: ["captcha-logs"],
+    queryFn: () => fetchCaptchaLogs({ data: { limit: 30 } }),
+    refetchInterval: 5000,
+  });
 
   const config = useQuery({
     queryKey: ["gate-config"],
@@ -229,6 +240,106 @@ function AccessAdminPage() {
               <p className="text-[11px] text-white/40 mt-2">
                 Add secret via project settings: <code className="text-white/70">TURNSTILE_SECRET</code> or <code className="text-white/70">HCAPTCHA_SECRET</code>.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CAPTCHA HEALTH — live test + recent verify log */}
+      {c?.captchaRequired && (
+        <div className="glass p-6 border border-white/10 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/60">
+              <Activity className="w-4 h-4 text-[#ff8a90]" /> Captcha health
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={testing}
+              onClick={async () => {
+                setTesting(true);
+                setTestResult(null);
+                try {
+                  const r = await runTestKeys();
+                  setTestResult(r);
+                  if (r.ok) toast.success("Captcha keys look healthy.");
+                  else toast.error(r.summary);
+                } catch (e: any) {
+                  toast.error(`Test failed: ${e?.message ?? "unknown"}`);
+                } finally { setTesting(false); }
+              }}
+            >
+              {testing
+                ? (<><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing…</>)
+                : (<><Play className="w-3.5 h-3.5 mr-1.5" /> Test captcha keys</>)}
+            </Button>
+          </div>
+
+          {testResult && (
+            <div className={`rounded-lg border px-4 py-3 text-[12px] ${
+              testResult.ok
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+                : "border-red-500/40 bg-red-500/10 text-red-100"
+            }`}>
+              <div className="flex items-start gap-2">
+                {testResult.ok
+                  ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-300" />
+                  : <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />}
+                <div className="flex-1">
+                  <div className="font-medium">{testResult.summary}</div>
+                  <ul className="mt-2 space-y-1">
+                    {testResult.checks.map((chk, i) => (
+                      <li key={i} className="flex items-center gap-2 text-[11px] font-mono">
+                        <span className={chk.ok ? "text-emerald-300" : "text-red-300"}>
+                          {chk.ok ? "PASS" : "FAIL"}
+                        </span>
+                        <span className="text-white/70">{chk.label}</span>
+                        <span className="text-white/40">— {chk.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-2">
+              Recent verify attempts (redacted)
+            </div>
+            <div className="rounded-md border border-white/10 overflow-hidden">
+              <table className="w-full text-[11px]">
+                <thead className="bg-white/[0.03] text-white/50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Time</th>
+                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Provider</th>
+                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Result</th>
+                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Codes</th>
+                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Token</th>
+                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Latency</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(captchaLogs.data?.rows ?? []).length === 0 ? (
+                    <tr><td colSpan={6} className="px-3 py-6 text-center text-white/40">No verify attempts yet.</td></tr>
+                  ) : (captchaLogs.data!.rows.map((r: any) => (
+                    <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.02]">
+                      <td className="px-3 py-2 text-white/60">{new Date(r.created_at).toLocaleTimeString()}</td>
+                      <td className="px-3 py-2 text-white/70">{r.provider}<span className="text-white/30 ml-1">/{r.purpose}</span></td>
+                      <td className="px-3 py-2">
+                        <span className={r.success ? "text-emerald-300" : "text-red-300"}>
+                          {r.success ? "ok" : (r.reason ?? "fail")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-white/50 font-mono">{(r.error_codes ?? []).join(", ") || "—"}</td>
+                      <td className="px-3 py-2 text-white/40 font-mono">
+                        {r.token_prefix ? `${r.token_prefix}… (${r.token_length})` : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-white/50">{r.latency_ms != null ? `${r.latency_ms}ms` : "—"}</td>
+                    </tr>
+                  )))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

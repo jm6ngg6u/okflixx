@@ -113,6 +113,11 @@ function HomePage() {
 
   const [accessKey, setAccessKey] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  // Which provider the widget on this page was actually rendered for —
+  // sent to the server so a mismatched admin toggle produces a clear
+  // error instead of "captcha failed".
+  const captchaWidgetProviderRef = useRef<"turnstile" | "hcaptcha" | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("");
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
@@ -164,11 +169,19 @@ function HomePage() {
             api.render(captchaWidgetRef.current, {
               sitekey: gate.data!.captchaSiteKey,
               theme: "dark",
-              callback: (token: string) => setCaptchaToken(token),
+              callback: (token: string) => {
+                setCaptchaToken(token);
+                setCaptchaError(null);
+                captchaWidgetProviderRef.current = provider;
+              },
               "expired-callback": () => setCaptchaToken(""),
-              "error-callback": () => setCaptchaToken(""),
+              "error-callback": (err?: string) => {
+                setCaptchaToken("");
+                setCaptchaError(err ? `Widget error: ${err}` : "Widget error — refresh and try again.");
+              },
             });
             captchaRenderedRef.current = true;
+            captchaWidgetProviderRef.current = provider;
           } catch { /* already rendered */ }
           return;
         }
@@ -256,6 +269,7 @@ function HomePage() {
           accessKey: accessKey || null,
           accessSessionToken: sessionToken,
           captchaToken: captchaToken || null,
+          captchaWidgetProvider: captchaWidgetProviderRef.current,
           fingerprint: fingerprint || null,
           authUserId,
         },
@@ -279,8 +293,16 @@ function HomePage() {
       } else if (result.error === "login_required") {
         toast.error(result.message ?? "Please sign in to activate.");
       } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
-        toast.error(result.message ?? "Captcha check failed. Please retry.");
+        const msg = result.message ?? "Captcha check failed. Please retry.";
+        toast.error(msg);
+        setCaptchaError(msg);
         setCaptchaToken(""); // force re-solve
+        // Re-render the widget so the user can solve again.
+        try {
+          const api: any = captchaWidgetProviderRef.current === "hcaptcha"
+            ? (window as any).hcaptcha : (window as any).turnstile;
+          api?.reset?.();
+        } catch { /* noop */ }
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
         // Session might have expired — clear it so the input reappears.
         if (result.error === "access_key_invalid" && sessionToken) {
@@ -454,7 +476,12 @@ function HomePage() {
                         ref={captchaWidgetRef}
                         className="min-h-[78px]"
                       />
-
+                      {captchaError && (
+                        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-200">
+                          <span className="font-mono uppercase tracking-widest text-red-300/80 mr-2">Reason</span>
+                          {captchaError}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
