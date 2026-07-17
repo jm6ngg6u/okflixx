@@ -189,32 +189,47 @@ export const submitActivation = createServerFn({ method: "POST" })
     }
 
     // Per-user daily activation limit (only when signed in).
+    // Precedence: per-user override (user_activation_overrides.daily_limit) > global setting.
+    // A limit value of 0 (in either place) means UNLIMITED for that scope.
     if (verifiedUserId) {
-      const perUserDaily = Math.max(
-        1,
-        parseInt(await getSetting(supabaseAdmin, "user_daily_activation_limit", "10"), 10),
+      const globalDaily = Math.max(
+        0,
+        parseInt(await getSetting(supabaseAdmin, "user_daily_activation_limit", "10"), 10) || 0,
       );
-      const { data: userRecent } = await supabaseAdmin.rpc("count_user_recent_attempts", {
-        _user_id: verifiedUserId,
-        _minutes: 24 * 60,
-      });
-      if ((userRecent ?? 0) >= perUserDaily) {
-        await supabaseAdmin.from("activation_attempts").insert({
-          code,
-          result: "rate_limited",
-          ip_hash: ipHash,
-          user_agent: userAgent,
-          country,
-          proxy_mode: false,
-          user_id: verifiedUserId,
+      const { data: overrideRow } = await supabaseAdmin
+        .from("user_activation_overrides")
+        .select("daily_limit")
+        .eq("user_id", verifiedUserId)
+        .maybeSingle();
+      const effectiveLimit =
+        overrideRow && typeof overrideRow.daily_limit === "number"
+          ? Math.max(0, overrideRow.daily_limit)
+          : globalDaily;
+      if (effectiveLimit > 0) {
+        const { data: userRecent } = await supabaseAdmin.rpc("count_user_recent_attempts", {
+          _user_id: verifiedUserId,
+          _minutes: 24 * 60,
         });
-        return {
-          ok: false,
-          error: "rate_limited",
-          message: `Daily limit reached (${perUserDaily} activations / 24h). Try again tomorrow.`,
-        };
+        if ((userRecent ?? 0) >= effectiveLimit) {
+          await supabaseAdmin.from("activation_attempts").insert({
+            code,
+            result: "rate_limited",
+            ip_hash: ipHash,
+            user_agent: userAgent,
+            country,
+            proxy_mode: false,
+            user_id: verifiedUserId,
+          });
+          return {
+            ok: false,
+            error: "rate_limited",
+            message: `Daily limit reached (${effectiveLimit} activations / 24h). Try again tomorrow.`,
+          };
+        }
       }
     }
+    let captchaPassed = false;
+
     if (captchaRequired) {
       if (!data.captchaToken) {
         return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
@@ -257,6 +272,7 @@ export const submitActivation = createServerFn({ method: "POST" })
           message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
         };
       }
+      captchaPassed = true;
     }
     if (accessKeyRequired) {
       const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
@@ -291,23 +307,29 @@ export const submitActivation = createServerFn({ method: "POST" })
         };
       }
     }
-    const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
-    const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
-      _ip_hash: ipHash,
-      _minutes: 10,
-    });
-    if ((recent ?? 0) >= rlWindow) {
-      await supabaseAdmin.from("activation_attempts").insert({
-        code,
-        result: "rate_limited",
-        ip_hash: ipHash,
-        user_agent: userAgent,
-        country,
-        proxy_mode: false,
-        user_id: verifiedUserId,
+    // Per-IP rate limit — a bot/scraper safety net. A user who solved the
+    // captcha or is signed in has already proved they're human, so we skip
+    // the IP cap for them (removes false positives on shared / NAT'd IPs).
+    if (!captchaPassed && !verifiedUserId) {
+      const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
+      const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
+        _ip_hash: ipHash,
+        _minutes: 10,
       });
-      return { ok: false, error: "rate_limited" };
+      if ((recent ?? 0) >= rlWindow) {
+        await supabaseAdmin.from("activation_attempts").insert({
+          code,
+          result: "rate_limited",
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          country,
+          proxy_mode: false,
+          user_id: verifiedUserId,
+        });
+        return { ok: false, error: "rate_limited" };
+      }
     }
+
 
     // 5. Config for the loop.
     const proxyMode = (await getSetting(supabaseAdmin, "proxy_mode", "0")) === "1";

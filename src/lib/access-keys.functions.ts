@@ -78,7 +78,7 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
     captchaSiteKey: m.captcha_site_key || "",
     maintenance: m.maintenance_enabled === "1",
     maintenanceMessage: m.maintenance_message || "",
-    userDailyActivationLimit: Math.max(1, parseInt(m.user_daily_activation_limit || "10", 10)),
+    userDailyActivationLimit: Math.max(0, parseInt(m.user_daily_activation_limit || "10", 10) || 0),
   };
 });
 
@@ -548,7 +548,7 @@ const GateSettingsInput = z.object({
   loginRequired: z.boolean().optional(),
   captchaProvider: z.enum(["turnstile", "hcaptcha"]).optional(),
   captchaSiteKey: z.string().max(200).optional(),
-  userDailyActivationLimit: z.number().int().min(1).max(1000).optional(),
+  userDailyActivationLimit: z.number().int().min(0).max(10000).optional(),
 });
 
 export const setGateSettings = createServerFn({ method: "POST" })
@@ -866,3 +866,110 @@ export const purgeCaptchaLogsNow = createServerFn({ method: "POST" })
     });
     return { deleted: (deleted as number) ?? 0, days };
   });
+
+// ==========================================================================
+// ADMIN — per-user activation-limit overrides. `daily_limit = 0` means
+// UNLIMITED for that specific user (bypasses the global cap). Admins can
+// grant unlimited access to trusted accounts or tighten specific ones.
+// ==========================================================================
+async function findUserByEmail(
+  supabaseAdmin: any,
+  email: string,
+): Promise<{ id: string; email: string } | null> {
+  const target = email.trim().toLowerCase();
+  if (!target) return null;
+  // Scan up to 3 pages of 1k users — plenty for this scale.
+  for (let page = 1; page <= 3; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    const users = data?.users ?? [];
+    const hit = users.find((u: any) => (u.email ?? "").toLowerCase() === target);
+    if (hit) return { id: hit.id, email: hit.email ?? target };
+    if (users.length < 1000) break;
+  }
+  return null;
+}
+
+export const listUserActivationOverrides = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("user_activation_overrides")
+      .select("user_id, daily_limit, note, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    const ids = new Set((rows ?? []).map((r: any) => r.user_id));
+    const emailById = new Map<string, string>();
+    if (ids.size > 0) {
+      // One listUsers scan is enough — resolve emails for display.
+      for (let page = 1; page <= 3; page++) {
+        const { data: udata } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        for (const u of udata?.users ?? []) {
+          if (ids.has(u.id)) emailById.set(u.id, u.email ?? "");
+        }
+        if ((udata?.users ?? []).length < 1000) break;
+      }
+    }
+    return {
+      rows: (rows ?? []).map((r: any) => ({
+        ...r,
+        email: emailById.get(r.user_id) ?? null,
+      })),
+    };
+  });
+
+export const setUserActivationOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        email: z.string().email().max(320),
+        dailyLimit: z.number().int().min(0).max(10000),
+        note: z.string().max(200).optional().nullable(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const userId = await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const user = await findUserByEmail(supabaseAdmin, data.email);
+    if (!user) throw new Error(`No signed-in user found with email "${data.email}"`);
+    const { error } = await supabaseAdmin.from("user_activation_overrides").upsert({
+      user_id: user.id,
+      daily_limit: data.dailyLimit,
+      note: data.note ?? null,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    });
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "user_override.set",
+      target: user.email,
+      details: { user_id: user.id, daily_limit: data.dailyLimit, note: data.note ?? null },
+    });
+    return { ok: true, userId: user.id, email: user.email };
+  });
+
+export const removeUserActivationOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ userId: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const adminId = await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("user_activation_overrides")
+      .delete()
+      .eq("user_id", data.userId);
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: adminId,
+      action: "user_override.remove",
+      target: data.userId,
+    });
+    return { ok: true };
+  });
+
