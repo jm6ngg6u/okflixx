@@ -496,6 +496,8 @@ function HomePage() {
       setSubmitting(false);
     }
   };
+  handleActivateRef.current = handleActivate;
+
 
   const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
 
