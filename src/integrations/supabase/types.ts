@@ -396,6 +396,60 @@ export type Database = {
         }
         Relationships: []
       }
+      captcha_verify_log: {
+        Row: {
+          challenge_ts: string | null
+          created_at: string
+          error_codes: string[]
+          hostname: string | null
+          http_status: number | null
+          id: string
+          ip_hash: string | null
+          latency_ms: number | null
+          provider: string
+          purpose: string
+          reason: string | null
+          success: boolean
+          token_length: number | null
+          token_prefix: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          challenge_ts?: string | null
+          created_at?: string
+          error_codes?: string[]
+          hostname?: string | null
+          http_status?: number | null
+          id?: string
+          ip_hash?: string | null
+          latency_ms?: number | null
+          provider: string
+          purpose?: string
+          reason?: string | null
+          success: boolean
+          token_length?: number | null
+          token_prefix?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          challenge_ts?: string | null
+          created_at?: string
+          error_codes?: string[]
+          hostname?: string | null
+          http_status?: number | null
+          id?: string
+          ip_hash?: string | null
+          latency_ms?: number | null
+          provider?: string
+          purpose?: string
+          reason?: string | null
+          success?: boolean
+          token_length?: number | null
+          token_prefix?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       cookie_pool: {
         Row: {
           cookies_json: Json
