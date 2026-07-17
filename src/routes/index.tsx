@@ -584,6 +584,16 @@ function HomePage() {
                         <span className={`w-1.5 h-1.5 rounded-full ${allSatisfied ? "bg-emerald-400" : "bg-[#ff2a3a] animate-pulse"}`} />
                         {allSatisfied ? "Ready" : "Action needed"}
                       </span>
+                      <button
+                        type="button"
+                        onClick={resetAttempt}
+                        disabled={submitting}
+                        title="Clear captcha, key session and re-run enabled gates"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/70 hover:text-white hover:border-white/20 hover:bg-white/[0.08] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Reset
+                      </button>
+
                     </div>
                     <div className="mt-3 h-1 rounded-full bg-white/5 overflow-hidden">
                       <div
