@@ -205,6 +205,10 @@ type ProxyRunResult = {
 };
 
 export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult> {
+  // Same-job single-instance guard. Different jobs still run in parallel.
+  if (await isJobRunning("proxies-autocheck")) {
+    return { ok: true, skipped: "already_running" };
+  }
   const jobId = await recordJobStart("proxies-autocheck");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { checkProxyViaWorker } = await import("@/lib/worker.server");
