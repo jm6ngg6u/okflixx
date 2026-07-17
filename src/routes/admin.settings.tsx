@@ -343,51 +343,10 @@ function SettingsPage() {
         </div>
       </Section>
 
-      {/* Contact channels */}
-      <Section
-        icon={MessageCircle}
-        title="Contact channels"
-        subtitle="Public contact links shown in the site footer. Leave a handle blank to hide that channel. Master toggle hides the whole strip."
-        pill={<Badge variant="outline" className={local.contact_enabled === "1"
-          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-          : "bg-white/10 text-white/60 border-white/15"}>{local.contact_enabled === "1" ? "VISIBLE" : "HIDDEN"}</Badge>}
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-3">
-            <div>
-              <div className="text-sm font-medium">Show contact strip on public site</div>
-              <div className="text-[11px] text-white/40">When off, no contact icons are rendered anywhere.</div>
-            </div>
-            <Switch
-              checked={local.contact_enabled === "1"}
-              onCheckedChange={(v) => { set("contact_enabled", v ? "1" : "0"); setTimeout(() => save("contact_enabled"), 0); }}
-            />
-          </div>
-
-          {local.contact_enabled !== "1" && (
-            ((local.contact_tg_username ?? "").trim() ||
-             (local.contact_ig_username ?? "").trim() ||
-             (local.contact_wa_number ?? "").trim()) ? (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs px-3 py-2">
-                Handles are filled but the master toggle is <b>OFF</b> — nothing appears on the public site. Enable the switch above to publish.
-              </div>
-            ) : null
-          )}
-
-          <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9" enableKey="contact_tg_enabled" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C" enableKey="contact_ig_enabled" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366" enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
-
-          {/* Live preview (local, mirrors public output) */}
-          <ContactPreview local={local} />
-
-          {/* Server-side consistency check — reads the exact same fn the public site uses */}
-          <ContactServerCheck local={local} />
-        </div>
-      </Section>
     </div>
   );
 }
+
 
 // ---- Contact normalization helpers ---------------------------------------
 function normalizeHandle(kind: "telegram" | "instagram" | "whatsapp", raw: string): string {
