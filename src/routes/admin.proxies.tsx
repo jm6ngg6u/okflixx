@@ -105,7 +105,15 @@ function ProxiesPage() {
 
   const checkMut = useMutation({
     mutationFn: async (ids?: string[]) => checkAll({ data: ids && ids.length ? { ids } : {} }),
-    onSuccess: (r: any) => toast.success("Recheck finished", { description: `${r.valid} valid · ${r.invalid} invalid` }),
+    onSuccess: (r: any) => {
+      if (r?.skipped === "already_running") {
+        toast.info("Recheck already in progress", {
+          description: "Another proxy recheck is running. It will finish independently — other jobs are not affected.",
+        });
+      } else {
+        toast.success("Recheck finished", { description: `${r.valid} valid · ${r.invalid} invalid` });
+      }
+    },
     onError: (e: any) => toast.error(e?.message ?? "Bulk check failed"),
   });
 
