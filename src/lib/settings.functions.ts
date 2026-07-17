@@ -107,6 +107,32 @@ export const setMaintenance = createServerFn({ method: "POST" })
   });
 
 /** Public getter for anon-safe subset (used by the landing page banner). */
+/** Public contact channels (Telegram / Instagram / WhatsApp). Anon-safe. Only
+ *  returns entries with a non-empty handle, and only when the master toggle
+ *  is on. Empty channels are omitted so the UI hides them automatically. */
+export const getPublicContacts = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const keys = [
+    "contact_enabled",
+    "contact_tg_name", "contact_tg_username",
+    "contact_ig_name", "contact_ig_username",
+    "contact_wa_name", "contact_wa_number",
+  ];
+  const { data } = await supabaseAdmin.from("app_settings").select("key,value").in("key", keys);
+  const m: Record<string, string> = {};
+  for (const r of data ?? []) m[r.key] = r.value;
+  const enabled = m.contact_enabled === "1";
+  if (!enabled) return { enabled: false, channels: [] as Array<{ kind: string; name: string; handle: string; href: string }> };
+  const channels: Array<{ kind: string; name: string; handle: string; href: string }> = [];
+  const tg = (m.contact_tg_username ?? "").replace(/^@/, "").trim();
+  if (tg) channels.push({ kind: "telegram", name: (m.contact_tg_name ?? "Telegram").trim() || "Telegram", handle: `@${tg}`, href: `https://t.me/${tg}` });
+  const ig = (m.contact_ig_username ?? "").replace(/^@/, "").trim();
+  if (ig) channels.push({ kind: "instagram", name: (m.contact_ig_name ?? "Instagram").trim() || "Instagram", handle: `@${ig}`, href: `https://instagram.com/${ig}` });
+  const waRaw = (m.contact_wa_number ?? "").replace(/[^\d+]/g, "").replace(/^\+/, "").trim();
+  if (waRaw) channels.push({ kind: "whatsapp", name: (m.contact_wa_name ?? "WhatsApp").trim() || "WhatsApp", handle: `+${waRaw}`, href: `https://wa.me/${waRaw}` });
+  return { enabled: true, channels };
+});
+
 export const getPublicStatus = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
