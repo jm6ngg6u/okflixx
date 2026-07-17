@@ -105,12 +105,12 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
     // Audit
     await supabaseAdmin.from("auth_audit_log").insert({
       user_id: userId,
-      event_type: "recovery_codes_generated",
+      event: "recovery_codes_generated",
       email: null,
       ip_hash: await sha256Hex(readIp()),
       user_agent: getRequestHeader("user-agent") ?? null,
       success: true,
-      details: { count: codes.length },
+      metadata: { count: codes.length },
     });
 
     return { codes };
@@ -143,12 +143,12 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
 
     await supabaseAdmin.from("auth_audit_log").insert({
       user_id: userId,
-      event_type: "recovery_code_redeemed",
+      event: "recovery_code_redeemed",
       email: null,
       ip_hash: ipHash,
       user_agent: getRequestHeader("user-agent") ?? null,
       success: !!row?.ok,
-      details: { reason: row?.reason ?? "unknown", remaining: row?.remaining ?? 0 },
+      metadata: { reason: row?.reason ?? "unknown", remaining: row?.remaining ?? 0 },
     });
 
     if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "invalid" };
@@ -170,10 +170,10 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------------------
 
 const AuditInput = z.object({
-  event_type: z.string().max(64),
+  event: z.string().max(64),
   email: z.string().email().optional().nullable(),
   success: z.boolean().default(true),
-  details: z.record(z.string(), z.any()).optional().nullable(),
+  metadata: z.record(z.string(), z.any()).optional().nullable(),
 });
 
 export const logMfaEvent = createServerFn({ method: "POST" })
@@ -184,12 +184,12 @@ export const logMfaEvent = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("auth_audit_log").insert({
       user_id: userId,
-      event_type: data.event_type,
+      event: data.event_type,
       email: data.email ?? null,
       ip_hash: await sha256Hex(readIp()),
       user_agent: getRequestHeader("user-agent") ?? null,
       success: data.success,
-      details: data.details ?? null,
+      metadata: data.details ?? null,
     });
     return { ok: true };
   });
