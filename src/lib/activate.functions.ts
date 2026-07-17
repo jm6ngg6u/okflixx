@@ -126,12 +126,19 @@ export const submitActivation = createServerFn({ method: "POST" })
       1,
       Math.min(10, parseInt(await getSetting(supabaseAdmin, "max_activation_attempts", "3"), 10)),
     );
+    const rawPolicy = (await getSetting(supabaseAdmin, "cookie_rotation_policy", "round_robin")).toLowerCase();
+    const policy: "round_robin" | "random" | "quality" =
+      rawPolicy === "random" || rawPolicy === "quality" ? (rawPolicy as any) : "round_robin";
 
     let attemptNumber = 0;
     for (attemptNumber = 1; attemptNumber <= maxAttempts; attemptNumber++) {
-      // 5a. Lock an active cookie.
-      const { data: cookieRows, error: pickErr } = await supabaseAdmin.rpc("pick_next_cookie");
+      // 5a. Lock an active cookie via the configured rotation policy.
+      const { data: cookieRows, error: pickErr } = await supabaseAdmin.rpc(
+        "pick_next_cookie_by_policy",
+        { _policy: policy },
+      );
       const cookie = Array.isArray(cookieRows) ? cookieRows[0] : cookieRows;
+
       if (pickErr || !cookie) {
         await supabaseAdmin.from("activation_attempts").insert({
           code,
