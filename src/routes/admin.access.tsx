@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   KeyRound, Plus, Copy, ShieldCheck, ShieldAlert, Ban, Trash2, Infinity as Inf,
   UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle, Play, Activity,
-  Download, Trash, Save,
+  Save, Loader2, AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,16 +25,16 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
-  testCaptchaKeys, listCaptchaLogs, listActivationCaptchaDebug,
-  exportCaptchaLogsCsv, getCaptchaRetention, setCaptchaRetention, purgeCaptchaLogsNow,
+  testCaptchaKeys,
 } from "@/lib/access-keys.functions";
 
 export const Route = createFileRoute("/admin/access")({
-  head: () => ({ meta: [{ title: "Access keys — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Access gates — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
   component: AccessAdminPage,
 });
 
 type KeyType = "unlimited" | "single_use" | "session_24h";
+const REFRESH_MS = 2000;
 
 function AccessAdminPage() {
   const qc = useQueryClient();
@@ -47,44 +47,10 @@ function AccessAdminPage() {
   const fetchRedemptions = useServerFn(listRedemptions);
   const fetchStats = useServerFn(getAccessStats);
   const runTestKeys = useServerFn(testCaptchaKeys);
-  const fetchCaptchaLogs = useServerFn(listCaptchaLogs);
-  const fetchActivationDebug = useServerFn(listActivationCaptchaDebug);
-  const exportCsv = useServerFn(exportCaptchaLogsCsv);
-  const fetchRetention = useServerFn(getCaptchaRetention);
-  const saveRetention = useServerFn(setCaptchaRetention);
-  const purgeNow = useServerFn(purgeCaptchaLogsNow);
 
-  const retention = useQuery({
-    queryKey: ["captcha-retention"],
-    queryFn: () => fetchRetention(),
-    refetchInterval: 15000,
-  });
-  const [retDays, setRetDays] = useState<string>("");
-  const [failLimit, setFailLimit] = useState<string>("");
-
-  const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
-  const [testing, setTesting] = useState(false);
-  const captchaLogs = useQuery({
-    queryKey: ["captcha-logs"],
-    queryFn: () => fetchCaptchaLogs({ data: { limit: 30 } }),
-    refetchInterval: 5000,
-  });
-  const activationDebug = useQuery({
-    queryKey: ["activation-captcha-debug"],
-    queryFn: () => fetchActivationDebug({ data: { limit: 25 } }),
-    refetchInterval: 5000,
-  });
-
-  const config = useQuery({
-    queryKey: ["gate-config"],
-    queryFn: () => getConfig(),
-    refetchInterval: 5000,
-  });
-  const stats = useQuery({
-    queryKey: ["access-stats"],
-    queryFn: () => fetchStats(),
-    refetchInterval: 5000,
-  });
+  // ─── Queries (2s live refresh) ───────────────────────────────────────
+  const config = useQuery({ queryKey: ["gate-config"], queryFn: () => getConfig(), refetchInterval: REFRESH_MS });
+  const stats = useQuery({ queryKey: ["access-stats"], queryFn: () => fetchStats(), refetchInterval: REFRESH_MS });
 
   const [filterType, setFilterType] = useState<"all" | KeyType>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "disabled" | "expired" | "exhausted">("all");
@@ -93,42 +59,59 @@ function AccessAdminPage() {
   const keys = useQuery({
     queryKey: ["access-keys", filterType, filterStatus],
     queryFn: () => fetchKeys({ data: { keyType: filterType, status: filterStatus, limit: 200 } }),
-    refetchInterval: 5000,
+    refetchInterval: REFRESH_MS,
   });
-
   const redemptions = useQuery({
     queryKey: ["access-redemptions"],
     queryFn: () => fetchRedemptions(),
-    refetchInterval: 5000,
+    refetchInterval: REFRESH_MS,
   });
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toUpperCase();
-    if (!q) return keys.data?.rows ?? [];
-    return (keys.data?.rows ?? []).filter(
+    const rows = keys.data?.rows ?? [];
+    if (!q) return rows;
+    return rows.filter(
       (r: any) => r.code_prefix?.includes(q) || (r.label ?? "").toUpperCase().includes(q),
     );
   }, [keys.data, search]);
 
-  // --- Gate toggles ---
-  async function toggle(field: "accessKeyRequired" | "captchaRequired" | "loginRequired", value: boolean) {
-    try {
-      await saveSettings({ data: { [field]: value } });
-      toast.success("Gate updated", { description: `${field.replace(/([A-Z])/g, " $1").toLowerCase()} · ${value ? "on" : "off"}` });
+  // ─── Gate toggles ────────────────────────────────────────────────────
+  const gateMut = useMutation({
+    mutationFn: (patch: any) => saveSettings({ data: patch }),
+    onSuccess: (_r, patch) => {
+      const [k, v] = Object.entries(patch)[0]!;
+      toast.success("Gate updated", { description: `${prettyKey(k)} · ${v ? "ON" : "OFF"}` });
       qc.invalidateQueries({ queryKey: ["gate-config"] });
-    } catch (e: any) {
-      toast.error("Update failed", { description: e?.message ?? "" });
-    }
-  }
+    },
+    onError: (e: any) => toast.error("Update failed", { description: e?.message ?? "Unknown" }),
+  });
 
-  // --- Create keys dialog state ---
-  const [genOpen, setGenOpen] = useState(false);
+  // ─── Captcha config (site key + provider) ────────────────────────────
+  const [siteKeyDraft, setSiteKeyDraft] = useState<string | null>(null);
+  const savedSiteKey = config.data?.captchaSiteKey ?? "";
+  const siteKeyDirty = siteKeyDraft !== null && siteKeyDraft !== savedSiteKey;
+
+  // ─── Captcha test panel ──────────────────────────────────────────────
+  const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
+  const testMut = useMutation({
+    mutationFn: () => runTestKeys(),
+    onSuccess: (r) => {
+      setTestResult(r);
+      if (r.ok) toast.success("Captcha handshake healthy");
+      else toast.error("Captcha test failed", { description: r.summary });
+    },
+    onError: (e: any) => toast.error("Test failed", { description: e?.message ?? "" }),
+  });
+
+  // ─── Key generator ───────────────────────────────────────────────────
   const [genType, setGenType] = useState<KeyType>("unlimited");
   const [genQty, setGenQty] = useState(1);
   const [genLabel, setGenLabel] = useState("");
   const [genExpiry, setGenExpiry] = useState<string>("");
   const [genMaxUses, setGenMaxUses] = useState<string>("");
   const [lastGenerated, setLastGenerated] = useState<{ code: string; id: string }[] | null>(null);
+  const [reveal, setReveal] = useState(true);
 
   const genMut = useMutation({
     mutationFn: () =>
@@ -143,7 +126,10 @@ function AccessAdminPage() {
       }),
     onSuccess: (r: any) => {
       setLastGenerated(r.keys);
-      toast.success("Keys generated", { description: `${r.keys.length} new ${keyTypeLabel(genType)} key(s)` });
+      setReveal(true);
+      toast.success(`${r.keys.length} ${keyTypeLabel(genType).toLowerCase()} key(s) generated`, {
+        description: "Copy them now — codes are shown once.",
+      });
       qc.invalidateQueries({ queryKey: ["access-keys"] });
       qc.invalidateQueries({ queryKey: ["access-stats"] });
     },
@@ -152,92 +138,109 @@ function AccessAdminPage() {
 
   function copyAll() {
     if (!lastGenerated) return;
-    const text = lastGenerated.map((k) => k.code).join("\n");
-    navigator.clipboard.writeText(text).then(
-      () => toast.success("All keys copied to clipboard"),
-      () => toast.error("Copy failed"),
+    navigator.clipboard.writeText(lastGenerated.map((k) => k.code).join("\n")).then(
+      () => toast.success(`${lastGenerated.length} key(s) copied`),
+      () => toast.error("Clipboard blocked"),
     );
   }
 
-  // --- Selection ---
+  // ─── Selection / bulk ────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
   function toggleSel(id: string) {
     setSelected((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
+      const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
     });
   }
   const bulkDelete = useMutation({
     mutationFn: () => removeKeys({ data: { ids: Array.from(selected) } }),
-    onSuccess: () => {
-      toast.success("Keys deleted", { description: `${selected.size} removed` });
+    onSuccess: (r: any) => {
+      toast.success(`${r.deleted} key(s) deleted`);
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["access-keys"] });
       qc.invalidateQueries({ queryKey: ["access-stats"] });
     },
-    onError: (e: any) => toast.error("Delete failed", { description: e?.message ?? "" }),
+    onError: (e: any) => toast.error("Bulk delete failed", { description: e?.message ?? "" }),
   });
 
   const c = config.data;
+  const anyGateOn = !!(c?.accessKeyRequired || c?.captchaRequired || c?.loginRequired);
+  const providerMismatch = detectProviderMismatch(c?.captchaSiteKey, c?.captchaProvider);
 
   return (
     <div className="space-y-8">
       {/* HEADER */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#ff2a3a]">// Security</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#ff2a3a]">// SECURITY · ACCESS GATES</div>
           <h1 className="font-display text-3xl md:text-4xl mt-1">Access gates &amp; keys</h1>
           <p className="text-white/60 text-sm mt-2 max-w-2xl">
-            Three independent gates protect the activation form. Turn any of them on to require it before a TV code is redeemed. All checks run server-side and cannot be bypassed.
+            Three independent gates protect activation. All checks run server-side; toggles apply instantly. Live refresh every 2s.
           </p>
         </div>
-        <Button variant="outline" onClick={() => { config.refetch(); keys.refetch(); stats.refetch(); }} className="border-white/10">
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={anyGateOn
+            ? "border-emerald-500/40 text-emerald-300 bg-emerald-500/5"
+            : "border-amber-500/40 text-amber-300 bg-amber-500/5"}>
+            {anyGateOn ? "● PROTECTED" : "○ UNPROTECTED"}
+          </Badge>
+          <Button variant="outline" onClick={() => { config.refetch(); keys.refetch(); stats.refetch(); redemptions.refetch(); }} className="border-white/10">
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+          </Button>
+        </div>
       </div>
+
+      {!anyGateOn && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-amber-100 text-sm">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" />
+          <div>
+            <div className="font-medium">No gates enabled</div>
+            <div className="text-amber-100/70 text-xs mt-0.5">
+              Activation is open to the public. Enable at least one gate below to require verification.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GATE MASTER SWITCHES */}
       <div className="grid md:grid-cols-3 gap-4">
         <GateCard
           icon={<KeyRound className="w-5 h-5" />}
           title="Access key gate"
-          desc="Require a valid key before every activation. Unlimited, single-use, or 24-hour keys."
+          desc="Require a valid key before every activation. Unlimited, single-use, or 24-hour session keys."
           enabled={!!c?.accessKeyRequired}
-          onToggle={(v) => toggle("accessKeyRequired", v)}
+          onToggle={(v) => gateMut.mutate({ accessKeyRequired: v })}
+          loading={gateMut.isPending}
         />
         <GateCard
           icon={<ShieldCheck className="w-5 h-5" />}
           title="Captcha gate"
-          desc="Cloudflare Turnstile or hCaptcha check on every submit. Blocks bots and scripts."
+          desc="Cloudflare Turnstile or hCaptcha check on every submit. Blocks bots and headless clients."
           enabled={!!c?.captchaRequired}
-          onToggle={(v) => toggle("captchaRequired", v)}
+          onToggle={(v) => gateMut.mutate({ captchaRequired: v })}
+          loading={gateMut.isPending}
         />
         <GateCard
           icon={<UserCheck className="w-5 h-5" />}
           title="Login gate"
-          desc="Email + password + captcha + 6-digit email OTP. Users must verify their email before activation. Highest trust, per-user daily limit enforced server-side."
+          desc="Require Google sign-in before activation. Enforces per-user daily limit and full audit trail."
           enabled={!!c?.loginRequired}
-          onToggle={(v) => toggle("loginRequired", v)}
+          onToggle={(v) => gateMut.mutate({ loginRequired: v })}
+          loading={gateMut.isPending}
         />
       </div>
 
       {/* LOGIN GATE CONFIG */}
       {c?.loginRequired && (
-        <div className="glass p-6 border border-emerald-500/20">
-          <div className="flex items-center gap-2 text-emerald-300 font-mono text-[10px] uppercase tracking-widest mb-3">
-            <UserCheck className="w-4 h-4" /> Login gate configuration
-          </div>
+        <Section title="Login gate configuration" tone="emerald" icon={<UserCheck className="w-4 h-4" />}>
           <div className="grid md:grid-cols-2 gap-4 items-end">
             <div>
               <Label className="label-caps mb-2 block">Per-user daily activation limit</Label>
               <Input
-                type="number"
-                min={1}
-                max={1000}
+                type="number" min={1} max={1000}
                 defaultValue={c.userDailyActivationLimit ?? 10}
                 onBlur={(e) => {
                   const n = Math.max(1, Math.min(1000, parseInt(e.target.value, 10) || 10));
+                  if (n === c.userDailyActivationLimit) return;
                   saveSettings({ data: { userDailyActivationLimit: n } }).then(() => {
                     toast.success(`Per-user limit set to ${n}/24h`);
                     qc.invalidateQueries({ queryKey: ["gate-config"] });
@@ -245,29 +248,31 @@ function AccessAdminPage() {
                 }}
               />
               <p className="mt-1.5 text-[11px] text-white/50">
-                Signed-in users can't exceed this many activations per 24 hours (regardless of IP).
+                Signed-in users cannot exceed this many activations per rolling 24 hours.
               </p>
             </div>
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/60 leading-relaxed">
               <div className="font-mono uppercase tracking-widest text-white/80 mb-1">How it works</div>
-              Sign up sends a 6-digit code to the user's email. They enter it to activate their account. Password reset uses <code className="font-mono text-white/80">/reset-password</code>. All activations are tied to their user id — you can trace, rate-limit, or ban per user.
+              Every activation is tied to a Google-verified user. Attempts are logged with IP, user agent, and result — filter by user in <code className="text-white/80">/admin/audit</code>.
             </div>
           </div>
-        </div>
+        </Section>
       )}
 
       {/* CAPTCHA CONFIG */}
       {c?.captchaRequired && (
-        <div className="glass p-6 border border-amber-500/20">
-          <div className="flex items-center gap-2 text-amber-400 font-mono text-[10px] uppercase tracking-widest mb-3">
-            <ShieldAlert className="w-4 h-4" /> Captcha configuration
-          </div>
+        <Section title="Captcha configuration" tone="amber" icon={<ShieldAlert className="w-4 h-4" />}>
           <div className="grid md:grid-cols-3 gap-4">
             <div>
               <Label className="label-caps mb-2 block">Provider</Label>
               <Select
                 value={c.captchaProvider}
-                onValueChange={(v) => saveSettings({ data: { captchaProvider: v as any } }).then(() => qc.invalidateQueries({ queryKey: ["gate-config"] }))}
+                onValueChange={(v) =>
+                  saveSettings({ data: { captchaProvider: v as any } }).then(() => {
+                    toast.success(`Provider set to ${v}`);
+                    qc.invalidateQueries({ queryKey: ["gate-config"] });
+                  })
+                }
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -280,354 +285,68 @@ function AccessAdminPage() {
               <Label className="label-caps mb-2 block">Site key (public)</Label>
               <div className="flex gap-2">
                 <Input
-                  defaultValue={c.captchaSiteKey}
-                  placeholder="0x4AAAA..."
-                  onBlur={(e) => {
-                    if (e.target.value !== c.captchaSiteKey) {
-                      saveSettings({ data: { captchaSiteKey: e.target.value } }).then(() =>
-                        qc.invalidateQueries({ queryKey: ["gate-config"] }),
-                      );
-                    }
-                  }}
+                  value={siteKeyDraft ?? savedSiteKey}
+                  placeholder="0x4AAAA… or hCaptcha UUID"
+                  onChange={(e) => setSiteKeyDraft(e.target.value)}
                 />
+                <Button
+                  variant={siteKeyDirty ? "default" : "outline"}
+                  disabled={!siteKeyDirty}
+                  onClick={() => {
+                    const v = (siteKeyDraft ?? "").trim();
+                    saveSettings({ data: { captchaSiteKey: v } }).then(() => {
+                      toast.success("Site key saved");
+                      setSiteKeyDraft(null);
+                      qc.invalidateQueries({ queryKey: ["gate-config"] });
+                    });
+                  }}
+                >
+                  <Save className="w-4 h-4 mr-1.5" /> Save
+                </Button>
               </div>
               <p className="text-[11px] text-white/40 mt-2 leading-relaxed">
-                The site key is public and used by the widget in the browser. The <code className="text-white/70">HCAPTCHA_SECRET</code> / <code className="text-white/70">TURNSTILE_SECRET</code> is stored encrypted in <b>Cloud → Secrets</b>, is only ever read server-side inside <code className="text-white/70">verifyCaptcha</code>, and is never returned to the client, written to logs, or shown in this UI.
+                Secret is stored in <code className="text-white/70">HCAPTCHA_SECRET</code> / <code className="text-white/70">TURNSTILE_SECRET</code> and is never exposed to the browser.
               </p>
             </div>
           </div>
-          {(() => {
-            const key = (c.captchaSiteKey || "").trim();
-            if (!key) return null;
-            // hCaptcha site keys are UUID-shaped (with dashes). Turnstile keys start with 0x/1x/2x/3x.
-            const looksLikeHcaptcha = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
-            const looksLikeTurnstile = /^[0-3]x[A-Za-z0-9_-]{10,}$/.test(key);
-            const inferred = looksLikeHcaptcha ? "hcaptcha" : looksLikeTurnstile ? "turnstile" : null;
-            if (!inferred || inferred === c.captchaProvider) return null;
-            return (
-              <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-[12px] text-red-100 flex items-start gap-2">
-                <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
-                <div>
-                  <div className="font-medium">Provider / site-key mismatch</div>
-                  <div className="text-red-200/80 mt-1">
-                    This site key looks like a <b>{inferred === "hcaptcha" ? "hCaptcha" : "Cloudflare Turnstile"}</b> key,
-                    but the selected provider is <b>{c.captchaProvider === "hcaptcha" ? "hCaptcha" : "Cloudflare Turnstile"}</b>.
-                    Switch the provider above or paste a matching site key — activations will fail otherwise.
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* CAPTCHA HEALTH — live test + recent verify log */}
-      {c?.captchaRequired && (
-        <div className="glass p-6 border border-white/10 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/60">
-              <Activity className="w-4 h-4 text-[#ff8a90]" /> Captcha health
-            </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={testing}
-              onClick={async () => {
-                setTesting(true);
-                setTestResult(null);
-                try {
-                  const r = await runTestKeys();
-                  setTestResult(r);
-                  if (r.ok) toast.success("Captcha keys look healthy.");
-                  else toast.error(r.summary);
-                } catch (e: any) {
-                  toast.error(`Test failed: ${e?.message ?? "unknown"}`);
-                } finally { setTesting(false); }
-              }}
-            >
-              {testing
-                ? (<><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing…</>)
-                : (<><Play className="w-3.5 h-3.5 mr-1.5" /> Test captcha keys</>)}
-            </Button>
-          </div>
-
-          {/* Retention & rate-limit + CSV export toolbar */}
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 flex flex-wrap items-end gap-3">
-            <div className="min-w-[140px]">
-              <Label className="label-caps mb-1.5 block">Retention (days)</Label>
-              <Input
-                type="number" min={1} max={365}
-                placeholder={String(retention.data?.retentionDays ?? 7)}
-                value={retDays}
-                onChange={(e) => setRetDays(e.target.value)}
-              />
-            </div>
-            <div className="min-w-[180px]">
-              <Label className="label-caps mb-1.5 block">Fail limit / 10 min / IP</Label>
-              <Input
-                type="number" min={1} max={500}
-                placeholder={String(retention.data?.failLimitPer10min ?? 20)}
-                value={failLimit}
-                onChange={(e) => setFailLimit(e.target.value)}
-              />
-            </div>
-            <Button
-              size="sm" variant="secondary"
-              onClick={async () => {
-                try {
-                  const payload: any = {};
-                  if (retDays) payload.retentionDays = Math.max(1, Math.min(365, parseInt(retDays, 10) || 7));
-                  if (failLimit) payload.failLimitPer10min = Math.max(1, Math.min(500, parseInt(failLimit, 10) || 20));
-                  if (Object.keys(payload).length === 0) { toast.info("Nothing to save"); return; }
-                  await saveRetention({ data: payload });
-                  toast.success("Captcha policy saved");
-                  setRetDays(""); setFailLimit("");
-                  qc.invalidateQueries({ queryKey: ["captcha-retention"] });
-                } catch (e: any) {
-                  toast.error(`Save failed: ${e?.message ?? "unknown"}`);
-                }
-              }}
-            >
-              <Save className="w-3.5 h-3.5 mr-1.5" /> Save policy
-            </Button>
-            <Button
-              size="sm" variant="outline"
-              onClick={async () => {
-                try {
-                  const r = await exportCsv({ data: { limit: 2000 } });
-                  const blob = new Blob([r.csv], { type: "text/csv;charset=utf-8" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `captcha-verify-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`;
-                  document.body.appendChild(a); a.click(); a.remove();
-                  URL.revokeObjectURL(url);
-                  toast.success(`Exported ${r.count} row(s)`);
-                } catch (e: any) {
-                  toast.error(`Export failed: ${e?.message ?? "unknown"}`);
-                }
-              }}
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="text-red-300 hover:text-red-200">
-                  <Trash className="w-3.5 h-3.5 mr-1.5" /> Purge now
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Purge captcha logs?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Deletes captcha verify log rows older than the current retention
-                    ({retention.data?.retentionDays ?? 7} days). This cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={async () => {
-                      try {
-                        const r = await purgeNow({ data: { days: retention.data?.retentionDays ?? 7 } });
-                        toast.success(`Purged ${r.deleted} row(s)`);
-                        qc.invalidateQueries({ queryKey: ["captcha-logs"] });
-                      } catch (e: any) {
-                        toast.error(`Purge failed: ${e?.message ?? "unknown"}`);
-                      }
-                    }}
-                  >Purge</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 ml-auto">
-              Daily auto-purge · 03:17 UTC
-            </div>
-          </div>
-
-
-          {testResult && (
-            <div className={`rounded-lg border px-4 py-3 text-[12px] ${
-              testResult.ok
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
-                : "border-red-500/40 bg-red-500/10 text-red-100"
-            }`}>
-              <div className="flex items-start gap-2">
-                {testResult.ok
-                  ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-300" />
-                  : <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />}
-                <div className="flex-1">
-                  <div className="font-medium">{testResult.summary}</div>
-                  <ul className="mt-2 space-y-1">
-                    {testResult.checks.map((chk, i) => (
-                      <li key={i} className="flex items-center gap-2 text-[11px] font-mono">
-                        <span className={chk.ok ? "text-emerald-300" : "text-red-300"}>
-                          {chk.ok ? "PASS" : "FAIL"}
-                        </span>
-                        <span className="text-white/70">{chk.label}</span>
-                        <span className="text-white/40">— {chk.detail}</span>
-                      </li>
-                    ))}
-                  </ul>
+          {providerMismatch && (
+            <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-[12px] text-red-100 flex items-start gap-2">
+              <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
+              <div>
+                <div className="font-medium">Provider / site-key mismatch</div>
+                <div className="text-red-200/80 mt-1">
+                  This site key looks like a <b>{providerMismatch}</b> key but the selected provider is <b>{c.captchaProvider}</b>. Activations will fail until they match.
                 </div>
               </div>
             </div>
           )}
 
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-2">
-              Recent verify attempts (redacted)
-            </div>
-            <div className="rounded-md border border-white/10 overflow-hidden">
-              <table className="w-full text-[11px]">
-                <thead className="bg-white/[0.03] text-white/50">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Time</th>
-                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Provider</th>
-                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Result</th>
-                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Codes</th>
-                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Token</th>
-                    <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Latency</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(captchaLogs.data?.rows ?? []).length === 0 ? (
-                    <tr><td colSpan={6} className="px-3 py-6 text-center text-white/40">No verify attempts yet.</td></tr>
-                  ) : (captchaLogs.data!.rows.map((r: any) => (
-                    <tr key={r.id} className="border-t border-white/5 hover:bg-white/[0.02]">
-                      <td className="px-3 py-2 text-white/60">{new Date(r.created_at).toLocaleTimeString()}</td>
-                      <td className="px-3 py-2 text-white/70">{r.provider}<span className="text-white/30 ml-1">/{r.purpose}</span></td>
-                      <td className="px-3 py-2">
-                        {(() => {
-                          const codes: string[] = r.error_codes ?? [];
-                          const diagnosticOk =
-                            r.purpose === "admin_test" &&
-                            !r.success &&
-                            (codes.includes("invalid-input-response") ||
-                              codes.includes("missing-input-response"));
-                          if (r.success) return <span className="text-emerald-300">ok</span>;
-                          if (diagnosticOk)
-                            return (
-                              <span
-                                className="text-emerald-300"
-                                title="Diagnostic probe sends a dummy token; providers reply invalid-input-response when the secret is valid — this is the expected healthy result."
-                              >
-                                healthy probe
-                              </span>
-                            );
-                          return <span className="text-red-300">{r.reason ?? "fail"}</span>;
-                        })()}
-                      </td>
-                      <td className="px-3 py-2 text-white/50 font-mono">{(r.error_codes ?? []).join(", ") || "—"}</td>
-                      <td className="px-3 py-2 text-white/40 font-mono">
-                        {r.token_prefix ? `${r.token_prefix}… (${r.token_length})` : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-white/50">{r.latency_ms != null ? `${r.latency_ms}ms` : "—"}</td>
-                    </tr>
-                  )))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Code legend — explains admin_test vs activate results */}
-            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 text-[11px] space-y-1.5">
-              <div className="font-mono uppercase tracking-widest text-white/50">What these codes mean</div>
-              <div className="grid md:grid-cols-2 gap-x-4 gap-y-1 text-white/70">
-                <div><span className="text-emerald-300 font-mono">healthy probe</span> — admin test with dummy token; provider replied <code className="text-white/50">invalid-input-response</code>. This confirms your secret is valid. <span className="text-white/40">Fix: none needed.</span></div>
-                <div><span className="text-red-300 font-mono">sitekey-secret-mismatch</span> — site key and secret belong to different projects/accounts. <span className="text-white/40">Fix: regenerate both from the same hCaptcha project.</span></div>
-                <div><span className="text-red-300 font-mono">invalid-input-secret</span> — the secret stored in <code className="text-white/50">HCAPTCHA_SECRET</code> is wrong or revoked. <span className="text-white/40">Fix: rotate it via Cloud → Secrets.</span></div>
-                <div><span className="text-red-300 font-mono">timeout-or-duplicate</span> — the user's captcha token expired (older than ~2 min) or was already used. <span className="text-white/40">Fix: user just needs to re-solve; not a config issue.</span></div>
-                <div><span className="text-red-300 font-mono">rate_limited</span> — this IP tripped the failure cap. <span className="text-white/40">Fix: raise <code className="text-white/50">captcha_fail_limit_per_10min</code> above if legitimate traffic is being blocked.</span></div>
-                <div><span className="text-red-300 font-mono">captcha_network_*</span> — could not reach hCaptcha/Turnstile from the server. <span className="text-white/40">Fix: transient — retry; check provider status page if it persists.</span></div>
+          {/* Live test */}
+          <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-3 flex flex-wrap items-center gap-3">
+            <Activity className="w-4 h-4 text-[#ff8a90]" />
+            <div className="text-[11px] font-mono uppercase tracking-widest text-white/60">Live handshake test</div>
+            <Button size="sm" variant="secondary" disabled={testMut.isPending} onClick={() => testMut.mutate()}>
+              {testMut.isPending
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing…</>
+                : <><Play className="w-3.5 h-3.5 mr-1.5" /> Test now</>}
+            </Button>
+            {testResult && (
+              <div className={`text-[11px] flex items-center gap-1.5 ${testResult.ok ? "text-emerald-300" : "text-red-300"}`}>
+                {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                <span>{testResult.summary}</span>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* ACTIVATION ↔ CAPTCHA DEBUG — last N attempts joined to their verify entry */}
-      {c?.captchaRequired && (
-        <div className="glass p-6 border border-white/10 space-y-3">
-          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/60">
-            <Activity className="w-4 h-4 text-[#ff8a90]" /> Activation captcha debug
-            <span className="text-white/30 normal-case tracking-normal font-sans">
-              — last 25 activation attempts and the captcha verify that produced them
-            </span>
-          </div>
-          <div className="rounded-md border border-white/10 overflow-hidden">
-            <table className="w-full text-[11px]">
-              <thead className="bg-white/[0.03] text-white/50">
-                <tr>
-                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Time</th>
-                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Code</th>
-                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Activation</th>
-                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Captcha</th>
-                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Reason / codes</th>
-                  <th className="text-left px-3 py-2 font-mono uppercase tracking-widest">Token</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(activationDebug.data?.rows ?? []).length === 0 ? (
-                  <tr><td colSpan={6} className="px-3 py-6 text-center text-white/40">No activation attempts yet.</td></tr>
-                ) : (activationDebug.data!.rows.map((r: any) => {
-                  const cap = r.captcha as null | {
-                    provider: string; success: boolean; reason: string | null;
-                    error_codes: string[]; http_status: number | null;
-                    latency_ms: number | null; token_prefix: string | null;
-                    token_length: number | null; delta_ms: number;
-                  };
-                  const okAct = r.result === "success";
-                  return (
-                    <tr key={r.attempt_id} className="border-t border-white/5 hover:bg-white/[0.02] align-top">
-                      <td className="px-3 py-2 text-white/60 whitespace-nowrap">
-                        {new Date(r.attempt_created_at).toLocaleTimeString()}
-                      </td>
-                      <td className="px-3 py-2 text-white/70 font-mono">{r.code ?? "—"}</td>
-                      <td className="px-3 py-2">
-                        <span className={okAct ? "text-emerald-300" : "text-red-300"}>{r.result}</span>
-                        {r.error_message && (
-                          <div className="text-white/40 text-[10px] mt-0.5 max-w-[280px] truncate" title={r.error_message}>
-                            {r.error_message}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {cap ? (
-                          <span className={cap.success ? "text-emerald-300" : "text-red-300"}>
-                            {cap.provider} · {cap.success ? "ok" : "fail"}
-                            <span className="text-white/30 ml-1">({cap.http_status ?? "—"})</span>
-                          </span>
-                        ) : (
-                          <span className="text-white/30">no match</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-white/60">
-                        {cap
-                          ? [cap.reason, (cap.error_codes ?? []).join(", ")].filter(Boolean).join(" · ") || "—"
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-white/40 whitespace-nowrap">
-                        {cap?.token_prefix ? `${cap.token_prefix}… (${cap.token_length})` : "—"}
-                        {cap && (
-                          <div className="text-[10px] text-white/30">Δ {Math.round(cap.delta_ms)}ms</div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                }))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </Section>
       )}
 
       {/* STATS STRIP */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Stat label="Total keys" value={stats.data?.total ?? 0} />
-        <Stat label="Unlimited" value={stats.data?.types.unlimited ?? 0} accent="emerald" />
-        <Stat label="Single-use" value={stats.data?.types.single_use ?? 0} accent="sky" />
-        <Stat label="24h session" value={stats.data?.types.session_24h ?? 0} accent="violet" />
-        <Stat label="Redeems · 24h" value={stats.data?.redemptions24h ?? 0} accent="red" />
+        <Stat label="TOTAL KEYS" value={stats.data?.total ?? 0} />
+        <Stat label="UNLIMITED" value={stats.data?.types.unlimited ?? 0} accent="emerald" />
+        <Stat label="SINGLE-USE" value={stats.data?.types.single_use ?? 0} accent="sky" />
+        <Stat label="24H SESSION" value={stats.data?.types.session_24h ?? 0} accent="violet" />
+        <Stat label="REDEEMS · 24H" value={stats.data?.redemptions24h ?? 0} accent="red" />
       </div>
 
       {/* KEY GENERATOR */}
@@ -635,10 +354,12 @@ function AccessAdminPage() {
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div>
             <h2 className="font-display text-xl">Generate keys</h2>
-            <p className="text-white/50 text-xs mt-1">All key codes are shown once. Store them safely or copy the batch below.</p>
+            <p className="text-white/50 text-xs mt-1">Codes are hashed on save and shown once. Copy immediately.</p>
           </div>
           <Button className="btn-red" onClick={() => genMut.mutate()} disabled={genMut.isPending}>
-            <Plus className="w-4 h-4 mr-2" /> {genMut.isPending ? "Generating…" : "Generate"}
+            {genMut.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…</>
+              : <><Plus className="w-4 h-4 mr-2" /> Generate</>}
           </Button>
         </div>
         <div className="grid md:grid-cols-5 gap-3">
@@ -647,15 +368,16 @@ function AccessAdminPage() {
             <Select value={genType} onValueChange={(v: any) => setGenType(v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="unlimited">♾️ Unlimited</SelectItem>
+                <SelectItem value="unlimited">♾ Unlimited</SelectItem>
                 <SelectItem value="single_use">🔒 Single-use</SelectItem>
-                <SelectItem value="session_24h">⏱️ 24-hour session</SelectItem>
+                <SelectItem value="session_24h">⏱ 24-hour session</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label className="label-caps mb-2 block">Quantity</Label>
-            <Input type="number" min={1} max={200} value={genQty} onChange={(e) => setGenQty(Math.max(1, Math.min(200, Number(e.target.value) || 1)))} />
+            <Input type="number" min={1} max={200} value={genQty}
+              onChange={(e) => setGenQty(Math.max(1, Math.min(200, Number(e.target.value) || 1)))} />
           </div>
           <div>
             <Label className="label-caps mb-2 block">Label (optional)</Label>
@@ -666,11 +388,13 @@ function AccessAdminPage() {
             <Input type="datetime-local" value={genExpiry} onChange={(e) => setGenExpiry(e.target.value)} />
           </div>
           <div>
-            <Label className="label-caps mb-2 block">Max uses {genType !== "unlimited" && <span className="text-white/30">(auto)</span>}</Label>
+            <Label className="label-caps mb-2 block">
+              Max uses {genType !== "unlimited" && <span className="text-white/30">(auto)</span>}
+            </Label>
             <Input
               type="number"
               disabled={genType !== "unlimited"}
-              placeholder={genType === "unlimited" ? "∞ (blank)" : genType === "single_use" ? "1" : "∞"}
+              placeholder={genType === "unlimited" ? "∞ blank = infinite" : genType === "single_use" ? "1" : "∞"}
               value={genMaxUses}
               onChange={(e) => setGenMaxUses(e.target.value)}
             />
@@ -679,11 +403,14 @@ function AccessAdminPage() {
 
         {lastGenerated && lastGenerated.length > 0 && (
           <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-emerald-400 font-mono text-[10px] uppercase tracking-widest">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-emerald-300 font-mono text-[10px] uppercase tracking-widest">
                 <CheckCircle2 className="w-4 h-4" /> {lastGenerated.length} key(s) generated · shown once
               </div>
               <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setReveal((r) => !r)}>
+                  {reveal ? <><EyeOff className="w-3 h-3 mr-1" /> Hide</> : <><Eye className="w-3 h-3 mr-1" /> Show</>}
+                </Button>
                 <Button size="sm" variant="outline" onClick={copyAll}><Copy className="w-3 h-3 mr-1" /> Copy all</Button>
                 <Button size="sm" variant="ghost" onClick={() => setLastGenerated(null)}>Dismiss</Button>
               </div>
@@ -695,7 +422,7 @@ function AccessAdminPage() {
                   onClick={() => navigator.clipboard.writeText(k.code).then(() => toast.success("Copied"))}
                   className="text-left px-3 py-2 rounded bg-black/40 border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition"
                 >
-                  {k.code}
+                  {reveal ? k.code : k.code.replace(/[A-Z0-9]/g, "•")}
                 </button>
               ))}
             </div>
@@ -706,8 +433,13 @@ function AccessAdminPage() {
       {/* KEY TABLE */}
       <div className="glass p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="font-display text-xl">Key ledger</h2>
-          <div className="flex flex-wrap gap-2">
+          <div>
+            <h2 className="font-display text-xl">Key ledger</h2>
+            <p className="text-white/40 text-xs mt-0.5">
+              {filteredRows.length} of {keys.data?.rows?.length ?? 0} · live · updates every 2s
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-white/40" />
               <Input placeholder="Search prefix / label" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 w-56" />
@@ -738,9 +470,9 @@ function AccessAdminPage() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete selected keys?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete {selected.size} key(s)?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This permanently removes {selected.size} key(s). Redemption logs stay in place but detach from the key.
+                      Redemption logs are preserved but detached. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -757,7 +489,13 @@ function AccessAdminPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">
-                <th className="py-2 px-2 w-8"></th>
+                <th className="py-2 px-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={filteredRows.length > 0 && selected.size === filteredRows.length}
+                    onChange={(e) => setSelected(e.target.checked ? new Set(filteredRows.map((r: any) => r.id)) : new Set())}
+                  />
+                </th>
                 <th className="py-2 px-2">Prefix</th>
                 <th className="py-2 px-2">Type</th>
                 <th className="py-2 px-2">Label</th>
@@ -769,10 +507,16 @@ function AccessAdminPage() {
             </thead>
             <tbody>
               {keys.isLoading && (
-                <tr><td colSpan={8} className="py-8 text-center text-white/40">Loading…</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-white/40">
+                  <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> Loading…
+                </td></tr>
               )}
               {!keys.isLoading && filteredRows.length === 0 && (
-                <tr><td colSpan={8} className="py-10 text-center text-white/40">No keys yet — generate the first batch above.</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-white/40">
+                  {search || filterType !== "all" || filterStatus !== "all"
+                    ? "No keys match the current filter."
+                    : "No keys yet — generate the first batch above."}
+                </td></tr>
               )}
               {filteredRows.map((r: any) => {
                 const expired = r.expires_at && new Date(r.expires_at).getTime() < Date.now();
@@ -783,12 +527,10 @@ function AccessAdminPage() {
                       <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSel(r.id)} />
                     </td>
                     <td className="px-2 py-2 font-mono text-white/90">{r.code_prefix}•••</td>
-                    <td className="px-2 py-2">
-                      <TypeBadge type={r.key_type} />
-                    </td>
+                    <td className="px-2 py-2"><TypeBadge type={r.key_type} /></td>
                     <td className="px-2 py-2 text-white/70">{r.label ?? <span className="text-white/30">—</span>}</td>
                     <td className="px-2 py-2 font-mono">
-                      {r.uses_count}{r.max_uses != null ? ` / ${r.max_uses}` : r.key_type === "unlimited" ? "" : ""}
+                      {r.uses_count}{r.max_uses != null ? ` / ${r.max_uses}` : ""}
                     </td>
                     <td className="px-2 py-2 text-xs text-white/60">
                       {r.expires_at ? new Date(r.expires_at).toLocaleString() : <span className="text-white/30">Never</span>}
@@ -802,28 +544,27 @@ function AccessAdminPage() {
                     <td className="px-2 py-2">
                       <div className="flex gap-1">
                         <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2"
+                          size="sm" variant="outline" className="h-7 px-2"
+                          title={r.disabled ? "Enable key" : "Disable key"}
                           onClick={() => {
                             toggleKey({ data: { id: r.id, disabled: !r.disabled } }).then(() => {
                               toast.success(r.disabled ? "Key enabled" : "Key disabled");
                               qc.invalidateQueries({ queryKey: ["access-keys"] });
-                            });
+                            }).catch((e: any) => toast.error("Toggle failed", { description: e?.message }));
                           }}
                         >
                           <Ban className="w-3 h-3" />
                         </Button>
                         <Button
-                          size="sm"
-                          variant="outline"
+                          size="sm" variant="outline"
                           className="h-7 px-2 text-red-300 border-red-500/30 hover:bg-red-500/10"
+                          title="Delete key"
                           onClick={() => {
                             removeKeys({ data: { ids: [r.id] } }).then(() => {
                               toast.success("Key deleted");
                               qc.invalidateQueries({ queryKey: ["access-keys"] });
                               qc.invalidateQueries({ queryKey: ["access-stats"] });
-                            });
+                            }).catch((e: any) => toast.error("Delete failed", { description: e?.message }));
                           }}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -841,8 +582,10 @@ function AccessAdminPage() {
       {/* REDEMPTION LOG */}
       <div className="glass p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-xl">Redemption log</h2>
-          <span className="text-xs text-white/40">Latest 200 · refreshes every 5s</span>
+          <div>
+            <h2 className="font-display text-xl">Redemption log</h2>
+            <p className="text-white/40 text-xs mt-0.5">Latest 200 · live · refreshes every 2s</p>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -861,7 +604,7 @@ function AccessAdminPage() {
                 <tr><td colSpan={6} className="py-8 text-center text-white/40">No redemptions yet.</td></tr>
               )}
               {(redemptions.data?.rows ?? []).map((r: any) => (
-                <tr key={r.id} className="border-b border-white/5">
+                <tr key={r.id} className="border-b border-white/5 hover:bg-white/5">
                   <td className="px-2 py-2 text-xs text-white/60">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-2 py-2">
                     {r.success
@@ -880,6 +623,23 @@ function AccessAdminPage() {
       </div>
     </div>
   );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// Helpers & sub-components
+// ───────────────────────────────────────────────────────────────────────
+function prettyKey(k: string): string {
+  return k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+}
+
+function detectProviderMismatch(siteKey?: string, provider?: string): "hcaptcha" | "turnstile" | null {
+  const key = (siteKey ?? "").trim();
+  if (!key || !provider) return null;
+  const isHcaptcha = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+  const isTurnstile = /^[0-3]x[A-Za-z0-9_-]{10,}$/.test(key);
+  const inferred = isHcaptcha ? "hcaptcha" : isTurnstile ? "turnstile" : null;
+  if (!inferred || inferred === provider) return null;
+  return inferred;
 }
 
 function keyTypeLabel(t: KeyType): string {
@@ -910,31 +670,48 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
 }
 
 function GateCard({
-  icon, title, desc, enabled, onToggle,
+  icon, title, desc, enabled, onToggle, loading,
 }: {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  enabled: boolean;
-  onToggle: (v: boolean) => void;
+  icon: React.ReactNode; title: string; desc: string;
+  enabled: boolean; onToggle: (v: boolean) => void; loading?: boolean;
 }) {
   return (
-    <div className={`glass p-5 border ${enabled ? "border-[#ff2a3a]/40 shadow-[0_0_0_1px_rgba(255,42,58,0.2)]" : "border-white/10"} transition`}>
+    <div className={`glass p-5 border transition ${enabled ? "border-[#ff2a3a]/40 shadow-[0_0_0_1px_rgba(255,42,58,0.2)]" : "border-white/10"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${enabled ? "bg-[#ff2a3a]/20 text-[#ff8a90]" : "bg-white/5 text-white/50"}`}>
           {icon}
         </div>
-        <Switch checked={enabled} onCheckedChange={onToggle} />
+        <Switch checked={enabled} onCheckedChange={onToggle} disabled={loading} />
       </div>
       <div className="mt-4">
         <div className="font-display text-lg">{title}</div>
         <p className="text-white/55 text-xs mt-1 leading-relaxed">{desc}</p>
         <div className="mt-3">
           {enabled
-            ? <Badge className="bg-[#ff2a3a]/20 text-[#ff8a90] border-none">● On</Badge>
-            : <Badge variant="outline" className="border-white/10 text-white/50">○ Off</Badge>}
+            ? <Badge className="bg-[#ff2a3a]/20 text-[#ff8a90] border-none">● ON</Badge>
+            : <Badge variant="outline" className="border-white/10 text-white/50">○ OFF</Badge>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Section({
+  title, tone, icon, children,
+}: {
+  title: string;
+  tone: "emerald" | "amber" | "sky";
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const border = tone === "emerald" ? "border-emerald-500/20" : tone === "amber" ? "border-amber-500/20" : "border-sky-500/20";
+  const text = tone === "emerald" ? "text-emerald-300" : tone === "amber" ? "text-amber-300" : "text-sky-300";
+  return (
+    <div className={`glass p-6 border ${border}`}>
+      <div className={`flex items-center gap-2 ${text} font-mono text-[10px] uppercase tracking-widest mb-4`}>
+        {icon} {title}
+      </div>
+      {children}
     </div>
   );
 }
