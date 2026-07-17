@@ -437,8 +437,25 @@ function HomePage() {
         toast.error("Access-key gate blocked activation", {
           description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
         });
-      } else if (result.error === "no_cookie" || result.error === "exhausted") {
-        toast.error("Couldn't activate right now", { description: result.message ?? "Please try again in a minute." });
+      } else if (result.error === "no_cookie") {
+        setServiceError({
+          kind: "no_cookie",
+          message: result.message ?? "Cookie pool is empty. Our team has been alerted — try again in a moment.",
+        });
+        setRetryCountdown(30);
+        toast.error("Cookie pool empty", {
+          description: "No active cookies available right now. Retry shortly.",
+        });
+      } else if (result.error === "exhausted") {
+        setServiceError({
+          kind: "exhausted",
+          message: result.message ?? "We tried several cookies and none activated this code.",
+          attempts: result.attempts,
+        });
+        setRetryCountdown(20);
+        toast.error("Activation exhausted", {
+          description: `We attempted ${result.attempts ?? "several"} cookies. Please retry in a few seconds.`,
+        });
       } else {
         toast.error("Server hiccup", { description: "Try again in a moment." });
       }
