@@ -191,8 +191,15 @@ function HomePage() {
                 disabled={submitting}
                 className="btn-red w-full mt-7 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? "Activating…" : "Activate Now →"}
+                {stage === "checking"
+                  ? "◆ Verifying cookie…"
+                  : stage === "activating"
+                    ? "◆ Activating on Netflix…"
+                    : submitting
+                      ? "Working…"
+                      : "Activate Now →"}
               </button>
+
               <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
                 <span>Encrypted End-to-End</span>
                 <span className="text-[#ff2a3a]">● Online</span>
