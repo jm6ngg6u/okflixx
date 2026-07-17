@@ -178,6 +178,7 @@ export type Database = {
           result: string
           selection_reason: Json | null
           user_agent: string | null
+          user_id: string | null
         }
         Insert: {
           attempt_number?: number
@@ -194,6 +195,7 @@ export type Database = {
           result: string
           selection_reason?: Json | null
           user_agent?: string | null
+          user_id?: string | null
         }
         Update: {
           attempt_number?: number
@@ -210,6 +212,7 @@ export type Database = {
           result?: string
           selection_reason?: Json | null
           user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -727,6 +730,10 @@ export type Database = {
       }
       count_recent_captcha_failures: {
         Args: { _ip_hash: string; _minutes: number }
+        Returns: number
+      }
+      count_user_recent_attempts: {
+        Args: { _minutes: number; _user_id: string }
         Returns: number
       }
       get_captcha_health: { Args: { _minutes?: number }; Returns: Json }
