@@ -39,6 +39,10 @@ function bucketReason(msg: string | null | undefined): string {
 
 /** Run the cookie auto-check. When `force=true`, ignores the enabled flag. */
 export async function runCookiesAutocheck(force = false): Promise<CookieRunResult> {
+  // Same-job single-instance guard. Different jobs still run in parallel.
+  if (await isJobRunning("cookies-autocheck")) {
+    return { ok: true, skipped: "already_running" };
+  }
   const jobId = await recordJobStart("cookies-autocheck");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { checkCookieViaWorker } = await import("@/lib/worker.server");
