@@ -112,6 +112,42 @@ function freshnessTone(iso: string | null | undefined): { cls: string; label: st
   return { cls: "bg-red-500", label: "stale" };
 }
 
+/**
+ * Health score (0-100) — a single number that combines success rate, freshness,
+ * status, and lock state so ops can prioritize cookies at a glance.
+ * Formula is client-side and derivable, so no DB migration is needed.
+ */
+function healthScore(r: any): number {
+  const succ = Number(r.success_count ?? 0);
+  const fail = Number(r.fail_count ?? 0);
+  const attempts = succ + fail;
+  let score = attempts > 0 ? (succ / attempts) * 100 : 50; // neutral if untested
+
+  if (r.status === "active") score += 10;
+  else if (r.status === "free") score += 3;
+  else if (r.status === "on_hold") score -= 15;
+  else if (r.status === "invalid") score -= 40;
+  else if (r.status === "unknown") score -= 5;
+
+  const t = r.last_checked_at ? Date.parse(r.last_checked_at) : 0;
+  if (!t) score -= 15;
+  else {
+    const age = Date.now() - t;
+    if (age > 24 * 60 * 60_000) score -= 12;
+    else if (age > 60 * 60_000) score -= 4;
+  }
+  if (r.is_locked && r.locked_at && Date.now() - Date.parse(r.locked_at) > 5 * 60_000) score -= 15;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+function healthTone(h: number): { text: string; bar: string; label: string } {
+  if (h >= 75) return { text: "text-emerald-300", bar: "from-emerald-500 to-emerald-400", label: "excellent" };
+  if (h >= 55) return { text: "text-lime-300",    bar: "from-lime-500 to-emerald-400",    label: "good" };
+  if (h >= 35) return { text: "text-amber-300",   bar: "from-amber-500 to-yellow-400",    label: "fair" };
+  if (h >= 15) return { text: "text-orange-300",  bar: "from-orange-500 to-amber-400",    label: "poor" };
+  return              { text: "text-red-300",     bar: "from-red-600 to-red-400",         label: "critical" };
+}
+
 function CookiePoolPage() {
   const qc = useQueryClient();
   const upload = useServerFn(uploadCookies);
