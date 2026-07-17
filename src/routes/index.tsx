@@ -1079,11 +1079,14 @@ function ContactStrip() {
   const q = useQuery({
     queryKey: ["public-contacts"],
     queryFn: () => fetchContacts(),
-    refetchInterval: 5000,
-    staleTime: 2000,
+    refetchInterval: 2000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+    staleTime: 0,
   });
   const channels = q.data?.channels ?? [];
-  if (!q.data?.enabled || channels.length === 0) return null;
+  const debugOn = typeof window !== "undefined" && /(?:^|[?&])debug=contacts(?:&|$)/.test(window.location.search);
 
   const iconFor = (kind: string) => {
     if (kind === "telegram") return Send;
@@ -1095,6 +1098,26 @@ function ContactStrip() {
     if (kind === "instagram") return "#E1306C";
     return "#25D366";
   };
+
+  if (!q.data?.enabled || channels.length === 0) {
+    if (!debugOn) return null;
+    return (
+      <div className="mx-auto max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-100 text-xs font-mono p-3 space-y-2">
+        <div className="uppercase tracking-widest text-[10px] text-amber-300">// Contact debug (?debug=contacts)</div>
+        <div>Master enabled: <b>{String(q.data?.debug?.masterEnabled ?? false)}</b></div>
+        {(q.data?.debug?.channels ?? []).map((c: any) => (
+          <div key={c.kind} className="flex flex-wrap gap-x-2">
+            <span className="text-amber-300">{c.kind}:</span>
+            <span>enabled={String(c.enabled)}</span>
+            <span>raw=&quot;{c.rawHandle || "—"}&quot;</span>
+            <span>norm=&quot;{c.normalizedHandle || "—"}&quot;</span>
+            <span>visible={String(c.visible)}</span>
+            <span>reason={c.reason}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -1127,6 +1150,11 @@ function ContactStrip() {
           );
         })}
       </div>
+      {debugOn && q.data?.debug && (
+        <div className="mx-auto max-w-2xl rounded-md border border-white/10 bg-black/60 text-[10px] text-white/60 font-mono p-2">
+          debug: {q.data.debug.channels.filter((c: any) => c.visible).map((c: any) => `${c.kind}=${c.display}`).join(" · ")}
+        </div>
+      )}
     </div>
   );
 }
