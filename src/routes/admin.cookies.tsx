@@ -1525,3 +1525,475 @@ function PageHeader({ title, subtitle, icon: Icon, action }: { title: string; su
     </div>
   );
 }
+
+// -------------------- Advanced cleanup dialog --------------------
+
+type CleanupFilters = {
+  countries: string[];
+  statuses: ("active" | "free" | "on_hold" | "invalid" | "unknown")[];
+  neverUsedDays: number | null;
+  staleDays: number | null;
+  lowSuccessEnabled: boolean;
+  lowSuccessThreshold: number;
+  lowSuccessMinUses: number;
+  requireAll: boolean;
+};
+
+const EMPTY_FILTERS: CleanupFilters = {
+  countries: [],
+  statuses: [],
+  neverUsedDays: null,
+  staleDays: null,
+  lowSuccessEnabled: false,
+  lowSuccessThreshold: 30,
+  lowSuccessMinUses: 5,
+  requireAll: true,
+};
+
+function AdvancedCleanupDialog({
+  open, onOpenChange, countries, onDone,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  countries: { code: string; count: number }[];
+  onDone: () => void;
+}) {
+  const cleanupFn = useServerFn(advancedCleanupCookies);
+  const [f, setF] = useState<CleanupFilters>(EMPTY_FILTERS);
+  const [preview, setPreview] = useState<any>(null);
+  const [phase, setPhase] = useState<"idle" | "previewing" | "confirming" | "deleting" | "done">("idle");
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState<any>(null);
+
+  function reset() {
+    setF(EMPTY_FILTERS);
+    setPreview(null);
+    setPhase("idle");
+    setProgress(0);
+    setResult(null);
+  }
+
+  function toBody(dryRun: boolean) {
+    const filters: any = { requireAll: f.requireAll };
+    if (f.countries.length > 0) filters.countries = f.countries;
+    if (f.statuses.length > 0) filters.statuses = f.statuses;
+    if (typeof f.neverUsedDays === "number") filters.neverUsedDays = f.neverUsedDays;
+    if (typeof f.staleDays === "number") filters.staleDays = f.staleDays;
+    if (f.lowSuccessEnabled) {
+      filters.lowSuccessThreshold = f.lowSuccessThreshold;
+      filters.lowSuccessMinUses = f.lowSuccessMinUses;
+    }
+    return { filters, dryRun };
+  }
+
+  const activeCount =
+    (f.countries.length > 0 ? 1 : 0) +
+    (f.statuses.length > 0 ? 1 : 0) +
+    (typeof f.neverUsedDays === "number" ? 1 : 0) +
+    (typeof f.staleDays === "number" ? 1 : 0) +
+    (f.lowSuccessEnabled ? 1 : 0);
+
+  async function runPreview() {
+    if (activeCount === 0) { toast.error("Add at least one filter"); return; }
+    setPhase("previewing");
+    setProgress(20);
+    try {
+      const r = await cleanupFn({ data: toBody(true) });
+      setPreview(r);
+      setPhase(r.matched > 0 ? "confirming" : "confirming");
+      setProgress(100);
+      setTimeout(() => setProgress(0), 400);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Preview failed");
+      setPhase("idle");
+      setProgress(0);
+    }
+  }
+
+  async function runDelete() {
+    if (!preview || preview.matched === 0) return;
+    setPhase("deleting");
+    setProgress(15);
+    const tick = setInterval(() => setProgress((p) => Math.min(90, p + 8)), 250);
+    try {
+      const r = await cleanupFn({ data: toBody(false) });
+      clearInterval(tick);
+      setProgress(100);
+      setResult(r);
+      setPhase("done");
+      toast.success(`Cleanup complete · ${r.deleted} deleted`);
+      onDone();
+    } catch (e: any) {
+      clearInterval(tick);
+      setProgress(0);
+      setPhase("confirming");
+      toast.error(e?.message ?? "Cleanup failed");
+    }
+  }
+
+  function toggleStatus(s: CleanupFilters["statuses"][number]) {
+    setF((cur) => ({
+      ...cur,
+      statuses: cur.statuses.includes(s) ? cur.statuses.filter((x) => x !== s) : [...cur.statuses, s],
+    }));
+    setPreview(null);
+    if (phase === "confirming") setPhase("idle");
+  }
+  function toggleCountry(code: string) {
+    setF((cur) => ({
+      ...cur,
+      countries: cur.countries.includes(code) ? cur.countries.filter((x) => x !== code) : [...cur.countries, code],
+    }));
+    setPreview(null);
+    if (phase === "confirming") setPhase("idle");
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); } onOpenChange(v); }}>
+      <DialogContent className="bg-black/95 border-white/10 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl flex items-center gap-2">
+            <SlidersHorizontal className="w-5 h-5 text-[#ff2a3a]" /> Advanced bulk cleanup
+          </DialogTitle>
+          <div className="text-[11px] text-white/50 font-mono">
+            Combine filters, preview matched rows, then confirm. Nothing is deleted until you press "Delete matched".
+          </div>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Status filter */}
+          <FilterCard icon={ShieldCheck} title="Status" active={f.statuses.length > 0}
+            subtitle={f.statuses.length === 0 ? "Any status" : f.statuses.length + " selected"}>
+            <div className="flex flex-wrap gap-1.5">
+              {(["active","free","on_hold","invalid","unknown"] as const).map((s) => {
+                const meta = STATUS_META[s];
+                const on = f.statuses.includes(s);
+                return (
+                  <button key={s} onClick={() => toggleStatus(s)}
+                    className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border transition ${
+                      on ? meta.cls + " ring-1 ring-current/40" : "border-white/10 bg-white/[0.02] text-white/50 hover:bg-white/5"
+                    }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+          </FilterCard>
+
+          {/* Never-used */}
+          <FilterCard icon={Clock3} title="Never used" active={typeof f.neverUsedDays === "number"}
+            subtitle={typeof f.neverUsedDays === "number" ? `Older than ${f.neverUsedDays}d + 0 uses` : "off"}>
+            <div className="flex items-center gap-2">
+              <input type="checkbox"
+                checked={typeof f.neverUsedDays === "number"}
+                onChange={(e) => { setF((c) => ({ ...c, neverUsedDays: e.target.checked ? 7 : null })); setPreview(null); }}
+                className="accent-[#ff2a3a]" />
+              <span className="text-xs text-white/70">Uploaded more than</span>
+              <Input type="number" min={0} max={365} value={f.neverUsedDays ?? 7}
+                onChange={(e) => { setF((c) => ({ ...c, neverUsedDays: Math.max(0, Math.min(365, Number(e.target.value) || 0)) })); setPreview(null); }}
+                disabled={typeof f.neverUsedDays !== "number"}
+                className="w-20 h-8 bg-white/5 border-white/10 font-mono text-xs" />
+              <span className="text-xs text-white/70">days ago · 0 uses</span>
+            </div>
+          </FilterCard>
+
+          {/* Stale */}
+          <FilterCard icon={CalendarClock} title="Stale check" active={typeof f.staleDays === "number"}
+            subtitle={typeof f.staleDays === "number" ? `Last check > ${f.staleDays}d ago` : "off"}>
+            <div className="flex items-center gap-2">
+              <input type="checkbox"
+                checked={typeof f.staleDays === "number"}
+                onChange={(e) => { setF((c) => ({ ...c, staleDays: e.target.checked ? 3 : null })); setPreview(null); }}
+                className="accent-[#ff2a3a]" />
+              <span className="text-xs text-white/70">Last checked more than</span>
+              <Input type="number" min={0} max={365} value={f.staleDays ?? 3}
+                onChange={(e) => { setF((c) => ({ ...c, staleDays: Math.max(0, Math.min(365, Number(e.target.value) || 0)) })); setPreview(null); }}
+                disabled={typeof f.staleDays !== "number"}
+                className="w-20 h-8 bg-white/5 border-white/10 font-mono text-xs" />
+              <span className="text-xs text-white/70">days ago</span>
+            </div>
+          </FilterCard>
+
+          {/* Low success rate */}
+          <FilterCard icon={Percent} title="Low success rate" active={f.lowSuccessEnabled}
+            subtitle={f.lowSuccessEnabled ? `< ${f.lowSuccessThreshold}% (min ${f.lowSuccessMinUses} uses)` : "off"}>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input type="checkbox"
+                  checked={f.lowSuccessEnabled}
+                  onChange={(e) => { setF((c) => ({ ...c, lowSuccessEnabled: e.target.checked })); setPreview(null); }}
+                  className="accent-[#ff2a3a]" />
+                <span className="text-xs text-white/70">Delete cookies with success rate below</span>
+                <Input type="number" min={0} max={100} value={f.lowSuccessThreshold}
+                  onChange={(e) => { setF((c) => ({ ...c, lowSuccessThreshold: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })); setPreview(null); }}
+                  disabled={!f.lowSuccessEnabled}
+                  className="w-16 h-8 bg-white/5 border-white/10 font-mono text-xs" />
+                <span className="text-xs text-white/70">%</span>
+              </div>
+              <div className="flex items-center gap-2 pl-6">
+                <span className="text-[11px] text-white/50">Only cookies with at least</span>
+                <Input type="number" min={1} max={10000} value={f.lowSuccessMinUses}
+                  onChange={(e) => { setF((c) => ({ ...c, lowSuccessMinUses: Math.max(1, Math.min(10000, Number(e.target.value) || 1)) })); setPreview(null); }}
+                  disabled={!f.lowSuccessEnabled}
+                  className="w-16 h-8 bg-white/5 border-white/10 font-mono text-xs" />
+                <span className="text-[11px] text-white/50">total uses</span>
+              </div>
+            </div>
+          </FilterCard>
+        </div>
+
+        {/* Country selector */}
+        <FilterCard icon={Globe2} title="Countries" active={f.countries.length > 0}
+          subtitle={f.countries.length === 0 ? "Any country" : `${f.countries.length} selected`}>
+          {countries.length === 0 ? (
+            <div className="text-[11px] text-white/40 font-mono">No countries with data yet.</div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+              {countries.map((c) => {
+                const on = f.countries.includes(c.code);
+                return (
+                  <button key={c.code} onClick={() => toggleCountry(c.code)}
+                    className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border transition ${
+                      on ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]" : "border-white/10 bg-white/[0.02] text-white/60 hover:bg-white/5"
+                    }`}>
+                    <span className="text-sm leading-none">{countryFlag(c.code)}</span>
+                    <span>{countryName(c.code)}</span>
+                    <span className="text-white/40 text-[10px]">×{c.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </FilterCard>
+
+        {/* Match mode + summary */}
+        <div className="flex items-center justify-between flex-wrap gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-white/50">Match mode:</span>
+            <div className="flex items-center gap-1 p-0.5 rounded-md border border-white/10 bg-white/[0.03]">
+              <button onClick={() => { setF((c) => ({ ...c, requireAll: true })); setPreview(null); }}
+                className={`px-2.5 py-1 rounded text-xs transition ${f.requireAll ? "bg-[#ff2a3a]/20 text-[#ff8a90]" : "text-white/50"}`}>
+                All filters (AND)
+              </button>
+              <button onClick={() => { setF((c) => ({ ...c, requireAll: false })); setPreview(null); }}
+                className={`px-2.5 py-1 rounded text-xs transition ${!f.requireAll ? "bg-[#ff2a3a]/20 text-[#ff8a90]" : "text-white/50"}`}>
+                Any filter (OR)
+              </button>
+            </div>
+          </div>
+          <div className="text-[11px] font-mono text-white/50">
+            {activeCount === 0 ? "no filters" : `${activeCount} filter${activeCount === 1 ? "" : "s"} active`}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {(phase === "previewing" || phase === "deleting" || progress > 0) && (
+          <div>
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div className={`h-full transition-all ${
+                phase === "deleting" ? "bg-gradient-to-r from-[#ff2a3a] to-[#b0060f]" : "bg-gradient-to-r from-sky-500 to-emerald-500"
+              }`} style={{ width: `${progress}%` }} />
+            </div>
+            <div className="text-[11px] text-white/50 font-mono mt-1">
+              {phase === "previewing" && "Scanning pool…"}
+              {phase === "deleting" && `Deleting ${preview?.matched ?? 0} cookies…`}
+            </div>
+          </div>
+        )}
+
+        {/* Preview result */}
+        {preview && phase !== "done" && (
+          <div className="rounded-lg border border-sky-500/20 bg-sky-500/[0.04] p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <ScanSearch className="w-4 h-4 text-sky-300" />
+              <div className="text-sm font-medium">
+                Preview · <span className="text-sky-300 tabular-nums">{preview.matched}</span> cookie{preview.matched === 1 ? "" : "s"} match
+              </div>
+            </div>
+            {preview.matched > 0 && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-3">
+                  {Object.entries(preview.summary.byStatus).map(([s, n]: any) => {
+                    const meta = STATUS_META[s] ?? STATUS_META.unknown;
+                    return (
+                      <div key={s} className={`text-[11px] px-2 py-1 rounded border ${meta.cls}`}>
+                        <span className="font-mono tabular-nums">{n}</span> {meta.label.toLowerCase()}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] font-mono text-white/40 mb-1.5">Sample (first {preview.sample.length}):</div>
+                <div className="max-h-40 overflow-y-auto rounded border border-white/5 divide-y divide-white/5">
+                  {preview.sample.map((r: any) => {
+                    const uses = r.total_uses ?? 0;
+                    const rate = uses > 0 ? Math.round(((r.success_count ?? 0) / uses) * 100) : null;
+                    return (
+                      <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-2 py-1.5 text-[11px] font-mono items-center">
+                        <span className="truncate text-white/80">{r.email ?? "—"}</span>
+                        <span className="text-white/50">
+                          {r.country ? <>{countryFlag(r.country)} {String(r.country).toUpperCase()}</> : "—"}
+                        </span>
+                        <span className="text-white/40">{uses}u · {rate == null ? "—" : `${rate}%`}</span>
+                        <span className={STATUS_META[r.status]?.cls + " px-1.5 rounded text-[10px]"}>{r.status ?? "?"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            {preview.matched === 0 && (
+              <div className="text-xs text-white/50">No cookies match these filters. Adjust and preview again.</div>
+            )}
+          </div>
+        )}
+
+        {/* Done state */}
+        {phase === "done" && result && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.08] p-4 flex items-center gap-3">
+            <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+            <div className="flex-1">
+              <div className="font-display text-lg">Cleanup complete</div>
+              <div className="text-xs text-white/60">
+                Deleted <span className="text-emerald-300 font-mono">{result.deleted}</span> cookie{result.deleted === 1 ? "" : "s"} · matched <span className="font-mono">{result.matched}</span>
+              </div>
+            </div>
+            <Button variant="outline" onClick={reset} className="border-white/10 bg-white/5">
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> New scan
+            </Button>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-between gap-2 pt-2 border-t border-white/5">
+          <Button variant="ghost" onClick={reset} className="text-white/60">
+            <X className="w-3.5 h-3.5 mr-1.5" /> Reset
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={runPreview}
+              disabled={activeCount === 0 || phase === "previewing" || phase === "deleting"}
+              className="border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20">
+              {phase === "previewing" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Eye className="w-3.5 h-3.5 mr-1.5" />}
+              Preview match
+            </Button>
+            <Button onClick={runDelete}
+              disabled={!preview || preview.matched === 0 || phase === "deleting" || phase === "done"}
+              className="btn-red">
+              {phase === "deleting" ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+              Delete matched {preview?.matched ? `(${preview.matched})` : ""}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FilterCard({
+  icon: Icon, title, subtitle, active, children,
+}: { icon: any; title: string; subtitle: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`rounded-lg border p-3 transition ${
+      active ? "border-[#ff2a3a]/30 bg-[#ff2a3a]/[0.04]" : "border-white/10 bg-white/[0.02]"
+    }`}>
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-6 h-6 rounded grid place-items-center ${
+          active ? "bg-[#ff2a3a]/15 text-[#ff8a90]" : "bg-white/5 text-white/50"
+        }`}>
+          <Icon className="w-3 h-3" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium">{title}</div>
+          <div className="text-[10px] text-white/40 font-mono truncate">{subtitle}</div>
+        </div>
+        {active && <Target className="w-3 h-3 text-[#ff2a3a]" />}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// -------------------- Upload dry-run preview panel --------------------
+
+function UploadPreviewPanel({
+  blobs, onCancel, onConfirm,
+}: {
+  blobs: { name: string; text: string }[];
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const previewFn = useServerFn(previewCookieUpload);
+  const q = useQuery({
+    queryKey: ["cookie-upload-preview", blobs.length, blobs.map((b) => b.text.length).join(",")],
+    queryFn: () => previewFn({ data: { blobs: blobs.map((b) => b.text) } }),
+    staleTime: 60_000,
+  });
+
+  const rows = q.data?.rows ?? [];
+  const s = q.data?.summary;
+
+  const badge = (a: string) => {
+    if (a === "insert") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+    if (a === "duplicate") return "bg-amber-500/15 text-amber-300 border-amber-500/30";
+    if (a === "duplicate_in_batch") return "bg-sky-500/15 text-sky-300 border-sky-500/30";
+    return "bg-red-500/15 text-red-300 border-red-500/30";
+  };
+
+  return (
+    <div className="rounded-lg border border-sky-500/30 bg-gradient-to-br from-sky-500/[0.06] via-white/[0.02] to-transparent p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <ScanSearch className="w-4 h-4 text-sky-300" />
+        <div className="font-display text-sm">Dry-run preview</div>
+        {q.isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-300" />}
+      </div>
+      {s && (
+        <div className="grid grid-cols-4 gap-1.5">
+          <MiniStat label="Will add" value={s.insert} tone="emerald" />
+          <MiniStat label="In pool" value={s.duplicate} tone="amber" />
+          <MiniStat label="Batch dup" value={s.duplicate_in_batch} tone="sky" />
+          <MiniStat label="Invalid" value={s.invalid} tone="red" />
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="max-h-56 overflow-y-auto rounded border border-white/5 divide-y divide-white/5">
+          {rows.map((r: any, i: number) => (
+            <div key={i} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 px-2 py-1.5 text-[11px] font-mono">
+              <span className="text-white/30 tabular-nums">#{r.index + 1}</span>
+              <span className="truncate text-white/80">{blobs[r.index]?.name ?? `blob ${r.index + 1}`}</span>
+              <span className="text-white/40">
+                {r.pairs > 0 ? `${r.pairs} pairs` : ""} {r.reason ? `· ${r.reason}` : ""}
+              </span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] border ${badge(r.action)}`}>
+                {r.action.replace(/_/g, " ")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end gap-2 pt-1">
+        <Button variant="ghost" size="sm" onClick={onCancel} className="text-white/60">
+          Cancel
+        </Button>
+        <Button size="sm" onClick={onConfirm}
+          disabled={q.isLoading || !s || s.insert === 0}
+          className="btn-red">
+          <Upload className="w-3.5 h-3.5 mr-1.5" /> Confirm & upload {s?.insert ?? 0}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "sky" | "red" }) {
+  const cls =
+    tone === "emerald" ? "border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-200"
+    : tone === "amber" ? "border-amber-500/30 bg-amber-500/[0.06] text-amber-200"
+    : tone === "sky" ? "border-sky-500/30 bg-sky-500/[0.06] text-sky-200"
+    : "border-red-500/30 bg-red-500/[0.06] text-red-200";
+  return (
+    <div className={`rounded border px-2 py-1.5 ${cls}`}>
+      <div className="text-[9px] uppercase tracking-widest opacity-70">{label}</div>
+      <div className="font-mono text-lg tabular-nums leading-tight">{value}</div>
+    </div>
+  );
+}
