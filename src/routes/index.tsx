@@ -363,7 +363,9 @@ function HomePage() {
           {authUserId ? (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-[11px] uppercase tracking-widest text-emerald-100/90">
               <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-mono normal-case tracking-normal">{authEmail}</span>
+              <Link to="/account" className="font-mono normal-case tracking-normal hover:text-white transition" title="My activations">
+                {authEmail}
+              </Link>
               <button
                 type="button"
                 onClick={async () => { await supabase.auth.signOut(); }}
