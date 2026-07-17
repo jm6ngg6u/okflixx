@@ -1079,8 +1079,8 @@ function ContactStrip() {
   const q = useQuery({
     queryKey: ["public-contacts"],
     queryFn: () => fetchContacts(),
-    refetchInterval: 15000,
-    staleTime: 10000,
+    refetchInterval: 5000,
+    staleTime: 2000,
   });
   const channels = q.data?.channels ?? [];
   if (!q.data?.enabled || channels.length === 0) return null;
