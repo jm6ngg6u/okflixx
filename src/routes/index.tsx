@@ -1074,6 +1074,65 @@ function HomePage() {
   );
 }
 
+function ContactStrip() {
+  const fetchContacts = useServerFn(getPublicContacts);
+  const q = useQuery({
+    queryKey: ["public-contacts"],
+    queryFn: () => fetchContacts(),
+    refetchInterval: 15000,
+    staleTime: 10000,
+  });
+  const channels = q.data?.channels ?? [];
+  if (!q.data?.enabled || channels.length === 0) return null;
+
+  const iconFor = (kind: string) => {
+    if (kind === "telegram") return Send;
+    if (kind === "instagram") return Instagram;
+    return Phone;
+  };
+  const colorFor = (kind: string) => {
+    if (kind === "telegram") return "#229ED9";
+    if (kind === "instagram") return "#E1306C";
+    return "#25D366";
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-white/40">// Contact</div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {channels.map((c) => {
+          const Icon = iconFor(c.kind);
+          const color = colorFor(c.kind);
+          return (
+            <a
+              key={c.kind}
+              href={c.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2.5 rounded-full border bg-black/40 backdrop-blur px-3.5 py-2 transition hover:bg-black/60"
+              style={{ borderColor: `${color}55` }}
+              aria-label={`${c.name} — ${c.handle}`}
+            >
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center icon-glow"
+                style={{ background: `${color}22`, border: `1px solid ${color}66`, color, ["--glow-color" as any]: color }}
+              >
+                <Icon className="w-4 h-4" />
+              </span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-white/50">{c.name}</span>
+                <span className="text-xs text-white/90 font-medium">{c.handle}</span>
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+
 function flagEmoji(cc: string | null): string {
   if (!cc || cc.length !== 2) return "🌐";
   const A = 0x1f1e6;
