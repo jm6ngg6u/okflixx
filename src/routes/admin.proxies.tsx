@@ -366,19 +366,19 @@ function ProxiesPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/5">
+            <thead className="text-[11px] tracking-wide text-white/50 border-b border-white/5 normal-case">
               <tr>
                 <th className="p-3 w-8">
                   <Checkbox checked={allChecked} data-state={someChecked ? "indeterminate" : allChecked ? "checked" : "unchecked"} onCheckedChange={toggleAll} />
                 </th>
-                <th className="text-left p-3">Endpoint</th>
-                <th className="text-left p-3">Scheme</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Health</th>
-                <th className="text-left p-3">Latency</th>
-                <th className="text-left p-3">Uses</th>
-                <th className="text-left p-3">Last check</th>
-                <th className="text-right p-3">Actions</th>
+                <th className="text-left p-3">endpoint</th>
+                <th className="text-left p-3">scheme</th>
+                <th className="text-left p-3">status</th>
+                <th className="text-left p-3">health</th>
+                <th className="text-left p-3">latency</th>
+                <th className="text-left p-3">uses</th>
+                <th className="text-left p-3">last check</th>
+                <th className="text-right p-3">actions</th>
               </tr>
             </thead>
             <tbody>
@@ -386,6 +386,7 @@ function ProxiesPage() {
               {!isLoading && rows.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-white/40">No proxies match — adjust filters or import a list above.</td></tr>}
               {rows.map((r: any) => {
                 const quar = !!r.quarantined_at;
+                const neverChecked = !r.last_checked_at;
                 const health = typeof r.health_score === "number" ? r.health_score : 0.5;
                 const healthPct = Math.round(health * 100);
                 const healthColor = health >= 0.75 ? "bg-emerald-500" : health >= 0.5 ? "bg-amber-500" : "bg-red-500";
@@ -395,17 +396,20 @@ function ProxiesPage() {
                       <Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleOne(r.id)} />
                     </td>
                     <td className="p-3 font-mono text-xs">{r.ip}:{r.port}{r.username ? <span className="text-white/30 ml-1">· auth</span> : null}</td>
-                    <td className="p-3 text-white/60 text-xs uppercase">{r.scheme}</td>
+                    <td className="p-3 text-white/60 text-xs lowercase">{r.scheme}</td>
                     <td className="p-3">
                       {quar ? (
-                        <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30">quarantined</Badge>
+                        <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30 normal-case">quarantined</Badge>
+                      ) : neverChecked ? (
+                        <Badge variant="outline" className="bg-sky-500/15 text-sky-300 border-sky-500/30 normal-case">unchecked</Badge>
                       ) : (
-                        <Badge variant="outline" className={r.is_valid ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-red-500/15 text-red-300 border-red-500/30"}>
+                        <Badge variant="outline" className={`normal-case ${r.is_valid ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-red-500/15 text-red-300 border-red-500/30"}`}>
                           {r.is_valid ? "valid" : "invalid"}
                         </Badge>
                       )}
                       {r.last_error && <div className="text-[10px] text-white/40 mt-1 truncate max-w-[180px]">{r.last_error}</div>}
                     </td>
+
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <div className="w-16 h-1.5 rounded-full bg-white/5 overflow-hidden">
