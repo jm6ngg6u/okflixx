@@ -270,7 +270,7 @@ export const getActivationPipelines = createServerFn({ method: "POST" })
     const since = new Date(Date.now() - data.windowMinutes * 60_000).toISOString();
     const { data: rows, error } = await supabase
       .from("activation_attempts")
-      .select("id, code, result, country, ip_hash, cookie_id, proxy_id, proxy_mode, attempt_number, duration_ms, error_message, created_at")
+      .select("id, code, result, country, ip_hash, cookie_id, proxy_id, proxy_mode, attempt_number, duration_ms, error_message, selection_reason, created_at")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(600);
