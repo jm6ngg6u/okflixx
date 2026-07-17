@@ -344,7 +344,7 @@ function HomePage() {
       return;
     }
 
-    setLoginError(null); setKeyError(null); setCaptchaError(null);
+    setLoginError(null); setKeyError(null); setCaptchaError(null); setServiceError(null); setRetryCountdown(0);
     setSubmitting(true);
 
     // Walk through enabled gates so the user sees a real per-step progress.
