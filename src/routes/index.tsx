@@ -100,6 +100,100 @@ function HomePage() {
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
   const [stage, setStage] = useState<"idle" | "checking" | "activating">("idle");
   const activate = useServerFn(submitActivation);
+  const fetchGate = useServerFn(getGateConfig);
+  const redeemFn = useServerFn(redeemAccessKey);
+
+  // Gate config polled every 10s so admin toggles reach the landing page.
+  const gate = useQuery({
+    queryKey: ["public-gate"],
+    queryFn: () => fetchGate(),
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  });
+
+  const [accessKey, setAccessKey] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [fingerprint, setFingerprint] = useState<string>("");
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(
+    typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null,
+  );
+
+  // Compute fingerprint once on mount.
+  useEffect(() => { computeFingerprint().then(setFingerprint); }, []);
+
+  // Track auth state (for login-gate).
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setAuthUserId(data.user?.id ?? null);
+      setAuthEmail(data.user?.email ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setAuthUserId(s?.user?.id ?? null);
+      setAuthEmail(s?.user?.email ?? null);
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
+
+  // Load Turnstile / hCaptcha script when captcha gate is on.
+  const captchaWidgetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!gate.data?.captchaRequired || !gate.data.captchaSiteKey) return;
+    const provider = gate.data.captchaProvider;
+    const src = provider === "hcaptcha"
+      ? "https://js.hcaptcha.com/1/api.js"
+      : "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    if (!document.querySelector(`script[src="${src}"]`)) {
+      const s = document.createElement("script"); s.src = src; s.async = true; s.defer = true; document.head.appendChild(s);
+    }
+    // Register a callback that reads the token.
+    (window as any).__emberlordCaptcha = (token: string) => setCaptchaToken(token);
+  }, [gate.data?.captchaRequired, gate.data?.captchaSiteKey, gate.data?.captchaProvider]);
+
+  const gateBlocks = useMemo(() => {
+    const g = gate.data;
+    if (!g) return { needsLogin: false, needsCaptcha: false, needsKey: false, hasSession: false };
+    return {
+      needsLogin: g.loginRequired && !authUserId,
+      needsCaptcha: g.captchaRequired && !captchaToken,
+      needsKey: g.accessKeyRequired && !accessKey && !sessionToken,
+      hasSession: !!sessionToken,
+    };
+  }, [gate.data, authUserId, captchaToken, accessKey, sessionToken]);
+
+  // --- Redeem key ---
+  const [redeeming, setRedeeming] = useState(false);
+  async function redeemKey() {
+    if (!accessKey.trim()) { toast.error("Enter your access key"); return; }
+    if (!fingerprint) { toast.error("Preparing security check — try again in a moment."); return; }
+    setRedeeming(true);
+    try {
+      const r = await redeemFn({ data: { code: accessKey.trim(), fingerprint } });
+      if (!r.ok) {
+        toast.error("Key rejected", {
+          description: r.reason === "already_redeemed" ? "This key was used on another device."
+            : r.reason === "expired" ? "This key has expired."
+            : r.reason === "disabled" ? "This key has been disabled."
+            : "Check the key and try again.",
+        });
+        return;
+      }
+      if (r.keyType === "session_24h" && r.sessionToken) {
+        localStorage.setItem(SESSION_KEY, r.sessionToken);
+        setSessionToken(r.sessionToken);
+        toast.success("Unlocked for 24 hours", { description: "You can activate freely on this device until it expires." });
+      } else {
+        toast.success("Key accepted", {
+          description: r.keyType === "unlimited" ? "Unlimited activations enabled." : "One-time key ready.",
+        });
+      }
+    } catch (e: any) {
+      toast.error("Redeem failed", { description: e?.message ?? "" });
+    } finally {
+      setRedeeming(false);
+    }
+  }
 
   const handleActivate = async () => {
     // Client throttle — 3s cooldown between submits.
@@ -117,9 +211,13 @@ function HomePage() {
       return;
     }
 
+    // Pre-flight gate checks (UI hints; server is source of truth).
+    if (gateBlocks.needsLogin) { toast.error("Please sign in first."); return; }
+    if (gateBlocks.needsCaptcha) { toast.error("Complete the captcha first."); return; }
+    if (gateBlocks.needsKey) { toast.error("Enter your access key first."); return; }
+
     setSubmitting(true);
     setStage("checking");
-    // Visual cue that the pipeline moved from check → activate.
     const stageTimer = window.setTimeout(() => setStage("activating"), 1200);
     try {
       const result = await activate({
@@ -127,6 +225,11 @@ function HomePage() {
           code,
           website: honeypotRef.current?.value ?? "",
           elapsedMs: now - mountedAtRef.current,
+          accessKey: accessKey || null,
+          accessSessionToken: sessionToken,
+          captchaToken: captchaToken || null,
+          fingerprint: fingerprint || null,
+          authUserId,
         },
       });
       if (result.ok) {
@@ -145,12 +248,23 @@ function HomePage() {
         toast.error(result.message ?? "That code doesn't look right. Check your TV screen.");
       } else if (result.error === "maintenance") {
         toast.error(result.message ?? "The service is temporarily unavailable.");
+      } else if (result.error === "login_required") {
+        toast.error(result.message ?? "Please sign in to activate.");
+      } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
+        toast.error(result.message ?? "Captcha check failed. Please retry.");
+        setCaptchaToken(""); // force re-solve
+      } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
+        // Session might have expired — clear it so the input reappears.
+        if (result.error === "access_key_invalid" && sessionToken) {
+          localStorage.removeItem(SESSION_KEY);
+          setSessionToken(null);
+        }
+        toast.error(result.message ?? "Access key required.");
       } else if (result.error === "no_cookie" || result.error === "exhausted") {
         toast.error(result.message ?? "We couldn't activate right now. Please try again shortly.");
       } else {
         toast.error("Server hiccup. Try again in a moment.");
       }
-
     } catch (err) {
       console.error(err);
       toast.error("Network error. Please try again.");
@@ -160,6 +274,9 @@ function HomePage() {
       setSubmitting(false);
     }
   };
+
+  const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
+
 
 
   return (
