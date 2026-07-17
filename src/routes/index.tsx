@@ -293,8 +293,16 @@ function HomePage() {
       } else if (result.error === "login_required") {
         toast.error(result.message ?? "Please sign in to activate.");
       } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
-        toast.error(result.message ?? "Captcha check failed. Please retry.");
+        const msg = result.message ?? "Captcha check failed. Please retry.";
+        toast.error(msg);
+        setCaptchaError(msg);
         setCaptchaToken(""); // force re-solve
+        // Re-render the widget so the user can solve again.
+        try {
+          const api: any = captchaWidgetProviderRef.current === "hcaptcha"
+            ? (window as any).hcaptcha : (window as any).turnstile;
+          api?.reset?.();
+        } catch { /* noop */ }
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
         // Session might have expired — clear it so the input reappears.
         if (result.error === "access_key_invalid" && sessionToken) {
