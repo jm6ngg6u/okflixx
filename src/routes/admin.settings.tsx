@@ -339,6 +339,72 @@ function SettingsPage() {
           <TextField k="pool_alert_webhook" label="Webhook URL" placeholder="https://…" local={local} set={set} onSave={save} />
         </div>
       </Section>
+
+      {/* Contact channels */}
+      <Section
+        icon={MessageCircle}
+        title="Contact channels"
+        subtitle="Public contact links shown in the site footer. Leave a handle blank to hide that channel. Master toggle hides the whole strip."
+        pill={<Badge variant="outline" className={local.contact_enabled === "1"
+          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+          : "bg-white/10 text-white/60 border-white/15"}>{local.contact_enabled === "1" ? "VISIBLE" : "HIDDEN"}</Badge>}
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div>
+              <div className="text-sm font-medium">Show contact strip on public site</div>
+              <div className="text-[11px] text-white/40">When off, no contact icons are rendered anywhere.</div>
+            </div>
+            <Switch
+              checked={local.contact_enabled === "1"}
+              onCheckedChange={(v) => { set("contact_enabled", v ? "1" : "0"); setTimeout(() => save("contact_enabled"), 0); }}
+            />
+          </div>
+
+          <ContactRow icon={Send} label="Telegram" accent="#229ED9" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="@yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Instagram} label="Instagram" accent="#E1306C" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="@yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Phone} label="WhatsApp" accent="#25D366" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function ContactRow({ icon: Icon, label, accent, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
+  icon: any; label: string; accent: string; nameKey: string; handleKey: string; handlePlaceholder: string;
+  local: Record<string, string>; set: (k: string, v: string) => void; onSave: (k: string) => void;
+}) {
+  const filled = !!(local[handleKey] ?? "").trim();
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span
+          className="w-8 h-8 rounded-md flex items-center justify-center icon-glow"
+          style={{ background: `${accent}22`, border: `1px solid ${accent}55`, color: accent, ["--glow-color" as any]: accent }}
+        >
+          <Icon className="w-4 h-4" />
+        </span>
+        <div className="text-sm font-medium">{label}</div>
+        <Badge variant="outline" className={filled
+          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 ml-auto"
+          : "bg-white/10 text-white/50 border-white/15 ml-auto"}>{filled ? "SHOWING" : "HIDDEN"}</Badge>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Display name</label>
+          <div className="flex gap-2">
+            <Input placeholder={label} value={local[nameKey] ?? ""} onChange={(e) => set(nameKey, e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
+            <Button size="sm" onClick={() => onSave(nameKey)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label === "WhatsApp" ? "Phone number" : "Username"}</label>
+          <div className="flex gap-2">
+            <Input placeholder={handlePlaceholder} value={local[handleKey] ?? ""} onChange={(e) => set(handleKey, e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
+            <Button size="sm" onClick={() => onSave(handleKey)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
