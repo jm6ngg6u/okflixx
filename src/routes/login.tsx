@@ -484,7 +484,18 @@ function LoginPage() {
                     placeholder="000000"
                   />
                 </div>
-                <button type="submit" disabled={busy || otp.length < 6} className="w-full py-3 rounded-md bg-[#ff2a3a] hover:bg-[#ff3a4a] text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition">
+                </div>
+                {otpLockUntil && Date.now() < otpLockUntil && (
+                  <div className="rounded-md border border-red-500/25 bg-red-500/5 p-2.5 text-[11px] text-red-200">
+                    Too many wrong codes. Try again in {Math.ceil((otpLockUntil - Date.now()) / 1000)}s.
+                  </div>
+                )}
+                {otpFails > 0 && (!otpLockUntil || Date.now() >= otpLockUntil) && (
+                  <div className="text-[10px] uppercase tracking-widest text-amber-300/80">
+                    Attempts used: {otpFails}/{MAX_OTP_VERIFY_ATTEMPTS}
+                  </div>
+                )}
+                <button type="submit" disabled={busy || otp.length < 6 || !!(otpLockUntil && Date.now() < otpLockUntil)} className="w-full py-3 rounded-md bg-[#ff2a3a] hover:bg-[#ff3a4a] text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition">
                   {busy ? "Verifying…" : "Verify & sign in"}
                 </button>
                 <div className="flex items-center justify-between text-[11px] uppercase tracking-widest">
