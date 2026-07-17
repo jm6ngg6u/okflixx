@@ -359,7 +359,28 @@ function HomePage() {
           <a href="#devices" className="hover:text-white transition">Devices</a>
           <a href="#reviews" className="hover:text-white transition">Reviews</a>
         </div>
-        <a href="#activate" className="btn-red text-sm">Activate →</a>
+        <div className="flex items-center gap-3">
+          {authUserId ? (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-[11px] uppercase tracking-widest text-emerald-100/90">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="font-mono normal-case tracking-normal">{authEmail}</span>
+              <button
+                type="button"
+                onClick={async () => { await supabase.auth.signOut(); }}
+                className="ml-1 text-white/40 hover:text-white transition"
+                title="Sign out"
+              >
+                ×
+              </button>
+            </div>
+          ) : gate.data?.loginRequired ? (
+            <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-[11px] uppercase tracking-widest text-white/80 transition">
+              <Lock className="w-3.5 h-3.5" />
+              Sign in
+            </Link>
+          ) : null}
+          <a href="#activate" className="btn-red text-sm">Activate →</a>
+        </div>
       </nav>
 
       {/* HERO — CENTERED */}
@@ -421,7 +442,7 @@ function HomePage() {
                         )}
                       </div>
                       {!authUserId && (
-                        <Link to="/auth" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
+                        <Link to="/login" className="text-xs text-[#ff8a90] hover:text-white underline underline-offset-2">Sign in →</Link>
                       )}
                     </div>
                   )}

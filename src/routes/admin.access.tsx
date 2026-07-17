@@ -216,11 +216,45 @@ function AccessAdminPage() {
         <GateCard
           icon={<UserCheck className="w-5 h-5" />}
           title="Login gate"
-          desc="Require the user to be signed in before activation. Highest friction, highest trust."
+          desc="Email + password + captcha + 6-digit email OTP. Users must verify their email before activation. Highest trust, per-user daily limit enforced server-side."
           enabled={!!c?.loginRequired}
           onToggle={(v) => toggle("loginRequired", v)}
         />
       </div>
+
+      {/* LOGIN GATE CONFIG */}
+      {c?.loginRequired && (
+        <div className="glass p-6 border border-emerald-500/20">
+          <div className="flex items-center gap-2 text-emerald-300 font-mono text-[10px] uppercase tracking-widest mb-3">
+            <UserCheck className="w-4 h-4" /> Login gate configuration
+          </div>
+          <div className="grid md:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label className="label-caps mb-2 block">Per-user daily activation limit</Label>
+              <Input
+                type="number"
+                min={1}
+                max={1000}
+                defaultValue={c.userDailyActivationLimit ?? 10}
+                onBlur={(e) => {
+                  const n = Math.max(1, Math.min(1000, parseInt(e.target.value, 10) || 10));
+                  saveSettings({ data: { userDailyActivationLimit: n } }).then(() => {
+                    toast.success(`Per-user limit set to ${n}/24h`);
+                    qc.invalidateQueries({ queryKey: ["gate-config"] });
+                  });
+                }}
+              />
+              <p className="mt-1.5 text-[11px] text-white/50">
+                Signed-in users can't exceed this many activations per 24 hours (regardless of IP).
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/60 leading-relaxed">
+              <div className="font-mono uppercase tracking-widest text-white/80 mb-1">How it works</div>
+              Sign up sends a 6-digit code to the user's email. They enter it to activate their account. Password reset uses <code className="font-mono text-white/80">/reset-password</code>. All activations are tied to their user id — you can trace, rate-limit, or ban per user.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CAPTCHA CONFIG */}
       {c?.captchaRequired && (

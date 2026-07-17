@@ -168,12 +168,52 @@ export const submitActivation = createServerFn({ method: "POST" })
     const captchaRequired = (await getSetting(supabaseAdmin, "captcha_required", "0")) === "1";
     const accessKeyRequired = (await getSetting(supabaseAdmin, "access_key_required", "0")) === "1";
 
-    if (loginRequired && !data.authUserId) {
+    // Server-side identity — verify the Authorization bearer instead of trusting
+    // client-provided authUserId. Empty when not signed in.
+    let verifiedUserId: string | null = null;
+    try {
+      const authHeader = request?.headers.get("authorization") ?? "";
+      const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+      if (token) {
+        const { data: u } = await supabaseAdmin.auth.getUser(token);
+        if (u?.user?.id && (u.user as any).email_confirmed_at) verifiedUserId = u.user.id;
+      }
+    } catch { /* ignore — treated as anonymous */ }
+
+    if (loginRequired && !verifiedUserId) {
       return {
         ok: false,
         error: "login_required",
-        message: "Please sign in to activate a TV code.",
+        message: "Please sign in and verify your email to activate a TV code.",
       };
+    }
+
+    // Per-user daily activation limit (only when signed in).
+    if (verifiedUserId) {
+      const perUserDaily = Math.max(
+        1,
+        parseInt(await getSetting(supabaseAdmin, "user_daily_activation_limit", "10"), 10),
+      );
+      const { data: userRecent } = await supabaseAdmin.rpc("count_user_recent_attempts", {
+        _user_id: verifiedUserId,
+        _minutes: 24 * 60,
+      });
+      if ((userRecent ?? 0) >= perUserDaily) {
+        await supabaseAdmin.from("activation_attempts").insert({
+          code,
+          result: "rate_limited",
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          country,
+          proxy_mode: false,
+          user_id: verifiedUserId,
+        });
+        return {
+          ok: false,
+          error: "rate_limited",
+          message: `Daily limit reached (${perUserDaily} activations / 24h). Try again tomorrow.`,
+        };
+      }
     }
     if (captchaRequired) {
       if (!data.captchaToken) {
@@ -264,6 +304,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         user_agent: userAgent,
         country,
         proxy_mode: false,
+        user_id: verifiedUserId,
       });
       return { ok: false, error: "rate_limited" };
     }
@@ -303,6 +344,7 @@ export const submitActivation = createServerFn({ method: "POST" })
           country,
           proxy_mode: proxyMode,
           attempt_number: attemptNumber,
+          user_id: verifiedUserId,
           selection_reason: {
             policy,
             filters: eligibility,
@@ -394,6 +436,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         proxy_id: proxyRow?.id ?? null,
         proxy_mode: proxyMode,
         attempt_number: attemptNumber,
+          user_id: verifiedUserId,
         duration_ms: outcome.duration_ms,
         error_message: (outcome as any).error ?? null,
         selection_reason: selectionReason,
