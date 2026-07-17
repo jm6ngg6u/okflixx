@@ -20,6 +20,7 @@ type JobRow = {
   summary: any;
   progress: any;
   error: string | null;
+  control?: "stop" | "cancel" | null;
 };
 
 const JOB_META: Record<string, { label: string; icon: any }> = {
