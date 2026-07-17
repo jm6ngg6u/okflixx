@@ -147,16 +147,26 @@ export function LiveJobsPanel() {
         desc = [a, b, rl].filter(Boolean).join(" • ") + ` • ${dur}`;
       } else if (r.job === "proxies-autocheck") {
         desc = [proxySummaryLine(r.summary), rl].filter(Boolean).join(" • ") + ` • ${dur}`;
+      } else if (r.job === "proxy_recheck") {
+        const s = r.summary ?? {};
+        const parts = [
+          `${s.total ?? 0} checked`,
+          `${s.valid ?? 0} valid`,
+          `${s.invalid ?? 0} invalid`,
+        ];
+        desc = `${parts.join(" • ")} • ${dur}`;
       } else if (r.job === "auto-cleanup") {
         desc = `${cleanupSummaryLine(r.summary)} • ${dur}`;
       } else {
         desc = `Completed in ${dur}`;
       }
+      const label = meta.label.charAt(0).toUpperCase() + meta.label.slice(1);
       if (r.ok === false) {
-        toast.error(`${meta.label} failed`, { description: r.error ?? desc, duration: 8000 });
+        toast.error(`${label} failed`, { description: r.error ?? desc, duration: 8000 });
       } else {
-        toast.success(`${meta.label} complete`, { description: desc, duration: 6000 });
+        toast.success(`${label} complete`, { description: desc, duration: 6000 });
       }
+
     }
   }, [q.data, qc, settings.notify_cookies, settings.notify_proxies, settings.notify_cleanup, settings.notify_quiet_start, settings.notify_quiet_end]);
 
