@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getGateConfig } from "@/lib/access-keys.functions";
+import { checkOtpLimit, recordOtpSent, logAuthEvent } from "@/lib/auth-audit.functions";
 import { toast } from "sonner";
 import { LogIn, UserPlus, MailCheck, ShieldCheck, KeyRound, ArrowLeft } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
@@ -24,6 +25,9 @@ type Stage = "form" | "verify-otp" | "reset-sent";
 function LoginPage() {
   const navigate = useNavigate();
   const fetchGate = useServerFn(getGateConfig);
+  const checkOtp = useServerFn(checkOtpLimit);
+  const recordOtp = useServerFn(recordOtpSent);
+  const logEvent = useServerFn(logAuthEvent);
   const gate = useQuery({ queryKey: ["login-gate"], queryFn: () => fetchGate(), staleTime: 15_000 });
 
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
@@ -34,6 +38,19 @@ function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpFails, setOtpFails] = useState(0);
+  const [otpLockUntil, setOtpLockUntil] = useState<number | null>(null);
+  const MAX_OTP_VERIFY_ATTEMPTS = 5;
+
+  const safeLog = (payload: {
+    event: "signin" | "signup" | "otp_send" | "otp_verify" | "password_reset";
+    email?: string;
+    success: boolean;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+  }) => {
+    logEvent({ data: payload }).catch(() => { /* swallow */ });
+  };
 
   // Captcha state (respects the same gate config as landing).
   const [captchaToken, setCaptchaToken] = useState("");
@@ -121,6 +138,26 @@ function LoginPage() {
     return null;
   }
 
+  async function guardOtpRateLimit(kind: "signup" | "recovery"): Promise<boolean> {
+    try {
+      const r = await checkOtp({ data: { email: email.trim(), kind } });
+      if (!r.allowed) {
+        if (r.reason === "cooldown") {
+          setResendCooldown(r.cooldown_remaining || 30);
+          toast.error(`Wait ${r.cooldown_remaining}s before requesting a new code.`);
+        } else {
+          toast.error(`Too many codes requested — try again after ${r.window_minutes} minutes.`);
+        }
+        safeLog({ event: "otp_send", email: email.trim(), success: false, reason: `rate_limit:${r.reason}` });
+        return false;
+      }
+      return true;
+    } catch {
+      // If the rate-limit check itself fails, fall through so the user isn't blocked by an outage.
+      return true;
+    }
+  }
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     const err = validateForm(); if (err) { toast.error(err); return; }
@@ -132,10 +169,12 @@ function LoginPage() {
         options: captchaToken ? { captchaToken } : undefined,
       });
       if (error) throw error;
+      safeLog({ event: "signin", email: email.trim(), success: true });
       toast.success("Signed in.");
       navigate({ to: "/" });
     } catch (e: any) {
       const msg = String(e.message ?? "");
+      safeLog({ event: "signin", email: email.trim(), success: false, reason: msg.slice(0, 180) });
       if (/email not confirmed/i.test(msg)) {
         toast.info("Verify your email first — we'll send a fresh code.");
         await sendOtpEmail();
@@ -152,6 +191,7 @@ function LoginPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     const err = validateForm(); if (err) { toast.error(err); return; }
+    if (!(await guardOtpRateLimit("signup"))) return;
     setBusy(true);
     try {
       const { error } = await supabase.auth.signUp({
@@ -163,11 +203,18 @@ function LoginPage() {
         },
       });
       if (error) throw error;
+      await recordOtp({ data: { email: email.trim(), kind: "signup" } }).catch(() => {});
+      safeLog({ event: "signup", email: email.trim(), success: true });
+      safeLog({ event: "otp_send", email: email.trim(), success: true, reason: "signup" });
       toast.success("Verification code sent — check your email.");
-      setResendCooldown(30);
+      setResendCooldown(60);
+      setOtpFails(0);
+      setOtpLockUntil(null);
       setStage("verify-otp");
     } catch (e: any) {
-      toast.error(e.message ?? "Sign-up failed");
+      const msg = e.message ?? "Sign-up failed";
+      safeLog({ event: "signup", email: email.trim(), success: false, reason: String(msg).slice(0, 180) });
+      toast.error(msg);
       resetCaptcha();
     } finally {
       setBusy(false);
@@ -175,16 +222,23 @@ function LoginPage() {
   }
 
   async function sendOtpEmail() {
-    // Resend a fresh signup confirmation code.
-    await supabase.auth.resend({
+    if (!(await guardOtpRateLimit("signup"))) return;
+    const { error } = await supabase.auth.resend({
       type: "signup",
       email: email.trim(),
       options: captchaToken ? { captchaToken } : undefined,
     });
+    if (!error) {
+      await recordOtp({ data: { email: email.trim(), kind: "signup" } }).catch(() => {});
+      safeLog({ event: "otp_send", email: email.trim(), success: true, reason: "resend-inline" });
+    } else {
+      safeLog({ event: "otp_send", email: email.trim(), success: false, reason: String(error.message).slice(0, 180) });
+    }
   }
 
   async function handleResend() {
     if (resendCooldown > 0) return;
+    if (!(await guardOtpRateLimit("signup"))) return;
     setBusy(true);
     try {
       const { error } = await supabase.auth.resend({
@@ -193,9 +247,12 @@ function LoginPage() {
         options: captchaToken ? { captchaToken } : undefined,
       });
       if (error) throw error;
+      await recordOtp({ data: { email: email.trim(), kind: "signup" } }).catch(() => {});
+      safeLog({ event: "otp_send", email: email.trim(), success: true, reason: "resend" });
       toast.success("New code sent.");
-      setResendCooldown(30);
+      setResendCooldown(60);
     } catch (e: any) {
+      safeLog({ event: "otp_send", email: email.trim(), success: false, reason: String(e.message ?? "").slice(0, 180) });
       toast.error(e.message ?? "Failed to resend");
     } finally {
       setBusy(false);
@@ -204,6 +261,11 @@ function LoginPage() {
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
+    if (otpLockUntil && Date.now() < otpLockUntil) {
+      const s = Math.ceil((otpLockUntil - Date.now()) / 1000);
+      toast.error(`Too many wrong codes — locked for ${s}s.`);
+      return;
+    }
     if (otp.length < 6) { toast.error("Enter the 6-digit code from your email."); return; }
     setBusy(true);
     try {
@@ -213,10 +275,19 @@ function LoginPage() {
         type: "email",
       });
       if (error) throw error;
+      safeLog({ event: "otp_verify", email: email.trim(), success: true });
       toast.success("Email verified — you're signed in.");
       navigate({ to: "/" });
     } catch (e: any) {
-      toast.error(e.message ?? "Invalid or expired code");
+      const next = otpFails + 1;
+      setOtpFails(next);
+      safeLog({ event: "otp_verify", email: email.trim(), success: false, reason: String(e.message ?? "").slice(0, 180), metadata: { attempt: next } });
+      if (next >= MAX_OTP_VERIFY_ATTEMPTS) {
+        setOtpLockUntil(Date.now() + 15 * 60_000);
+        toast.error(`Maximum ${MAX_OTP_VERIFY_ATTEMPTS} attempts reached — locked for 15 minutes.`);
+      } else {
+        toast.error(`${e.message ?? "Invalid or expired code"} (attempt ${next}/${MAX_OTP_VERIFY_ATTEMPTS})`);
+      }
     } finally {
       setBusy(false);
     }
@@ -232,9 +303,11 @@ function LoginPage() {
         captchaToken: captchaToken || undefined,
       });
       if (error) throw error;
+      safeLog({ event: "password_reset", email: email.trim(), success: true });
       setStage("reset-sent");
       toast.success("Reset link sent — check your email.");
     } catch (e: any) {
+      safeLog({ event: "password_reset", email: email.trim(), success: false, reason: String(e.message ?? "").slice(0, 180) });
       toast.error(e.message ?? "Failed to send reset email");
       resetCaptcha();
     } finally {
@@ -417,7 +490,17 @@ function LoginPage() {
                     placeholder="000000"
                   />
                 </div>
-                <button type="submit" disabled={busy || otp.length < 6} className="w-full py-3 rounded-md bg-[#ff2a3a] hover:bg-[#ff3a4a] text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition">
+                {otpLockUntil && Date.now() < otpLockUntil && (
+                  <div className="rounded-md border border-red-500/25 bg-red-500/5 p-2.5 text-[11px] text-red-200">
+                    Too many wrong codes. Try again in {Math.ceil((otpLockUntil - Date.now()) / 1000)}s.
+                  </div>
+                )}
+                {otpFails > 0 && (!otpLockUntil || Date.now() >= otpLockUntil) && (
+                  <div className="text-[10px] uppercase tracking-widest text-amber-300/80">
+                    Attempts used: {otpFails}/{MAX_OTP_VERIFY_ATTEMPTS}
+                  </div>
+                )}
+                <button type="submit" disabled={busy || otp.length < 6 || !!(otpLockUntil && Date.now() < otpLockUntil)} className="w-full py-3 rounded-md bg-[#ff2a3a] hover:bg-[#ff3a4a] text-white text-sm font-semibold uppercase tracking-widest disabled:opacity-50 transition">
                   {busy ? "Verifying…" : "Verify & sign in"}
                 </button>
                 <div className="flex items-center justify-between text-[11px] uppercase tracking-widest">

@@ -13,6 +13,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BgPreviewIndexRouteImport } from './routes/bg-preview.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -26,6 +27,7 @@ import { Route as AdminRotationRouteImport } from './routes/admin.rotation'
 import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminBackgroundSongRouteImport } from './routes/admin.background-song'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
 import { Route as AdminAccessRouteImport } from './routes/admin.access'
 import { Route as ApiPublicBackgroundSongAudioRouteImport } from './routes/api/public/background-song-audio'
@@ -53,6 +55,11 @@ const AuthRoute = AuthRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -120,6 +127,11 @@ const AdminBackgroundSongRoute = AdminBackgroundSongRouteImport.update({
   path: '/background-song',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
   id: '/attempts',
   path: '/attempts',
@@ -168,12 +180,14 @@ const ApiPublicHooksAutoCleanupRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
@@ -195,11 +209,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
@@ -222,12 +238,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
@@ -251,12 +269,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
     | '/admin'
     | '/auth'
     | '/login'
     | '/reset-password'
     | '/admin/access'
     | '/admin/attempts'
+    | '/admin/audit'
     | '/admin/background-song'
     | '/admin/cookies'
     | '/admin/proxies'
@@ -278,11 +298,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
     | '/auth'
     | '/login'
     | '/reset-password'
     | '/admin/access'
     | '/admin/attempts'
+    | '/admin/audit'
     | '/admin/background-song'
     | '/admin/cookies'
     | '/admin/proxies'
@@ -304,12 +326,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/account'
     | '/admin'
     | '/auth'
     | '/login'
     | '/reset-password'
     | '/admin/access'
     | '/admin/attempts'
+    | '/admin/audit'
     | '/admin/background-song'
     | '/admin/cookies'
     | '/admin/proxies'
@@ -332,6 +356,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   LoginRoute: typeof LoginRoute
@@ -376,6 +401,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -469,6 +501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBackgroundSongRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/attempts': {
       id: '/admin/attempts'
       path: '/attempts'
@@ -531,6 +570,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAccessRoute: typeof AdminAccessRoute
   AdminAttemptsRoute: typeof AdminAttemptsRoute
+  AdminAuditRoute: typeof AdminAuditRoute
   AdminBackgroundSongRoute: typeof AdminBackgroundSongRoute
   AdminCookiesRoute: typeof AdminCookiesRoute
   AdminProxiesRoute: typeof AdminProxiesRoute
@@ -544,6 +584,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccessRoute: AdminAccessRoute,
   AdminAttemptsRoute: AdminAttemptsRoute,
+  AdminAuditRoute: AdminAuditRoute,
   AdminBackgroundSongRoute: AdminBackgroundSongRoute,
   AdminCookiesRoute: AdminCookiesRoute,
   AdminProxiesRoute: AdminProxiesRoute,
@@ -558,6 +599,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   LoginRoute: LoginRoute,
