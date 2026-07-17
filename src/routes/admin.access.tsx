@@ -632,12 +632,7 @@ function AccessAdminPage() {
                         <Button
                           size="sm" variant="outline" className="h-7 px-2"
                           title={r.disabled ? "Enable key" : "Disable key"}
-                          onClick={() => {
-                            toggleKey({ data: { id: r.id, disabled: !r.disabled } }).then(() => {
-                              toast.success(r.disabled ? "Key enabled" : "Key disabled");
-                              qc.invalidateQueries({ queryKey: ["access-keys"] });
-                            }).catch((e: any) => toast.error("Toggle failed", { description: e?.message }));
-                          }}
+                          onClick={() => toggleKeyMut.mutate({ id: r.id, disabled: !r.disabled })}
                         >
                           <Ban className="w-3 h-3" />
                         </Button>
@@ -645,16 +640,11 @@ function AccessAdminPage() {
                           size="sm" variant="outline"
                           className="h-7 px-2 text-red-300 border-red-500/30 hover:bg-red-500/10"
                           title="Delete key"
-                          onClick={() => {
-                            removeKeys({ data: { ids: [r.id] } }).then(() => {
-                              toast.success("Key deleted");
-                              qc.invalidateQueries({ queryKey: ["access-keys"] });
-                              qc.invalidateQueries({ queryKey: ["access-stats"] });
-                            }).catch((e: any) => toast.error("Delete failed", { description: e?.message }));
-                          }}
+                          onClick={() => deleteKeyMut.mutate(r.id)}
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
+
                       </div>
                     </td>
                   </tr>
