@@ -502,6 +502,14 @@ export type Database = {
           id: string
         }[]
       }
+      pick_next_cookie_by_policy: {
+        Args: { _policy?: string }
+        Returns: {
+          cookies_json: Json
+          fingerprint: string
+          id: string
+        }[]
+      }
       pick_next_proxy: {
         Args: never
         Returns: {
