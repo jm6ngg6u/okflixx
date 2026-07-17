@@ -297,9 +297,11 @@ function LoginPage() {
         captchaToken: captchaToken || undefined,
       });
       if (error) throw error;
+      safeLog({ event: "password_reset", email: email.trim(), success: true });
       setStage("reset-sent");
       toast.success("Reset link sent — check your email.");
     } catch (e: any) {
+      safeLog({ event: "password_reset", email: email.trim(), success: false, reason: String(e.message ?? "").slice(0, 180) });
       toast.error(e.message ?? "Failed to send reset email");
       resetCaptcha();
     } finally {
