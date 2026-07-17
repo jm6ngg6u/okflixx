@@ -85,8 +85,8 @@ function AuthPage() {
           setStep("totp");
           setStatus("");
         } else {
-          // Signed in at aal1 with no factor → send to enrollment
-          openMfa("enroll");
+          // No verified factor → TOTP is optional. Go straight to admin.
+          navigate({ to: "/admin" });
         }
       } catch (err: any) {
         setStatus("");
@@ -145,7 +145,10 @@ function AuthPage() {
         setStatus("");
         setBusy(false);
       } else {
-        openMfa("enroll");
+        // No TOTP enrolled → allow entry. User can enable it later at /admin/security.
+        setStatus("Opening admin panel…");
+        toast.success("Signed in");
+        navigate({ to: "/admin" });
       }
     } catch (err: any) {
       setErrorMessage(err?.message ?? "Sign-in failed after password verification. Please retry.");

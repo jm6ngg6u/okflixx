@@ -60,14 +60,18 @@ function AdminLayout() {
         setMfaReady(true);
         return;
       }
-      // aal1 → need MFA. Send to enroll or challenge depending on factor state.
+      // aal1 → only require TOTP if a verified factor is enrolled. Otherwise skip.
       const { data: factors } = await withTimeout(
         supabase.auth.mfa.listFactors(),
         "Authenticator factor check",
       );
       const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
-      setMfaReady(false);
-      navigate({ to: "/auth/mfa", search: { mode: verified ? "challenge" : "enroll" } as any });
+      if (verified) {
+        setMfaReady(false);
+        navigate({ to: "/auth/mfa", search: { mode: "challenge" } as any });
+        return;
+      }
+      setMfaReady(true);
     } catch (err: any) {
       setMfaReady(false);
       setGateError(err?.message ?? "Could not verify two-factor status.");
