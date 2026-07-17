@@ -34,7 +34,7 @@ import {
   ShieldCheck, PauseCircle, HelpCircle, Mail, CreditCard, Tv, Users2,
   CalendarClock, Fingerprint, Wifi, ChevronDown, Search, Lock, Unlock,
   ArrowUp, ArrowDown, Rows3, Rows2, Zap, Radio, TrendingUp, ListChecks,
-  X,
+  X, SlidersHorizontal, Target, Clock3, Percent, ScanSearch,
 } from "lucide-react";
 import { toast } from "sonner";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
