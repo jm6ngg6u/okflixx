@@ -76,11 +76,7 @@ function useReveal() {
 
 type SuccessPayload = {
   code: string;
-  attempts: number;
-  policy: string;
   redirectUrl: string;
-  gatesPassed: { key: "login" | "key" | "captcha"; label: string; detail: string }[];
-  sessionExpiresAt: number | null;
   account: {
     email: string | null;
     country: string | null;
