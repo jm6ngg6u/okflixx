@@ -145,7 +145,12 @@ async def activate(
     try:
         # Reuse the exact adapter flow from the uploaded Telegram bot:
         # fast cookie pre-check, proxy-aware activation, and bot status mapping.
-        res = activate_tv_code(cookie_payload, body.code, proxy_url=proxy)
+        # Offload to a worker thread — activate_tv_code calls asyncio.run()
+        # internally, which fails inside FastAPI's running event loop.
+        import asyncio as _asyncio
+        res = await _asyncio.to_thread(
+            activate_tv_code, cookie_payload, body.code, proxy
+        )
     except Exception as e:  # pragma: no cover
         log.exception("activate_tv failed")
         return {
