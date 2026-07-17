@@ -285,6 +285,26 @@ export async function verifyCaptcha(
     return { ok: false, reason: "empty_token", errorCodes: ["missing-input-response"] };
   }
 
+  // Rate-limit spam: too many recent failures from the same IP → short-circuit
+  // instead of hammering the upstream provider during outages/attacks.
+  if (logMeta?.ipHash && purpose === "activate") {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: limitRow } = await supabaseAdmin
+        .from("app_settings").select("value").eq("key", "captcha_fail_limit_per_10min").maybeSingle();
+      const limit = Math.max(1, parseInt((limitRow?.value as string) ?? "20", 10));
+      const { data: recent } = await supabaseAdmin.rpc("count_recent_captcha_failures", {
+        _ip_hash: logMeta.ipHash, _minutes: 10,
+      });
+      if ((recent ?? 0) >= limit) {
+        await writeLog({ success: false, reason: "rate_limited", error_codes: ["rate-limited"] });
+        return { ok: false, reason: "rate_limited", errorCodes: ["rate-limited"] };
+      }
+    } catch (e) {
+      console.warn("[captcha] rate-limit check failed", (e as any)?.message);
+    }
+  }
+
   const url =
     provider === "hcaptcha"
       ? "https://hcaptcha.com/siteverify"
