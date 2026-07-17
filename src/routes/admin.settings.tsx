@@ -543,6 +543,96 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
   );
 }
 
+function ContactServerCheck({ local }: { local: Record<string, string> }) {
+  const fetchPublic = useServerFn(getPublicContacts);
+  const q = useQuery({
+    queryKey: ["public-contacts", "admin-check"],
+    queryFn: () => fetchPublic(),
+    refetchInterval: 2000,
+    staleTime: 0,
+  });
+  const dbg = q.data?.debug;
+  const rows: Array<{ kind: "telegram" | "instagram" | "whatsapp"; enableKey: string; nameKey: string; handleKey: string }> = [
+    { kind: "telegram", enableKey: "contact_tg_enabled", nameKey: "contact_tg_name", handleKey: "contact_tg_username" },
+    { kind: "instagram", enableKey: "contact_ig_enabled", nameKey: "contact_ig_name", handleKey: "contact_ig_username" },
+    { kind: "whatsapp", enableKey: "contact_wa_enabled", nameKey: "contact_wa_name", handleKey: "contact_wa_number" },
+  ];
+  const localMasterOn = local.contact_enabled === "1";
+  const mismatches: string[] = [];
+  if (dbg) {
+    if (dbg.masterEnabled !== localMasterOn) mismatches.push("master toggle");
+    for (const r of rows) {
+      const localOn = (local[r.enableKey] ?? "1") === "1";
+      const localHandle = normalizeHandle(r.kind, local[r.handleKey] ?? "");
+      const remote = dbg.channels.find((c: any) => c.kind === r.kind);
+      if (!remote) { mismatches.push(`${r.kind} row missing`); continue; }
+      if (remote.enabled !== localOn) mismatches.push(`${r.kind} toggle`);
+      if (remote.normalizedHandle !== localHandle) mismatches.push(`${r.kind} handle`);
+    }
+  }
+  const ok = dbg && mismatches.length === 0;
+
+  return (
+    <div className="rounded-md border border-white/10 bg-black/40 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Server consistency check</div>
+        <div className="flex items-center gap-2">
+          {q.isFetching && <RefreshCw className="w-3 h-3 text-white/40 animate-spin" />}
+          <Badge variant="outline" className={ok
+            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+            : "bg-amber-500/15 text-amber-300 border-amber-500/30"}>
+            {q.isLoading ? "CHECKING…" : ok ? "IN SYNC" : `DRIFT: ${mismatches.join(", ").toUpperCase()}`}
+          </Badge>
+        </div>
+      </div>
+      <p className="text-[11px] text-white/40 leading-relaxed">
+        Reads the exact same server function the public footer uses (<code className="text-white/60">getPublicContacts</code>, query key <code className="text-white/60">public-contacts</code>). If anything drifts from what you typed above, it&apos;ll show here within 2s.
+      </p>
+      {dbg && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr className="text-white/40 uppercase tracking-widest text-[10px]">
+                <th className="text-left py-1 pr-3">Kind</th>
+                <th className="text-left py-1 pr-3">Enabled</th>
+                <th className="text-left py-1 pr-3">Handle → normalized</th>
+                <th className="text-left py-1 pr-3">Public URL</th>
+                <th className="text-left py-1">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dbg.channels.map((c: any) => (
+                <tr key={c.kind} className="border-t border-white/5">
+                  <td className="py-1.5 pr-3 text-white/80">{c.kind}</td>
+                  <td className="py-1.5 pr-3">
+                    <span className={c.enabled ? "text-emerald-300" : "text-white/40"}>{c.enabled ? "on" : "off"}</span>
+                  </td>
+                  <td className="py-1.5 pr-3 text-white/60">
+                    {c.rawHandle ? <>{c.rawHandle} <span className="text-white/25">→</span> <span className="text-white/80">{c.display || "—"}</span></> : <span className="text-white/30">empty</span>}
+                  </td>
+                  <td className="py-1.5 pr-3 truncate max-w-[220px]">
+                    {c.href ? <a className="text-white/60 hover:text-white" href={c.href} target="_blank" rel="noopener noreferrer">{c.href}</a> : <span className="text-white/30">—</span>}
+                  </td>
+                  <td className="py-1.5">
+                    {c.visible
+                      ? <span className="text-emerald-300">visible</span>
+                      : <span className="text-amber-300">hidden · {c.reason.replace(/_/g, " ")}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {dbg.updatedAt && (
+            <div className="mt-2 text-[10px] text-white/30 font-mono">Last write {new Date(dbg.updatedAt).toLocaleString()}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 
 function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   icon: any; title: string; subtitle?: string; pill?: React.ReactNode; children: React.ReactNode; highlight?: string;
