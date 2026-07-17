@@ -765,6 +765,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_activation_overrides: {
+        Row: {
+          daily_limit: number
+          note: string | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          daily_limit?: number
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          daily_limit?: number
+          note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
