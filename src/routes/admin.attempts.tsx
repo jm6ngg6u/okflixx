@@ -22,6 +22,28 @@ export const Route = createFileRoute("/admin/attempts")({
   component: AttemptsPage,
 });
 
+type SelectionReason = {
+  policy?: string;
+  filters?: {
+    include_statuses?: string[];
+    require_valid?: boolean;
+    min_success_rate?: number;
+    min_total_uses?: number;
+  };
+  eligible_at_pick?: number | null;
+  cookie?: {
+    status?: string | null;
+    is_valid?: boolean | null;
+    total_uses?: number;
+    success_count?: number;
+    fail_count?: number;
+    success_rate?: number | null;
+    last_used_at?: string | null;
+  };
+  why?: string;
+  outcome?: string;
+};
+
 type Attempt = {
   id: string;
   code: string | null;
@@ -36,6 +58,7 @@ type Attempt = {
   attempt_number: number | null;
   duration_ms: number | null;
   error_message: string | null;
+  selection_reason: SelectionReason | null;
 };
 
 const RESULTS = [
@@ -486,9 +509,22 @@ function AttemptsPage() {
                     </td>
                     <td className={`px-3 ${rowPad} ${rowText} text-white/50`}>
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        {r.selection_reason?.policy && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest bg-[#ff2a3a]/10 border border-[#ff2a3a]/30 text-[#ff8a90]"
+                            title={r.selection_reason?.why ?? ""}
+                          >
+                            {r.selection_reason.policy.replace("_", " ")}
+                          </span>
+                        )}
                         {r.cookie_id && (
-                          <span className="inline-flex items-center gap-1 text-white/40" title={`Cookie ${r.cookie_id}`}>
+                          <span className="inline-flex items-center gap-1 text-white/40" title={`Cookie ${r.cookie_id}${r.selection_reason?.cookie?.total_uses != null ? ` · ${r.selection_reason.cookie.total_uses} uses` : ""}`}>
                             <Cookie className="w-3 h-3" /> {r.cookie_id.slice(0, 6)}
+                          </span>
+                        )}
+                        {r.selection_reason?.eligible_at_pick != null && (
+                          <span className="text-white/35 tabular-nums" title="Eligible cookies at pick time">
+                            elig {r.selection_reason.eligible_at_pick}
                           </span>
                         )}
                         {r.proxy_id && (
@@ -501,7 +537,7 @@ function AttemptsPage() {
                             · {r.error_message}
                           </span>
                         )}
-                        {!r.cookie_id && !r.proxy_id && !r.error_message && (
+                        {!r.cookie_id && !r.proxy_id && !r.error_message && !r.selection_reason && (
                           <span className="text-white/30">—</span>
                         )}
                       </div>
@@ -632,6 +668,7 @@ function AttemptDetailModal({ attempt, onClose }: { attempt: Attempt | null; onC
             <Row label="Proxy ID" mono value={attempt.proxy_id ?? "—"} onCopy={attempt.proxy_id ? () => copy("Proxy ID", attempt.proxy_id!) : undefined} />
             <Row label="IP hash" mono value={attempt.ip_hash ?? "—"} onCopy={attempt.ip_hash ? () => copy("IP hash", attempt.ip_hash!) : undefined} />
             <Row label="User agent" value={attempt.user_agent ?? "—"} multiline onCopy={attempt.user_agent ? () => copy("User agent", attempt.user_agent!) : undefined} />
+            {attempt.selection_reason && <SelectionReasonBlock reason={attempt.selection_reason} />}
             {attempt.error_message && (
               <div className="mt-2 p-3 rounded border border-[#ff2a3a]/30 bg-[#ff2a3a]/[0.06]">
                 <div className="text-[10px] uppercase tracking-widest text-[#ff8a90]/80 font-mono mb-1">Error</div>
@@ -643,6 +680,52 @@ function AttemptDetailModal({ attempt, onClose }: { attempt: Attempt | null; onC
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SelectionReasonBlock({ reason }: { reason: SelectionReason }) {
+  const c = reason.cookie ?? {};
+  const f = reason.filters ?? {};
+  return (
+    <div className="mt-3 rounded border border-white/10 bg-white/[0.03] p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-widest text-white/50 font-mono">Cookie selection</div>
+        {reason.policy && (
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#ff2a3a]/10 border border-[#ff2a3a]/30 text-[#ff8a90] uppercase tracking-widest">
+            {reason.policy.replace("_", " ")}
+          </span>
+        )}
+      </div>
+      {reason.why && <div className="text-xs text-white/80 leading-snug">{reason.why}</div>}
+      {reason.outcome === "no_eligible_cookie" && (
+        <div className="text-xs text-[#ff8a90]">RPC returned no eligible row — pool empty for current filters.</div>
+      )}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
+        <span className="text-white/40">Eligible at pick</span>
+        <span className="text-white/85 tabular-nums">{reason.eligible_at_pick ?? "—"}</span>
+        <span className="text-white/40">Cookie status</span>
+        <span className="text-white/85">{c.status ?? "—"}{c.is_valid === false ? " · invalid" : ""}</span>
+        <span className="text-white/40">Uses (succ/fail)</span>
+        <span className="text-white/85 tabular-nums">
+          {c.total_uses ?? 0} <span className="text-white/40">·</span> {c.success_count ?? 0}/{c.fail_count ?? 0}
+          {c.success_rate != null && <span className="text-white/40"> · {c.success_rate}%</span>}
+        </span>
+        <span className="text-white/40">Last used</span>
+        <span className="text-white/85 tabular-nums">
+          {c.last_used_at ? new Date(c.last_used_at).toLocaleString() : "never"}
+        </span>
+      </div>
+      <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
+        <span className="text-white/35">RPC filter · statuses</span>
+        <span className="text-white/70">{(f.include_statuses ?? []).join(", ") || "—"}</span>
+        <span className="text-white/35">require valid</span>
+        <span className="text-white/70">{String(f.require_valid ?? true)}</span>
+        <span className="text-white/35">min success rate</span>
+        <span className="text-white/70 tabular-nums">{((f.min_success_rate ?? 0) * 100).toFixed(0)}%</span>
+        <span className="text-white/35">min total uses</span>
+        <span className="text-white/70 tabular-nums">{f.min_total_uses ?? 0}</span>
+      </div>
+    </div>
   );
 }
 
