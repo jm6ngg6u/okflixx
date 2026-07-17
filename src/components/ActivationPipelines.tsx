@@ -252,9 +252,18 @@ export function ActivationPipelines() {
   );
 }
 
+type Precheck = {
+  policy: "round_robin" | "random" | "quality";
+  proxy_mode: boolean;
+  eligible: number;
+  eligibility: { include_statuses: string[]; require_valid: boolean; min_success_rate: number; min_total_uses: number };
+  can_retry: boolean;
+  reason: string | null;
+};
+
 function PipelineRow({
-  pipeline, expanded, onToggle, onRetry, retrying,
-}: { pipeline: Pipeline; expanded: boolean; onToggle: () => void; onRetry: () => void; retrying: boolean }) {
+  pipeline, expanded, onToggle, onRetry, retrying, precheck,
+}: { pipeline: Pipeline; expanded: boolean; onToggle: () => void; onRetry: () => void; retrying: boolean; precheck?: Precheck }) {
   const final = pipeline.final_result;
   const isSuccess = final === "success";
   const finalIsTerminal = isTerminal(final);
