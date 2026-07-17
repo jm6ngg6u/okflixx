@@ -169,11 +169,19 @@ function HomePage() {
             api.render(captchaWidgetRef.current, {
               sitekey: gate.data!.captchaSiteKey,
               theme: "dark",
-              callback: (token: string) => setCaptchaToken(token),
+              callback: (token: string) => {
+                setCaptchaToken(token);
+                setCaptchaError(null);
+                captchaWidgetProviderRef.current = provider;
+              },
               "expired-callback": () => setCaptchaToken(""),
-              "error-callback": () => setCaptchaToken(""),
+              "error-callback": (err?: string) => {
+                setCaptchaToken("");
+                setCaptchaError(err ? `Widget error: ${err}` : "Widget error — refresh and try again.");
+              },
             });
             captchaRenderedRef.current = true;
+            captchaWidgetProviderRef.current = provider;
           } catch { /* already rendered */ }
           return;
         }
