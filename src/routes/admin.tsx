@@ -25,38 +25,66 @@ function AdminLayout() {
   const [authed, setAuthed] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [mfaReady, setMfaReady] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const auditedAccessRef = useRef<string | null>(null);
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  async function verifyMfa(userIdArg: string | null) {
+    if (!userIdArg) return;
+    try {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.currentLevel === "aal2") {
+        setMfaReady(true);
+        return;
+      }
+      // aal1 → need MFA. Send to enroll or challenge depending on factor state.
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
+      setMfaReady(false);
+      navigate({ to: "/auth/mfa", search: { mode: verified ? "challenge" : "enroll" } as any });
+    } catch {
+      setMfaReady(false);
+      navigate({ to: "/auth" });
+    }
+  }
+
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getUser().then(({ data, error }) => {
+    supabase.auth.getUser().then(async ({ data, error }) => {
       if (!mounted) return;
       const user = error ? null : data.user;
       setAuthed(!!user);
       setUserId(user?.id ?? null);
       setUserEmail(user?.email ?? null);
       setAuthReady(true);
-      if (!user) navigate({ to: "/auth" });
+      if (!user) {
+        navigate({ to: "/auth" });
+        return;
+      }
+      await verifyMfa(user.id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         setAuthed(false);
         setUserId(null);
         setUserEmail(null);
+        setMfaReady(false);
         qc.clear();
         navigate({ to: "/auth" });
-      } else if (event === "SIGNED_IN") {
+      } else if (event === "SIGNED_IN" || event === "MFA_CHALLENGE_VERIFIED") {
         setAuthed(true);
         setUserId(session.user.id);
         setUserEmail(session.user.email ?? null);
         qc.invalidateQueries({ queryKey: ["staff-role"] });
+        void verifyMfa(session.user.id);
       }
     });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, qc]);
+
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
@@ -109,6 +137,7 @@ function AdminLayout() {
 
   if (!authReady) return <FullScreen label="Loading session…" />;
   if (!authed) return null;
+  if (!mfaReady) return <FullScreen label="Verifying two-factor…" />;
   if (role.isLoading) return <FullScreen label="Checking permissions…" />;
   if (role.error || !role.data?.isStaff) {
     return (

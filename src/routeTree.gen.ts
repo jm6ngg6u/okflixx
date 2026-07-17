@@ -19,6 +19,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as BgPreviewParticlesRouteImport } from './routes/bg-preview.particles'
 import { Route as BgPreviewNebulaRouteImport } from './routes/bg-preview.nebula'
 import { Route as BgPreviewAuroraRouteImport } from './routes/bg-preview.aurora'
+import { Route as AuthMfaRouteImport } from './routes/auth.mfa'
 import { Route as AdminStaffRouteImport } from './routes/admin.staff'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSecurityRouteImport } from './routes/admin.security'
@@ -85,6 +86,11 @@ const BgPreviewAuroraRoute = BgPreviewAuroraRouteImport.update({
   id: '/bg-preview/aurora',
   path: '/bg-preview/aurora',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthMfaRoute = AuthMfaRouteImport.update({
+  id: '/mfa',
+  path: '/mfa',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AdminStaffRoute = AdminStaffRouteImport.update({
   id: '/staff',
@@ -176,7 +182,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
+  '/auth/mfa': typeof AuthMfaRoute
   '/bg-preview/aurora': typeof BgPreviewAuroraRoute
   '/bg-preview/nebula': typeof BgPreviewNebulaRoute
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
@@ -203,7 +210,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
+  '/auth/mfa': typeof AuthMfaRoute
   '/bg-preview/aurora': typeof BgPreviewAuroraRoute
   '/bg-preview/nebula': typeof BgPreviewNebulaRoute
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
@@ -232,7 +240,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
+  '/auth/mfa': typeof AuthMfaRoute
   '/bg-preview/aurora': typeof BgPreviewAuroraRoute
   '/bg-preview/nebula': typeof BgPreviewNebulaRoute
   '/bg-preview/particles': typeof BgPreviewParticlesRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
+    | '/auth/mfa'
     | '/bg-preview/aurora'
     | '/bg-preview/nebula'
     | '/bg-preview/particles'
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
+    | '/auth/mfa'
     | '/bg-preview/aurora'
     | '/bg-preview/nebula'
     | '/bg-preview/particles'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
+    | '/auth/mfa'
     | '/bg-preview/aurora'
     | '/bg-preview/nebula'
     | '/bg-preview/particles'
@@ -346,7 +358,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   LoginRoute: typeof LoginRoute
   BgPreviewAuroraRoute: typeof BgPreviewAuroraRoute
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
@@ -431,6 +443,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/bg-preview/aurora'
       preLoaderRoute: typeof BgPreviewAuroraRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/auth/mfa': {
+      id: '/auth/mfa'
+      path: '/mfa'
+      fullPath: '/auth/mfa'
+      preLoaderRoute: typeof AuthMfaRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/admin/staff': {
       id: '/admin/staff'
@@ -577,11 +596,21 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface AuthRouteChildren {
+  AuthMfaRoute: typeof AuthMfaRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthMfaRoute: AuthMfaRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
   BgPreviewAuroraRoute: BgPreviewAuroraRoute,
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
