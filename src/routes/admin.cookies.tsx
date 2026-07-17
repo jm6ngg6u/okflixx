@@ -1242,23 +1242,26 @@ function UploadPanel({
 function SingleUpload({ runUpload, onDone }: { runUpload: (b: string[], l: string) => Promise<BatchResult>; onDone: () => void }) {
   const [label, setLabel] = useState("");
   const [blob, setBlob] = useState("");
+  const [srcName, setSrcName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
 
   async function loadFile(f: File) {
     const text = await f.text();
     setBlob(text);
+    setSrcName(f.name);
     if (!label) setLabel(f.name.replace(/\.(txt|json)$/i, ""));
     toast.success(`Loaded ${f.name}`);
   }
 
-  async function submit() {
+  async function doUpload() {
     if (!blob.trim()) return;
     setBusy(true);
     try {
       const r = await runUpload([blob.trim()], label);
       toast.success(`Added ${r.inserted} · ${r.duplicates} dupe · ${r.invalid} invalid`);
-      setBlob(""); setLabel("");
+      setBlob(""); setLabel(""); setSrcName(""); setPreview(false);
       onDone();
     } catch (e: any) {
       toast.error(e?.message ?? "Upload failed");
@@ -1283,15 +1286,30 @@ function SingleUpload({ runUpload, onDone }: { runUpload: (b: string[], l: strin
         rows={8}
         placeholder={"Paste one Netflix cookie export — Netscape, JSON, or header string.\nExample:  NetflixId=v%3D2%26...; SecureNetflixId=v%3D2%26...; ..."}
         value={blob}
-        onChange={(e) => setBlob(e.target.value)}
+        onChange={(e) => { setBlob(e.target.value); setSrcName(""); setPreview(false); }}
         className="bg-white/5 border-white/10 font-mono text-xs"
       />
-      <div className="flex justify-end">
-        <Button onClick={submit} disabled={!blob.trim() || busy} className="btn-red">
-          {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-          {busy ? "Uploading…" : "Add to pool"}
-        </Button>
-      </div>
+
+      {preview && blob.trim() && (
+        <UploadPreviewPanel
+          blobs={[{ name: srcName || label || "pasted cookie", text: blob.trim() }]}
+          onCancel={() => setPreview(false)}
+          onConfirm={doUpload}
+        />
+      )}
+
+      {!preview && (
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setPreview(true)} disabled={!blob.trim() || busy}
+            className="border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20">
+            <Eye className="w-4 h-4 mr-2" /> Preview (dry-run)
+          </Button>
+          <Button onClick={doUpload} disabled={!blob.trim() || busy} className="btn-red">
+            {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+            {busy ? "Uploading…" : "Add to pool"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
