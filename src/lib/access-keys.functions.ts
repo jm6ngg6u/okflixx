@@ -93,15 +93,15 @@ export const redeemAccessKey = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const code = normalizeCode(data.code);
-    const codeHash = sha256(code);
-    const fpHash = sha256(data.fingerprint);
+    const codeHash = await sha256(code);
+    const fpHash = await sha256(data.fingerprint);
 
     const rawIp =
       getRequestHeader("cf-connecting-ip") ??
       getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim() ??
       getRequestIP({ xForwardedFor: true }) ??
       "unknown";
-    const ipHash = sha256(`${ipSalt()}:${rawIp}`);
+    const ipHash = await sha256(`${ipSalt()}:${rawIp}`);
     const userAgent = getRequestHeader("user-agent")?.slice(0, 500) ?? null;
 
     const { data: rows, error } = await supabaseAdmin.rpc("consume_access_key", {
@@ -128,8 +128,8 @@ export const redeemAccessKey = createServerFn({ method: "POST" })
 
     // For session_24h keys, issue an opaque token bound to IP+FP.
     if (row.key_type === "session_24h") {
-      const token = `sess_${randomBytes(24).toString("base64url")}`;
-      const tokenHash = sha256(token);
+      const token = `sess_${toBase64Url(randomBytes(24))}`;
+      const tokenHash = await sha256(token);
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       await supabaseAdmin.from("access_sessions").insert({
         session_token_hash: tokenHash,
@@ -138,6 +138,7 @@ export const redeemAccessKey = createServerFn({ method: "POST" })
         fingerprint_hash: fpHash,
         expires_at: expiresAt,
       });
+
       return {
         ok: true as const,
         keyType: "session_24h" as const,
