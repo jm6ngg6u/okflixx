@@ -732,3 +732,162 @@ function Section({
     </div>
   );
 }
+
+// ───────────────────────────────────────────────────────────────────────
+// Per-user activation-limit overrides
+// ───────────────────────────────────────────────────────────────────────
+function UserOverridesPanel() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listUserActivationOverrides);
+  const setFn = useServerFn(setUserActivationOverride);
+  const removeFn = useServerFn(removeUserActivationOverride);
+
+  const q = useQuery({
+    queryKey: ["user-overrides"],
+    queryFn: () => listFn(),
+    refetchInterval: 2000,
+  });
+
+  const [email, setEmail] = useState("");
+  const [limit, setLimit] = useState<string>("0");
+  const [note, setNote] = useState("");
+  const [search, setSearch] = useState("");
+
+  const setMut = useMutation({
+    mutationFn: () =>
+      setFn({
+        data: {
+          email: email.trim(),
+          dailyLimit: Math.max(0, Math.min(10000, parseInt(limit, 10) || 0)),
+          note: note.trim() || null,
+        },
+      }),
+    onSuccess: (r: any) => {
+      const n = Math.max(0, parseInt(limit, 10) || 0);
+      toast.success(
+        n === 0 ? `${r.email} · ∞ unlimited` : `${r.email} · ${n}/24h`,
+        { description: "Override applied instantly" },
+      );
+      setEmail(""); setLimit("0"); setNote("");
+      qc.invalidateQueries({ queryKey: ["user-overrides"] });
+    },
+    onError: (e: any) => toast.error("Could not set override", { description: e?.message ?? "" }),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: (userId: string) => removeFn({ data: { userId } }),
+    onSuccess: () => {
+      toast.success("Override removed", { description: "User falls back to the global limit" });
+      qc.invalidateQueries({ queryKey: ["user-overrides"] });
+    },
+    onError: (e: any) => toast.error("Remove failed", { description: e?.message ?? "" }),
+  });
+
+  const rows = (q.data?.rows ?? []) as Array<{
+    user_id: string; daily_limit: number; note: string | null; updated_at: string; email: string | null;
+  }>;
+  const filtered = search.trim()
+    ? rows.filter((r) => (r.email ?? "").toLowerCase().includes(search.trim().toLowerCase()))
+    : rows;
+
+  return (
+    <div className="mt-6 rounded-lg border border-emerald-500/20 bg-black/30">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/5">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-emerald-300">Per-user activation limits</div>
+          <p className="text-white/50 text-[11px] mt-0.5">
+            Overrides the global cap for one account. <b className="text-white/80">0 = unlimited</b> — takes effect on the very next activation.
+          </p>
+        </div>
+        <div className="text-[10px] font-mono uppercase tracking-widest text-white/40">
+          {filtered.length} / {rows.length} · live
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-[minmax(0,1.4fr)_120px_minmax(0,1fr)_auto] gap-2 p-3 border-b border-white/5">
+        <Input placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input
+          type="number" min={0} max={10000}
+          placeholder="0 = ∞"
+          value={limit}
+          onChange={(e) => setLimit(e.target.value)}
+          title="Daily activation cap for this user (0 = unlimited)"
+        />
+        <Input placeholder="Note (optional) · e.g. VIP reseller" value={note} onChange={(e) => setNote(e.target.value)} />
+        <Button
+          className="btn-red"
+          disabled={setMut.isPending || !email.trim()}
+          onClick={() => setMut.mutate()}
+        >
+          {setMut.isPending
+            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Applying…</>
+            : <><Save className="w-4 h-4 mr-2" /> Apply</>}
+        </Button>
+      </div>
+
+      <div className="px-3 py-2 border-b border-white/5">
+        <div className="relative max-w-xs">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-white/40" />
+          <Input
+            className="pl-8 h-8 text-xs"
+            placeholder="Filter by email"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">
+              <th className="py-2 px-3">Email</th>
+              <th className="py-2 px-3">Limit</th>
+              <th className="py-2 px-3">Note</th>
+              <th className="py-2 px-3">Updated</th>
+              <th className="py-2 px-3 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-white/40 text-xs">
+                  {rows.length === 0
+                    ? "No per-user overrides — every signed-in user is on the global limit."
+                    : "No user matches that search."}
+                </td>
+              </tr>
+            )}
+            {filtered.map((r) => (
+              <tr key={r.user_id} className="border-b border-white/5 hover:bg-white/5">
+                <td className="py-2 px-3 font-mono text-xs text-white/80">
+                  {r.email ?? <span className="text-white/40 italic">unknown · {r.user_id.slice(0, 8)}…</span>}
+                </td>
+                <td className="py-2 px-3">
+                  {r.daily_limit === 0
+                    ? <Badge variant="outline" className="border-emerald-500/40 text-emerald-300"><Inf className="w-3 h-3 mr-1" /> Unlimited</Badge>
+                    : <Badge variant="outline" className="border-sky-500/40 text-sky-300">{r.daily_limit}/24h</Badge>}
+                </td>
+                <td className="py-2 px-3 text-xs text-white/60">{r.note || <span className="text-white/30">—</span>}</td>
+                <td className="py-2 px-3 text-[11px] text-white/40 whitespace-nowrap">
+                  {new Date(r.updated_at).toLocaleString()}
+                </td>
+                <td className="py-2 px-3 text-right">
+                  <Button
+                    size="sm" variant="outline"
+                    className="h-7 px-2 text-red-300 border-red-500/30 hover:bg-red-500/10"
+                    title="Remove override (fall back to global limit)"
+                    onClick={() => removeMut.mutate(r.user_id)}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
