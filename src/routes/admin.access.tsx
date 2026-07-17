@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   KeyRound, Plus, Copy, ShieldCheck, ShieldAlert, Ban, Trash2, Infinity as Inf,
-  UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle,
+  UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle, Play, Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
+  testCaptchaKeys, listCaptchaLogs,
 } from "@/lib/access-keys.functions";
 
 export const Route = createFileRoute("/admin/access")({
