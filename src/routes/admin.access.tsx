@@ -563,7 +563,7 @@ function AccessAdminPage() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => bulkDelete.mutate()}>Delete</AlertDialogAction>
+                    <AlertDialogAction onClick={() => bulkDelete.mutate(Array.from(selected))}>Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
