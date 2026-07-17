@@ -431,6 +431,7 @@ export const submitActivation = createServerFn({ method: "POST" })
           error: "no_cookie",
           attempts: attemptNumber,
           message: "Cookie pool is empty — please try again shortly.",
+          captchaPass: mintedPass,
         };
       }
 
