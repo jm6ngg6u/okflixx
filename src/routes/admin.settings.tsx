@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
-  runCookiesAutocheckNow, runProxiesAutocheckNow,
+  runCookiesAutocheckNow, runProxiesAutocheckNow, getPublicContacts,
 } from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -374,12 +374,15 @@ function SettingsPage() {
             ) : null
           )}
 
-          <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+          <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9" enableKey="contact_tg_enabled" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C" enableKey="contact_ig_enabled" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366" enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
 
-          {/* Live preview */}
+          {/* Live preview (local, mirrors public output) */}
           <ContactPreview local={local} />
+
+          {/* Server-side consistency check — reads the exact same fn the public site uses */}
+          <ContactServerCheck local={local} />
         </div>
       </Section>
     </div>
@@ -407,9 +410,9 @@ function displayHandle(kind: "telegram" | "instagram" | "whatsapp", handle: stri
   return kind === "whatsapp" ? `+${handle}` : `@${handle}`;
 }
 
-function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
+function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
   icon: any; label: string; kind: "telegram" | "instagram" | "whatsapp"; accent: string;
-  nameKey: string; handleKey: string; handlePlaceholder: string;
+  enableKey: string; nameKey: string; handleKey: string; handlePlaceholder: string;
   local: Record<string, string>; set: (k: string, v: string) => void;
   onSave: (k: string, valueOverride?: string) => void | Promise<void>;
 }) {
@@ -417,14 +420,20 @@ function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handl
   const normalized = normalizeHandle(kind, rawHandle);
   const filled = !!normalized;
   const invalid = !!rawHandle && !normalized;
+  // Per-channel toggle: default ON when key absent (backward compat).
+  const channelOn = (local[enableKey] ?? "1") === "1";
   const commitHandle = () => {
     if (rawHandle === normalized) { if (rawHandle) onSave(handleKey); return; }
     set(handleKey, normalized);
     onSave(handleKey, normalized);
   };
   const commitName = () => onSave(nameKey);
+  const status = !channelOn ? { label: "DISABLED", cls: "bg-white/10 text-white/50 border-white/15" }
+    : filled ? { label: "SHOWING", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" }
+    : invalid ? { label: "INVALID", cls: "bg-red-500/15 text-red-300 border-red-500/30" }
+    : { label: "EMPTY", cls: "bg-white/10 text-white/50 border-white/15" };
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-2">
+    <div className={`rounded-md border p-3 space-y-2 ${channelOn ? "border-white/10 bg-white/[0.02]" : "border-white/5 bg-white/[0.01] opacity-70"}`}>
       <div className="flex items-center gap-2">
         <span
           className="w-8 h-8 rounded-md flex items-center justify-center icon-glow"
@@ -433,9 +442,12 @@ function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handl
           <Icon className="w-4 h-4" />
         </span>
         <div className="text-sm font-medium">{label}</div>
-        <Badge variant="outline" className={filled
-          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 ml-auto"
-          : "bg-white/10 text-white/50 border-white/15 ml-auto"}>{filled ? "SHOWING" : "HIDDEN"}</Badge>
+        <Badge variant="outline" className={`ml-auto ${status.cls}`}>{status.label}</Badge>
+        <Switch
+          checked={channelOn}
+          onCheckedChange={(v) => { set(enableKey, v ? "1" : "0"); setTimeout(() => onSave(enableKey, v ? "1" : "0"), 0); }}
+          aria-label={`Enable ${label}`}
+        />
       </div>
       <div className="grid sm:grid-cols-2 gap-2">
         <div className="space-y-1">
@@ -483,16 +495,17 @@ function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handl
 function ContactPreview({ local }: { local: Record<string, string> }) {
   const enabled = local.contact_enabled === "1";
   const items: Array<{ kind: "telegram" | "instagram" | "whatsapp"; name: string; accent: string; Icon: any; handle: string; href: string }> = [];
-  const push = (kind: "telegram" | "instagram" | "whatsapp", nameKey: string, handleKey: string, fallbackName: string, accent: string, Icon: any) => {
+  const push = (kind: "telegram" | "instagram" | "whatsapp", enableKey: string, nameKey: string, handleKey: string, fallbackName: string, accent: string, Icon: any) => {
+    if ((local[enableKey] ?? "1") !== "1") return;
     const h = normalizeHandle(kind, local[handleKey] ?? "");
     if (!h) return;
     const href = hrefFor(kind, h);
     if (!href) return;
     items.push({ kind, name: (local[nameKey] ?? "").trim() || fallbackName, accent, Icon, handle: displayHandle(kind, h), href });
   };
-  push("telegram", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
-  push("instagram", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
-  push("whatsapp", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
+  push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
+  push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
+  push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
 
   return (
     <div className="rounded-md border border-white/10 bg-black/40 p-4">
@@ -529,6 +542,96 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
     </div>
   );
 }
+
+function ContactServerCheck({ local }: { local: Record<string, string> }) {
+  const fetchPublic = useServerFn(getPublicContacts);
+  const q = useQuery({
+    queryKey: ["public-contacts", "admin-check"],
+    queryFn: () => fetchPublic(),
+    refetchInterval: 2000,
+    staleTime: 0,
+  });
+  const dbg = q.data?.debug;
+  const rows: Array<{ kind: "telegram" | "instagram" | "whatsapp"; enableKey: string; nameKey: string; handleKey: string }> = [
+    { kind: "telegram", enableKey: "contact_tg_enabled", nameKey: "contact_tg_name", handleKey: "contact_tg_username" },
+    { kind: "instagram", enableKey: "contact_ig_enabled", nameKey: "contact_ig_name", handleKey: "contact_ig_username" },
+    { kind: "whatsapp", enableKey: "contact_wa_enabled", nameKey: "contact_wa_name", handleKey: "contact_wa_number" },
+  ];
+  const localMasterOn = local.contact_enabled === "1";
+  const mismatches: string[] = [];
+  if (dbg) {
+    if (dbg.masterEnabled !== localMasterOn) mismatches.push("master toggle");
+    for (const r of rows) {
+      const localOn = (local[r.enableKey] ?? "1") === "1";
+      const localHandle = normalizeHandle(r.kind, local[r.handleKey] ?? "");
+      const remote = dbg.channels.find((c: any) => c.kind === r.kind);
+      if (!remote) { mismatches.push(`${r.kind} row missing`); continue; }
+      if (remote.enabled !== localOn) mismatches.push(`${r.kind} toggle`);
+      if (remote.normalizedHandle !== localHandle) mismatches.push(`${r.kind} handle`);
+    }
+  }
+  const ok = dbg && mismatches.length === 0;
+
+  return (
+    <div className="rounded-md border border-white/10 bg-black/40 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">// Server consistency check</div>
+        <div className="flex items-center gap-2">
+          {q.isFetching && <RefreshCw className="w-3 h-3 text-white/40 animate-spin" />}
+          <Badge variant="outline" className={ok
+            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+            : "bg-amber-500/15 text-amber-300 border-amber-500/30"}>
+            {q.isLoading ? "CHECKING…" : ok ? "IN SYNC" : `DRIFT: ${mismatches.join(", ").toUpperCase()}`}
+          </Badge>
+        </div>
+      </div>
+      <p className="text-[11px] text-white/40 leading-relaxed">
+        Reads the exact same server function the public footer uses (<code className="text-white/60">getPublicContacts</code>, query key <code className="text-white/60">public-contacts</code>). If anything drifts from what you typed above, it&apos;ll show here within 2s.
+      </p>
+      {dbg && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr className="text-white/40 uppercase tracking-widest text-[10px]">
+                <th className="text-left py-1 pr-3">Kind</th>
+                <th className="text-left py-1 pr-3">Enabled</th>
+                <th className="text-left py-1 pr-3">Handle → normalized</th>
+                <th className="text-left py-1 pr-3">Public URL</th>
+                <th className="text-left py-1">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dbg.channels.map((c: any) => (
+                <tr key={c.kind} className="border-t border-white/5">
+                  <td className="py-1.5 pr-3 text-white/80">{c.kind}</td>
+                  <td className="py-1.5 pr-3">
+                    <span className={c.enabled ? "text-emerald-300" : "text-white/40"}>{c.enabled ? "on" : "off"}</span>
+                  </td>
+                  <td className="py-1.5 pr-3 text-white/60">
+                    {c.rawHandle ? <>{c.rawHandle} <span className="text-white/25">→</span> <span className="text-white/80">{c.display || "—"}</span></> : <span className="text-white/30">empty</span>}
+                  </td>
+                  <td className="py-1.5 pr-3 truncate max-w-[220px]">
+                    {c.href ? <a className="text-white/60 hover:text-white" href={c.href} target="_blank" rel="noopener noreferrer">{c.href}</a> : <span className="text-white/30">—</span>}
+                  </td>
+                  <td className="py-1.5">
+                    {c.visible
+                      ? <span className="text-emerald-300">visible</span>
+                      : <span className="text-amber-300">hidden · {c.reason.replace(/_/g, " ")}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {dbg.updatedAt && (
+            <div className="mt-2 text-[10px] text-white/30 font-mono">Last write {new Date(dbg.updatedAt).toLocaleString()}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 
 function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
