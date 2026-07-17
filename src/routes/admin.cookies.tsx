@@ -995,18 +995,30 @@ function LiveIndicator({ realtimeUp, isFetching, isAnyChecking, nextTickIn }: { 
   );
 }
 
-function PoolHealthStrip({ stats, onFilterStatus, onFilterStuck }: {
+function PoolHealthStrip({ stats, avgHealth, onFilterStatus, onFilterStuck }: {
   stats: any;
+  avgHealth: number | null;
   onFilterStatus: (s: string) => void;
   onFilterStuck: () => void;
 }) {
   const s = stats ?? { byStatus: {}, total: 0, locked: 0, stuck: 0, successRate: null, checkedLastHour: 0 };
+  const hTone = avgHealth == null ? "muted"
+    : avgHealth >= 75 ? "emerald"
+    : avgHealth >= 55 ? "sky"
+    : avgHealth >= 35 ? "amber"
+    : "red";
+  const hLabel = avgHealth == null ? "no data"
+    : avgHealth >= 75 ? "excellent"
+    : avgHealth >= 55 ? "good"
+    : avgHealth >= 35 ? "fair"
+    : avgHealth >= 15 ? "poor" : "critical";
   const tiles: { key: string; label: string; value: string; sub?: string; tone: string; Icon: any; onClick?: () => void }[] = [
     { key: "total",    label: "Total",       value: fmt(s.total),                Icon: Cookie,      tone: "muted" },
     { key: "active",   label: "Active",      value: fmt(s.byStatus?.active),     Icon: ShieldCheck, tone: "emerald", onClick: () => onFilterStatus("active") },
     { key: "free",     label: "Free",        value: fmt(s.byStatus?.free),       Icon: Sparkles,    tone: "sky",     onClick: () => onFilterStatus("free") },
     { key: "on_hold",  label: "On hold",     value: fmt(s.byStatus?.on_hold),    Icon: PauseCircle, tone: "amber",   onClick: () => onFilterStatus("on_hold") },
     { key: "invalid",  label: "Invalid",     value: fmt(s.byStatus?.invalid),    Icon: XCircle,     tone: "red",     onClick: () => onFilterStatus("invalid") },
+    { key: "health",   label: "Avg health",  value: avgHealth == null ? "—" : `${avgHealth}`, sub: `page · ${hLabel}`, Icon: TrendingUp, tone: hTone },
     { key: "success",  label: "Success rate",value: s.successRate == null ? "—" : `${s.successRate}%`, sub: `${fmt(s.totalSucc)} ✓ / ${fmt(s.totalFail)} ✗`, Icon: TrendingUp, tone: "emerald" },
     { key: "locked",   label: "Locked now",  value: fmt(s.locked), sub: s.stuck > 0 ? `${s.stuck} stuck` : "healthy", Icon: Lock, tone: s.stuck > 0 ? "amber" : "muted", onClick: s.stuck > 0 ? onFilterStuck : undefined },
     { key: "check1h",  label: "Checks 1h",   value: fmt(s.checkedLastHour), Icon: Zap, tone: "sky" },
