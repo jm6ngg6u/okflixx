@@ -101,11 +101,14 @@ function HomePage() {
   const lastSubmitRef = useRef<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
-  const [stage, setStage] = useState<"idle" | "checking" | "activating">("idle");
+  // Multi-step progress: idle → checking-login → checking-key → checking-captcha → checking-cookie → activating.
+  type Stage = "idle" | "checking-login" | "checking-key" | "checking-captcha" | "checking-cookie" | "activating";
+  const [stage, setStage] = useState<Stage>("idle");
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
   const fetchCaptchaHealth = useServerFn(getCaptchaHealth);
+
 
   // Gate config polled every 10s so admin toggles reach the landing page.
   const gate = useQuery({
