@@ -113,7 +113,6 @@ export const setMaintenance = createServerFn({ method: "POST" })
 export const getPublicContacts = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const keys = [
-    "contact_enabled",
     "contact_tg_enabled", "contact_tg_name", "contact_tg_username",
     "contact_ig_enabled", "contact_ig_name", "contact_ig_username",
     "contact_wa_enabled", "contact_wa_name", "contact_wa_number",
@@ -126,7 +125,6 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
     const t = (r as any).updated_at ? Date.parse((r as any).updated_at) : 0;
     if (t > updatedAt) updatedAt = t;
   }
-  const masterEnabled = m.contact_enabled === "1";
   // Per-channel enable: default ON when key absent (backward compat).
   const tgOn = (m.contact_tg_enabled ?? "1") === "1";
   const igOn = (m.contact_ig_enabled ?? "1") === "1";
@@ -151,14 +149,13 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
     { kind: "whatsapp", enabled: waOn, name: (m.contact_wa_name ?? "").trim() || "WhatsApp", raw: m.contact_wa_number ?? "", handleNorm: wa, handle: wa ? `+${wa}` : "", href: wa ? `https://wa.me/${wa}` : "" },
   ];
   const channels = all
-    .filter((c) => masterEnabled && c.enabled && !!c.handleNorm)
+    .filter((c) => c.enabled && !!c.handleNorm)
     .map(({ kind, name, handle, href }) => ({ kind, name, handle, href }));
 
   return {
-    enabled: masterEnabled,
+    enabled: channels.length > 0,
     channels,
     debug: {
-      masterEnabled,
       updatedAt: updatedAt || null,
       channels: all.map((c) => ({
         kind: c.kind,
@@ -167,26 +164,13 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
         normalizedHandle: c.handleNorm,
         display: c.handle,
         href: c.href,
-        visible: masterEnabled && c.enabled && !!c.handleNorm,
-        reason: !masterEnabled ? "master_off" : !c.enabled ? "channel_off" : !c.handleNorm ? "empty_or_invalid_handle" : "ok",
+        visible: c.enabled && !!c.handleNorm,
+        reason: !c.enabled ? "channel_off" : !c.handleNorm ? "empty_or_invalid_handle" : "ok",
       })),
     },
   };
 });
 
-export const getPublicStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("app_settings")
-    .select("key,value")
-    .in("key", ["maintenance_enabled", "maintenance_message"]);
-  const map: Record<string, string> = {};
-  for (const row of data ?? []) map[row.key] = row.value;
-  return {
-    maintenance: map.maintenance_enabled === "1",
-    message: map.maintenance_message ?? "",
-  };
-});
 
 /**
  * Public pool-status snapshot for the landing page. Anon-safe — exposes only
