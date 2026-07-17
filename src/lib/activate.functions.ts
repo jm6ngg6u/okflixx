@@ -145,7 +145,62 @@ export const submitActivation = createServerFn({ method: "POST" })
       return { ok: false, error: "maintenance", message };
     }
 
-    // 4. Rate limit.
+    // 3b. Access-gate checks (admin-toggleable: login / captcha / access key).
+    const loginRequired = (await getSetting(supabaseAdmin, "login_required", "0")) === "1";
+    const captchaRequired = (await getSetting(supabaseAdmin, "captcha_required", "0")) === "1";
+    const accessKeyRequired = (await getSetting(supabaseAdmin, "access_key_required", "0")) === "1";
+
+    if (loginRequired && !data.authUserId) {
+      return {
+        ok: false,
+        error: "login_required",
+        message: "Please sign in to activate a TV code.",
+      };
+    }
+    if (captchaRequired) {
+      if (!data.captchaToken) {
+        return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
+      }
+      const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
+      const { verifyCaptcha } = await import("@/lib/access-keys.functions");
+      const v = await verifyCaptcha(provider, data.captchaToken, rawIp);
+      if (!v.ok) {
+        return { ok: false, error: "captcha_invalid", message: "Captcha check failed. Please retry." };
+      }
+    }
+    if (accessKeyRequired) {
+      const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
+      if (!data.accessKey && !data.accessSessionToken) {
+        return {
+          ok: false,
+          error: "access_key_required",
+          message: "This site requires an access key.",
+        };
+      }
+      const { verifyAccessCredentials } = await import("@/lib/access-keys.functions");
+      const check = await verifyAccessCredentials(supabaseAdmin, {
+        code: data.accessKey ?? null,
+        sessionToken: data.accessSessionToken ?? null,
+        fingerprint,
+        ipHash,
+      });
+      if (!check.ok) {
+        return {
+          ok: false,
+          error: "access_key_invalid",
+          message:
+            check.reason === "session_expired"
+              ? "Your 24-hour unlock expired. Enter your key again."
+              : check.reason === "already_redeemed"
+                ? "This key has already been used on another device."
+                : check.reason === "expired"
+                  ? "This access key has expired."
+                  : check.reason === "disabled"
+                    ? "This access key has been disabled."
+                    : "Invalid access key.",
+        };
+      }
+    }
     const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
     const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
       _ip_hash: ipHash,
