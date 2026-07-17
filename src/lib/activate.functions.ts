@@ -343,6 +343,7 @@ export const submitActivation = createServerFn({ method: "POST" })
           country,
           proxy_mode: proxyMode,
           attempt_number: attemptNumber,
+          user_id: verifiedUserId,
           selection_reason: {
             policy,
             filters: eligibility,
@@ -434,6 +435,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         proxy_id: proxyRow?.id ?? null,
         proxy_mode: proxyMode,
         attempt_number: attemptNumber,
+          user_id: verifiedUserId,
         duration_ms: outcome.duration_ms,
         error_message: (outcome as any).error ?? null,
         selection_reason: selectionReason,
