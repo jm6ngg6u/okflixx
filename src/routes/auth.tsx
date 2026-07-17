@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 type Step = "credentials" | "totp" | "recovery";
+type MfaMode = "enroll" | "challenge";
 
 function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 15000): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -45,6 +46,24 @@ function AuthPage() {
   const [status, setStatus] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
+  const [mfaRedirectMode, setMfaRedirectMode] = useState<MfaMode | null>(null);
+
+  const openMfa = useCallback((mode: MfaMode) => {
+    const target = `/auth/mfa?mode=${mode}`;
+    setMfaRedirectMode(mode);
+    setStatus(mode === "enroll" ? "Opening two-factor setup…" : "Opening two-factor verification…");
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (window.location.pathname !== "/auth/mfa") {
+        window.location.assign(target);
+      }
+    }, 900);
+
+    void navigate({ to: "/auth/mfa", search: { mode } as any }).catch(() => {
+      window.clearTimeout(fallbackTimer);
+      window.location.assign(target);
+    });
+  }, [navigate]);
 
   // If already signed in with aal2 → straight to /admin.
   // If signed in at aal1 with a factor → jump to TOTP step.
@@ -67,7 +86,7 @@ function AuthPage() {
           setStatus("");
         } else {
           // Signed in at aal1 with no factor → send to enrollment
-          navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
+          openMfa("enroll");
         }
       } catch (err: any) {
         setStatus("");
@@ -75,7 +94,7 @@ function AuthPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate, openMfa]);
 
   async function handlePasswordSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -121,12 +140,12 @@ function AuthPage() {
       const verified = (factors?.totp ?? []).find((f: any) => f.status === "verified");
       if (verified) {
         setFactorId(verified.id);
+        setMfaRedirectMode(null);
         setStep("totp");
         setStatus("");
         setBusy(false);
       } else {
-        setStatus("Opening two-factor setup…");
-        navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
+        openMfa("enroll");
       }
     } catch (err: any) {
       setErrorMessage(err?.message ?? "Sign-in failed after password verification. Please retry.");
@@ -229,7 +248,7 @@ function AuthPage() {
         return;
       }
       toast.success("Recovery accepted — enroll a new authenticator");
-      navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
+      openMfa("enroll");
     } catch (err: any) {
       setErrorMessage(err?.message ?? "Recovery failed");
       toast.error(err?.message ?? "Recovery failed");
@@ -267,6 +286,20 @@ function AuthPage() {
             <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/60 flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-red-300" />
               <span>{status}</span>
+            </div>
+          )}
+          {mfaRedirectMode && (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100 space-y-3">
+              <p className="text-emerald-100/80">
+                Your password is accepted. This account needs authenticator setup before the admin panel can open.
+              </p>
+              <Button
+                type="button"
+                onClick={() => window.location.assign(`/auth/mfa?mode=${mfaRedirectMode}`)}
+                className="w-full h-10 btn-red font-medium"
+              >
+                Open two-factor setup now
+              </Button>
             </div>
           )}
           {step === "credentials" && (
