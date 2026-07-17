@@ -7,11 +7,11 @@ import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
-import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
-import { getPublicPoolStatus, getPublicContacts } from "@/lib/settings.functions";
+import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
+import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Copy, LifeBuoy, X, Database, Sparkles, Repeat, Send, Instagram, Phone } from "lucide-react";
+import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
