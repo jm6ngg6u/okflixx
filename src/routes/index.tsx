@@ -131,6 +131,11 @@ function HomePage() {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [serviceError, setServiceError] = useState<
+    | { kind: "no_cookie" | "exhausted"; message: string; attempts?: number }
+    | null
+  >(null);
+  const [retryCountdown, setRetryCountdown] = useState(0);
 
   // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
   // Sent on subsequent activations so the user doesn't have to re-solve for
