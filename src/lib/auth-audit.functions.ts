@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequestHeader, getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 /** SHA-256 hex hash. */
@@ -10,12 +10,11 @@ async function sha256Hex(v: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function pickIp(req: Request | undefined): string {
-  const h = req?.headers;
+function readIp(): string {
   return (
-    h?.get("cf-connecting-ip") ??
-    h?.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h?.get("x-real-ip") ??
+    getRequestHeader("cf-connecting-ip") ??
+    getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim() ??
+    getRequestIP({ xForwardedFor: true }) ??
     "0.0.0.0"
   );
 }
