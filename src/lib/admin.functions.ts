@@ -341,6 +341,7 @@ export const getActivationPipelines = createServerFn({ method: "POST" })
           proxy_mode: !!r.proxy_mode,
           error: r.error_message,
           at: r.created_at,
+          selection_reason: r.selection_reason ?? null,
         })),
         total_duration_ms: totalDuration,
       };
