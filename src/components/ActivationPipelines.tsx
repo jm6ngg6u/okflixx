@@ -441,3 +441,10 @@ function timeAgo(iso: string): string {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   return `${Math.floor(s / 3600)}h ago`;
 }
+function fmtCountdown(sec: number): string {
+  if (sec <= 0) return "0s";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m <= 0) return `${s}s`;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
