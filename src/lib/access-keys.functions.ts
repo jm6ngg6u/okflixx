@@ -301,7 +301,7 @@ export const createAccessKeys = createServerFn({ method: "POST" })
     const generated: { code: string; id: string }[] = [];
     for (let i = 0; i < data.quantity; i++) {
       const code = generateKeyCode();
-      const codeHash = sha256(code);
+      const codeHash = await sha256(code);
       const { data: row, error } = await supabaseAdmin
         .from("access_keys")
         .insert({
