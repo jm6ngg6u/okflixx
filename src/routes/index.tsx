@@ -7,7 +7,7 @@ import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
-import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
+import { getGateConfig, redeemAccessKey, getCaptchaHealth } from "@/lib/access-keys.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2 } from "lucide-react";
