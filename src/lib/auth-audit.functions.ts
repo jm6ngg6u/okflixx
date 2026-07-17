@@ -92,9 +92,8 @@ const AuthEventInput = z.object({
 export const logAuthEvent = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => AuthEventInput.parse(d))
   .handler(async ({ data }) => {
-    const req = getRequest();
-    const ipHash = await sha256Hex(pickIp(req));
-    const userAgent = (req?.headers.get("user-agent") ?? "").slice(0, 300);
+    const ipHash = await sha256Hex(readIp());
+    const userAgent = (getRequestHeader("user-agent") ?? "").slice(0, 300);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     await supabaseAdmin.from("auth_audit_log").insert({
