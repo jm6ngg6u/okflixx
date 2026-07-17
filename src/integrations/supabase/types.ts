@@ -28,6 +28,7 @@ export type Database = {
           proxy_id: string | null
           proxy_mode: boolean
           result: string
+          selection_reason: Json | null
           user_agent: string | null
         }
         Insert: {
@@ -43,6 +44,7 @@ export type Database = {
           proxy_id?: string | null
           proxy_mode?: boolean
           result: string
+          selection_reason?: Json | null
           user_agent?: string | null
         }
         Update: {
@@ -58,6 +60,7 @@ export type Database = {
           proxy_id?: string | null
           proxy_mode?: boolean
           result?: string
+          selection_reason?: Json | null
           user_agent?: string | null
         }
         Relationships: [
@@ -559,6 +562,17 @@ export type Database = {
         Returns: undefined
       }
       run_auto_cleanup: { Args: never; Returns: Json }
+      simulate_cookie_selection: {
+        Args: {
+          _include_statuses?: string[]
+          _limit?: number
+          _min_success_rate?: number
+          _min_total_uses?: number
+          _policy?: string
+          _require_valid?: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "moderator"
