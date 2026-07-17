@@ -8,7 +8,8 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
-  Shield, ShieldAlert, KeyRound, Menu, X, Music4,
+  Shield, ShieldAlert, KeyRound, Menu, X, Music4, Shuffle,
+
 } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
@@ -132,6 +133,8 @@ function AdminLayout() {
     { to: "/admin/attempts", label: "Attempts log", icon: ScrollText },
     { to: "/admin/cookies", label: "Cookie pool", icon: Cookie, adminOnly: true },
     { to: "/admin/proxies", label: "Proxy pool", icon: Globe2, adminOnly: true },
+    { to: "/admin/rotation", label: "Rotation policy", icon: Shuffle, adminOnly: true },
+
     { to: "/admin/staff", label: "Staff & roles", icon: Users, adminOnly: true },
     { to: "/admin/security", label: "Security (TOTP)", icon: KeyRound },
     { to: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
