@@ -25,6 +25,9 @@ type Stage = "form" | "verify-otp" | "reset-sent";
 function LoginPage() {
   const navigate = useNavigate();
   const fetchGate = useServerFn(getGateConfig);
+  const checkOtp = useServerFn(checkOtpLimit);
+  const recordOtp = useServerFn(recordOtpSent);
+  const logEvent = useServerFn(logAuthEvent);
   const gate = useQuery({ queryKey: ["login-gate"], queryFn: () => fetchGate(), staleTime: 15_000 });
 
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
@@ -35,6 +38,13 @@ function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpFails, setOtpFails] = useState(0);
+  const [otpLockUntil, setOtpLockUntil] = useState<number | null>(null);
+  const MAX_OTP_VERIFY_ATTEMPTS = 5;
+
+  const safeLog = (payload: Parameters<typeof logAuthEvent>[0] extends { data: infer T } ? T : any) => {
+    logEvent({ data: payload as any }).catch(() => { /* swallow */ });
+  };
 
   // Captcha state (respects the same gate config as landing).
   const [captchaToken, setCaptchaToken] = useState("");
