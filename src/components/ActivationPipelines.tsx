@@ -105,8 +105,22 @@ export function ActivationPipelines() {
     setExpanded((e) => (e[newestKey] === undefined ? { ...e, [newestKey]: true } : e));
   }, [newestKey]);
 
-  const rlData = rl.data;
+  const rlData = rl.data as any;
   const rlBusy = !!rlData && rlData.total > 0;
+
+  // Live-tick the countdown once per second when there is any active throttle.
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    if (!rlBusy) return;
+    const iv = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(iv);
+  }, [rlBusy]);
+
+  // Decrement server-reported cooldown by the client-side drift.
+  const lastFetchedAt = rl.dataUpdatedAt || nowTick;
+  const drift = Math.max(0, Math.floor((nowTick - lastFetchedAt) / 1000));
+  const liveCooldown = Math.max(0, (rlData?.cooldown_seconds ?? 0) - drift);
+  const worstCountdown = fmtCountdown(liveCooldown);
 
   return (
     <div className="glass p-5">
@@ -125,7 +139,7 @@ export function ActivationPipelines() {
         </div>
       </div>
 
-      {/* Rate-limit strip */}
+      {/* Rate-limit strip with live countdown */}
       <div className={`mb-4 rounded-lg border px-3 py-2 flex items-center gap-3 flex-wrap ${
         rlBusy
           ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] via-amber-500/[0.03] to-transparent"
@@ -139,7 +153,7 @@ export function ActivationPipelines() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-mono uppercase tracking-widest text-white/40">
-            rate-limit · last {rlData?.windowMinutes ?? 15}m
+            rate-limit · {rlData?.rateLimitPer10Min ?? 10}/10m per IP · window {rlData?.windowMinutes ?? 15}m
           </div>
           <div className="text-xs text-white/80 truncate">
             {rlBusy ? (
@@ -154,14 +168,29 @@ export function ActivationPipelines() {
             )}
           </div>
         </div>
-        {rlBusy && rlData.top.slice(0, 4).map((ip) => (
-          <span key={ip.ip_hash}
-            className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-100"
-            title={`IP ${ip.ip_hash.slice(0, 16)}… · last ${new Date(ip.last).toLocaleTimeString()}`}>
-            <ShieldAlert className="w-3 h-3" />
-            {ip.ip_hash.slice(0, 8)} · ×{ip.count}
+        {rlBusy && liveCooldown > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-amber-500/40 bg-amber-500/15 text-amber-100 tabular-nums shadow-[0_0_20px_-8px_rgba(251,191,36,0.6)]">
+            <Clock className="w-3 h-3 animate-pulse" />
+            cools in {worstCountdown}
           </span>
-        ))}
+        )}
+        {rlBusy && rlData.top.slice(0, 3).map((ip: any) => {
+          const ipCd = Math.max(0, (ip.cooldown_seconds ?? 0) - drift);
+          const isBot = ip.result === "bot_detected";
+          return (
+            <span key={ip.ip_hash}
+              className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border tabular-nums ${
+                isBot
+                  ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-100"
+              }`}
+              title={`IP ${ip.ip_hash.slice(0, 16)}… · last ${new Date(ip.last).toLocaleTimeString()}`}>
+              <ShieldAlert className="w-3 h-3" />
+              {ip.ip_hash.slice(0, 8)} · ×{ip.count}
+              {ipCd > 0 && <span className="text-white/50">· {fmtCountdown(ipCd)}</span>}
+            </span>
+          );
+        })}
       </div>
 
       {pipelines.length === 0 ? (
@@ -411,4 +440,11 @@ function timeAgo(iso: string): string {
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   return `${Math.floor(s / 3600)}h ago`;
+}
+function fmtCountdown(sec: number): string {
+  if (sec <= 0) return "0s";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m <= 0) return `${s}s`;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
 }

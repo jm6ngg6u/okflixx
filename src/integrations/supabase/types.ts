@@ -475,6 +475,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      count_eligible_cookies: {
+        Args: {
+          _include_statuses?: string[]
+          _min_success_rate?: number
+          _min_total_uses?: number
+          _require_valid?: boolean
+        }
+        Returns: number
+      }
       count_recent_attempts: {
         Args: { _ip_hash: string; _minutes: number }
         Returns: number
@@ -504,6 +513,20 @@ export type Database = {
       }
       pick_next_cookie_by_policy: {
         Args: { _policy?: string }
+        Returns: {
+          cookies_json: Json
+          fingerprint: string
+          id: string
+        }[]
+      }
+      pick_next_cookie_filtered: {
+        Args: {
+          _include_statuses?: string[]
+          _min_success_rate?: number
+          _min_total_uses?: number
+          _policy?: string
+          _require_valid?: boolean
+        }
         Returns: {
           cookies_json: Json
           fingerprint: string
