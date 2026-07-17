@@ -31,6 +31,23 @@ function useReveal() {
   }, []);
 }
 
+type SuccessPayload = {
+  code: string;
+  attempts: number;
+  policy: string;
+  redirectUrl: string;
+  account: {
+    email: string | null;
+    country: string | null;
+    plan_name: string | null;
+    video_quality: string | null;
+    max_streams: number | null;
+    member_since: string | null;
+    payment_method: string | null;
+    name: string | null;
+  };
+};
+
 function HomePage() {
   useReveal();
   const codeRef = useRef<CodeInputHandle>(null);
@@ -38,6 +55,8 @@ function HomePage() {
   const mountedAtRef = useRef<number>(Date.now());
   const lastSubmitRef = useRef<number>(0);
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<SuccessPayload | null>(null);
+  const [stage, setStage] = useState<"idle" | "checking" | "activating">("idle");
   const activate = useServerFn(submitActivation);
 
   const handleActivate = async () => {
@@ -57,6 +76,9 @@ function HomePage() {
     }
 
     setSubmitting(true);
+    setStage("checking");
+    // Visual cue that the pipeline moved from check → activate.
+    const stageTimer = window.setTimeout(() => setStage("activating"), 1200);
     try {
       const result = await activate({
         data: {
@@ -66,8 +88,13 @@ function HomePage() {
         },
       });
       if (result.ok) {
-        toast.success(result.message ?? "Code accepted — opening Netflix…");
-        setTimeout(() => { window.location.href = result.redirectUrl; }, 800);
+        setSuccess({
+          code,
+          attempts: result.attempts,
+          policy: result.policy,
+          redirectUrl: result.redirectUrl,
+          account: result.account,
+        });
       } else if (result.error === "rate_limited") {
         toast.error("Too many attempts. Try again in 10 minutes.");
       } else if (result.error === "bot_detected") {
@@ -86,9 +113,12 @@ function HomePage() {
       console.error(err);
       toast.error("Network error. Please try again.");
     } finally {
+      window.clearTimeout(stageTimer);
+      setStage("idle");
       setSubmitting(false);
     }
   };
+
 
   return (
     <div className="relative min-h-screen text-white">
