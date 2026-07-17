@@ -360,6 +360,21 @@ function HomePage() {
 
   const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
 
+  // Ordered list of enabled gates with satisfaction state → drives the header,
+  // progress bar, and numbered badges. Only reads gate.data; never invents gates.
+  const gateItems = useMemo(() => {
+    const g = gate.data;
+    if (!g) return [] as { key: "login" | "key" | "captcha"; label: string; done: boolean }[];
+    const out: { key: "login" | "key" | "captcha"; label: string; done: boolean }[] = [];
+    if (g.loginRequired) out.push({ key: "login", label: "Sign in", done: !!authUserId });
+    if (g.accessKeyRequired) out.push({ key: "key", label: "Access key", done: !!sessionToken });
+    if (g.captchaRequired) out.push({ key: "captcha", label: "Human check", done: !!(captchaToken || captchaPassToken) });
+    return out;
+  }, [gate.data, authUserId, sessionToken, captchaToken, captchaPassToken]);
+  const doneCount = gateItems.filter((g) => g.done).length;
+  const allSatisfied = gateItems.length > 0 && doneCount === gateItems.length;
+
+
 
 
   return (
