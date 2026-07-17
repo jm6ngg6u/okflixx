@@ -233,6 +233,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
 
     let ok = 0, dead = 0;
     const reasons: Record<string, number> = {};
+    let control: "stop" | "cancel" | null = null;
     for (const p of rows ?? []) {
       const res = await checkProxyViaWorker({
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
@@ -252,19 +253,32 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
           phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, reasons,
         });
       }
+      if (done % 4 === 0) {
+        control = await readJobControl(jobId);
+        if (control) break;
+      }
+    }
+    if (control === "cancel") {
+      const summary = { checked: ok + dead, ok_count: ok, dead, reasons, cancelled: true };
+      await recordJobFinish(jobId, false, summary, "Cancelled by admin");
+      return { ok: false, error: "cancelled", ...summary };
     }
     await recordJobProgress(jobId, {
-      phase: "cleanup", total: rows?.length ?? 0, checked: (rows ?? []).length, ok_count: ok, dead, reasons,
+      phase: "cleanup", total: rows?.length ?? 0, checked: ok + dead, ok_count: ok, dead, reasons,
+      stopped: control === "stop" || undefined,
     });
 
     let removed_invalid = 0;
-    if (map.proxy_autocheck_cleanup !== "0") {
+    if (map.proxy_autocheck_cleanup !== "0" && control !== "stop") {
       const { count: c } = await supabaseAdmin
         .from("proxy_pool").select("id", { count: "exact", head: true }).eq("is_valid", false);
       await supabaseAdmin.from("proxy_pool").delete().eq("is_valid", false);
       removed_invalid = c ?? 0;
     }
-    const summary = { checked: (rows ?? []).length, ok_count: ok, dead, removed_invalid, reasons };
+    const summary = {
+      checked: ok + dead, ok_count: ok, dead, removed_invalid, reasons,
+      stopped: control === "stop" || undefined,
+    };
     await recordJobFinish(jobId, true, summary);
     await supabaseAdmin.from("app_settings").upsert({
       key: "proxies_last_run_at", value: new Date().toISOString(), updated_at: new Date().toISOString(),
