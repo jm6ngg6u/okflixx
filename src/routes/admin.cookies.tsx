@@ -8,6 +8,7 @@ import {
   deleteAllCookies, deleteInvalidCookies, deleteFreeHoldCookies,
   deleteDuplicateCookies, getCookieDetail,
   getCookiePoolStats, unlockStuckCookies, bulkDeleteCookies,
+  previewCookieUpload, advancedCleanupCookies,
 } from "@/lib/pool.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { countryFlag, countryName } from "@/lib/countries";
