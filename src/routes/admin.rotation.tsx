@@ -6,9 +6,10 @@ import { listSettings, setSetting } from "@/lib/settings.functions";
 import { getCookiePoolStats } from "@/lib/pool.functions";
 import {
   getCookieEligibility, setCookieEligibility, previewCookieEligibility,
+  simulateCookieSelection,
 } from "@/lib/admin.functions";
 import { Badge } from "@/components/ui/badge";
-import { Shuffle, Repeat, Sparkles, CheckCircle2, Loader2, RefreshCw, Filter, Save, RotateCcw } from "lucide-react";
+import { Shuffle, Repeat, Sparkles, CheckCircle2, Loader2, RefreshCw, Filter, Save, RotateCcw, FlaskConical, Trophy, Cookie, XCircle, Lock, Ban, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/rotation")({
@@ -57,6 +58,7 @@ function RotationPage() {
   const fetchElig = useServerFn(getCookieEligibility);
   const saveElig = useServerFn(setCookieEligibility);
   const previewElig = useServerFn(previewCookieEligibility);
+  const simulate = useServerFn(simulateCookieSelection);
   const qc = useQueryClient();
 
   const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
@@ -130,6 +132,11 @@ function RotationPage() {
       qc.invalidateQueries({ queryKey: ["cookie-pool-stats"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Save failed"),
+  });
+
+  const sim = useMutation({
+    mutationFn: async () => simulate({ data: { ...draft, policy: current, limit: 10 } as any }),
+    onError: (e: any) => toast.error(e?.message ?? "Simulation failed"),
   });
 
   const resetDefaults = () => {
@@ -351,6 +358,16 @@ function RotationPage() {
             </button>
             <button
               type="button"
+              onClick={() => sim.mutate()}
+              disabled={sim.isPending || eligibleNow === 0}
+              className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 hover:border-sky-500/50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {sim.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Running…</>
+                : <><FlaskConical className="w-3 h-3" /> Dry-run</>}
+            </button>
+            <button
+              type="button"
               onClick={() => save.mutate()}
               disabled={!dirty || save.isPending || eligibleNow === 0}
               className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-4 py-1.5 rounded border border-[#ff2a3a]/40 bg-gradient-to-r from-[#ff2a3a]/20 to-[#b0060f]/10 text-[#ff8a90] hover:from-[#ff2a3a]/30 hover:border-[#ff2a3a]/60 transition disabled:opacity-40 disabled:cursor-not-allowed"
@@ -361,6 +378,9 @@ function RotationPage() {
             </button>
           </div>
         </div>
+
+        {/* Dry-run result */}
+        {sim.data && <SimResult sim={sim.data} draftPolicy={current} />}
       </div>
 
       {/* How it works */}
@@ -444,4 +464,110 @@ function StatTile({
       {hint && <div className="text-[11px] text-white/40 mt-1">{hint}</div>}
     </div>
   );
+}
+
+function SimResult({ sim, draftPolicy }: { sim: any; draftPolicy: Policy }) {
+  const winner = sim?.winner;
+  const preview: any[] = sim?.preview ?? [];
+  const skip = sim?.skipped ?? {};
+  const total = sim?.total ?? 0;
+  const elig = sim?.eligible ?? 0;
+
+  const skipRows: { key: string; label: string; count: number; icon: any; tone: string }[] = [
+    { key: "wrong_status", label: "Status not allowed", count: skip.wrong_status ?? 0, icon: Ban, tone: "text-white/60" },
+    { key: "invalid_flag", label: "Marked invalid", count: skip.invalid_flag ?? 0, icon: XCircle, tone: "text-[#ff8a90]" },
+    { key: "currently_locked", label: "Currently locked (in-flight)", count: skip.currently_locked ?? 0, icon: Lock, tone: "text-amber-300" },
+    { key: "low_success_rate", label: "Below min success rate", count: skip.low_success_rate ?? 0, icon: TrendingDown, tone: "text-rose-300" },
+  ];
+
+  return (
+    <div className="mt-5 pt-5 border-t border-white/10">
+      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-sky-300/80">// Dry-run simulation</div>
+          <div className="font-display text-lg mt-0.5">Selection preview</div>
+          <div className="text-xs text-white/50 mt-0.5">
+            Policy <span className="text-white font-mono">{draftPolicy.replace("_", " ")}</span> · {elig} of {total} cookies pass · nothing was locked
+          </div>
+        </div>
+      </div>
+
+      {/* Winner */}
+      {winner ? (
+        <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/[0.08] via-emerald-500/[0.02] to-transparent p-4 mb-4 shadow-[0_0_40px_-20px_rgba(52,211,153,0.6)]">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/40 grid place-items-center text-emerald-300">
+              <Trophy className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[10px] uppercase tracking-widest text-emerald-300/80">Next pick would be</div>
+              <div className="font-display text-lg text-emerald-100 truncate">{winner.email ?? winner.id?.slice(0, 8)}</div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] font-mono text-white/60">
+                {winner.country && <span>🌍 {winner.country}</span>}
+                <span>uses <span className="text-white">{winner.total_uses ?? 0}</span></span>
+                <span>success <span className="text-emerald-300">{winner.success_count ?? 0}</span></span>
+                <span>rate <span className="text-white">{winner.success_rate != null ? `${Math.round(winner.success_rate * 100)}%` : "—"}</span></span>
+                {winner.last_used_at && <span>last {new Date(winner.last_used_at).toLocaleTimeString()}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.05] p-4 mb-4 text-sm text-[#ff8a90]">
+          No cookie would be picked with these rules.
+        </div>
+      )}
+
+      {/* Preview table */}
+      {preview.length > 1 && (
+        <div className="rounded-xl border border-white/10 overflow-hidden mb-4">
+          <div className="px-3 py-2 border-b border-white/10 bg-white/[0.02] font-mono text-[10px] uppercase tracking-widest text-white/50">
+            Top {preview.length} eligible cookies · in policy order
+          </div>
+          <div className="divide-y divide-white/5">
+            {preview.map((c: any) => (
+              <div key={c.id} className={`grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2 text-[11px] font-mono ${c.rank === 1 ? "bg-emerald-500/[0.04]" : ""}`}>
+                <span className={`tabular-nums w-6 text-right ${c.rank === 1 ? "text-emerald-300" : "text-white/40"}`}>#{c.rank}</span>
+                <span className="min-w-0 flex items-center gap-2">
+                  <Cookie className="w-3 h-3 text-white/40" />
+                  <span className="truncate text-white/80">{c.email ?? c.id.slice(0, 12)}</span>
+                  {c.country && <span className="text-white/40">· {c.country}</span>}
+                </span>
+                <span className="text-white/50 tabular-nums">
+                  {c.success_count}/{c.total_uses}
+                </span>
+                <span className={`tabular-nums ${(c.success_rate ?? 0) >= 0.7 ? "text-emerald-300" : (c.success_rate ?? 0) >= 0.3 ? "text-amber-300" : c.total_uses > 0 ? "text-rose-300" : "text-white/40"}`}>
+                  {c.success_rate != null ? `${Math.round(c.success_rate * 100)}%` : "—"}
+                </span>
+                <span className="text-white/40 tabular-nums whitespace-nowrap">
+                  {c.last_used_at ? relTime(c.last_used_at) : "never"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Skip breakdown */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {skipRows.map((r) => (
+          <div key={r.key} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div className="flex items-center gap-2">
+              <r.icon className={`w-3.5 h-3.5 ${r.tone}`} />
+              <span className="font-mono text-[9px] uppercase tracking-widest text-white/40">{r.label}</span>
+            </div>
+            <div className={`mt-1 font-display text-xl ${r.count === 0 ? "text-white/30" : r.tone}`}>{r.count}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function relTime(iso: string): string {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }

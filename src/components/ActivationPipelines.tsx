@@ -1,13 +1,36 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getActivationPipelines, getRateLimitStatus, retryActivationAdmin } from "@/lib/admin.functions";
+import { getActivationPipelines, getRateLimitStatus, retryActivationAdmin, getRetryPrecheck } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Cookie, Globe2, ListChecks, PlayCircle, Server,
-  CheckCircle2, XCircle, Clock, Zap, RefreshCw, ShieldAlert, Loader2, Gauge,
+  CheckCircle2, XCircle, Clock, Zap, RefreshCw, ShieldAlert, Loader2, Gauge, Info, Filter,
 } from "lucide-react";
+
+type SelectionReason = {
+  policy?: string;
+  filters?: {
+    include_statuses?: string[];
+    require_valid?: boolean;
+    min_success_rate?: number;
+    min_total_uses?: number;
+  };
+  eligible_at_pick?: number | null;
+  admin_retry?: boolean;
+  outcome?: string;
+  cookie?: {
+    status?: string | null;
+    is_valid?: boolean | null;
+    total_uses?: number;
+    success_count?: number;
+    fail_count?: number;
+    success_rate?: number | null;
+    last_used_at?: string | null;
+  };
+  why?: string;
+};
 
 type Attempt = {
   id: string;
@@ -19,6 +42,7 @@ type Attempt = {
   proxy_mode: boolean;
   error: string | null;
   at: string;
+  selection_reason: SelectionReason | null;
 };
 type Pipeline = {
   key: string;
@@ -53,6 +77,7 @@ export function ActivationPipelines() {
   const fetchPipelines = useServerFn(getActivationPipelines);
   const fetchRateLimit = useServerFn(getRateLimitStatus);
   const retryFn = useServerFn(retryActivationAdmin);
+  const precheckFn = useServerFn(getRetryPrecheck);
   const qc = useQueryClient();
 
   const q = useQuery({
@@ -65,13 +90,24 @@ export function ActivationPipelines() {
     queryFn: () => fetchRateLimit({ data: { windowMinutes: 15 } }),
     refetchInterval: 20_000,
   });
+  const pc = useQuery({
+    queryKey: ["retry-precheck"],
+    queryFn: () => precheckFn(),
+    refetchInterval: 15_000,
+  });
 
   const retryMut = useMutation({
-    mutationFn: async (code: string) => retryFn({ data: { code } }),
+    mutationFn: async (code: string) => {
+      const pre = await precheckFn();
+      if (!pre.can_retry) throw new Error(pre.reason ?? "Retry blocked");
+      return retryFn({ data: { code } });
+    },
     onSuccess: (r: any) => {
       if (r?.ok) toast.success(`Retry succeeded · ${r.status} · ${r.duration_ms}ms`);
+      else if (r?.status === "no_cookie") toast.error(`Retry blocked · ${r.message ?? "No eligible cookie"}`);
       else toast.error(`Retry → ${r?.status ?? "error"}`);
       qc.invalidateQueries({ queryKey: ["activation-pipelines"] });
+      qc.invalidateQueries({ queryKey: ["retry-precheck"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
   });
@@ -207,6 +243,7 @@ export function ActivationPipelines() {
               onToggle={() => setExpanded((e) => ({ ...e, [p.key]: !e[p.key] }))}
               onRetry={() => retryMut.mutate(p.code)}
               retrying={retryMut.isPending && retryMut.variables === p.code}
+              precheck={pc.data as any}
             />
           ))}
         </div>
@@ -215,9 +252,18 @@ export function ActivationPipelines() {
   );
 }
 
+type Precheck = {
+  policy: "round_robin" | "random" | "quality";
+  proxy_mode: boolean;
+  eligible: number;
+  eligibility: { include_statuses: string[]; require_valid: boolean; min_success_rate: number; min_total_uses: number };
+  can_retry: boolean;
+  reason: string | null;
+};
+
 function PipelineRow({
-  pipeline, expanded, onToggle, onRetry, retrying,
-}: { pipeline: Pipeline; expanded: boolean; onToggle: () => void; onRetry: () => void; retrying: boolean }) {
+  pipeline, expanded, onToggle, onRetry, retrying, precheck,
+}: { pipeline: Pipeline; expanded: boolean; onToggle: () => void; onRetry: () => void; retrying: boolean; precheck?: Precheck }) {
   const final = pipeline.final_result;
   const isSuccess = final === "success";
   const finalIsTerminal = isTerminal(final);
@@ -295,21 +341,43 @@ function PipelineRow({
             <Meta label="IP hash" value={pipeline.ip_hash ? pipeline.ip_hash.slice(0, 10) + "…" : "—"} />
           </div>
 
-          {/* Retry action */}
+          {/* Retry action + pre-check strip */}
           <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-[10px] font-mono text-white/40">
-              admin retry uses the current rotation policy · logged as <span className="text-white/60">activation.admin_retry</span>
+            <div className="text-[10px] font-mono text-white/40 flex items-center gap-2 flex-wrap">
+              <span>admin retry · logged as <span className="text-white/60">activation.admin_retry</span></span>
+              {precheck && (
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border ${
+                  precheck.can_retry
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
+                }`}>
+                  <Filter className="w-3 h-3" />
+                  {precheck.eligible} eligible · {precheck.policy.replace("_", " ")}
+                </span>
+              )}
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); onRetry(); }}
-              disabled={retrying}
-              className="group inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90] hover:bg-[#ff2a3a]/20 hover:border-[#ff2a3a]/60 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={retrying || (precheck ? !precheck.can_retry : false)}
+              title={precheck && !precheck.can_retry ? (precheck.reason ?? "Retry blocked") : `Retry ${pipeline.code}`}
+              className={`group inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                precheck && !precheck.can_retry
+                  ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/5 text-[#ff8a90]"
+                  : "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90] hover:bg-[#ff2a3a]/20 hover:border-[#ff2a3a]/60"
+              }`}
             >
               {retrying
                 ? <><Loader2 className="w-3 h-3 animate-spin" /> retrying…</>
-                : <><RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-300" /> retry {pipeline.code}</>}
+                : precheck && !precheck.can_retry
+                  ? <><ShieldAlert className="w-3 h-3" /> blocked</>
+                  : <><RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-300" /> retry {pipeline.code}</>}
             </button>
           </div>
+          {precheck && !precheck.can_retry && precheck.reason && (
+            <div className="mt-2 text-[10px] font-mono text-[#ff8a90]/80 border border-[#ff2a3a]/30 bg-[#ff2a3a]/[0.04] rounded px-2 py-1">
+              ⚠ {precheck.reason}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -378,45 +446,81 @@ function StageRail({
 function AttemptRow({ attempt, totalAttempts }: { attempt: Attempt; totalAttempts: number }) {
   const isSuccess = attempt.result === "success";
   const tone = isSuccess ? "text-emerald-400" : "text-[#ff8a90]";
+  const r = attempt.selection_reason;
   return (
-    <div className="grid grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 text-[11px] font-mono px-2 py-1.5 rounded bg-white/[0.02] border border-white/5">
-      <span className="text-white/40 tabular-nums">#{attempt.n}/{totalAttempts}</span>
-      <span className={`w-1.5 h-1.5 rounded-full ${isSuccess ? "bg-emerald-400" : "bg-[#ff2a3a]"}`} />
-      <span className="min-w-0 flex items-center gap-2 flex-wrap">
-        <span className={`px-1.5 py-0.5 rounded border text-[10px] ${
-          isSuccess
-            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-            : "bg-[#ff2a3a]/10 text-[#ff8a90] border-[#ff2a3a]/30"
-        }`}>
-          {(attempt.result ?? "pending").replace(/_/g, " ")}
+    <div className="rounded bg-white/[0.02] border border-white/5">
+      <div className="grid grid-cols-[auto_auto_1fr_auto_auto] items-center gap-3 text-[11px] font-mono px-2 py-1.5">
+        <span className="text-white/40 tabular-nums">#{attempt.n}/{totalAttempts}</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${isSuccess ? "bg-emerald-400" : "bg-[#ff2a3a]"}`} />
+        <span className="min-w-0 flex items-center gap-2 flex-wrap">
+          <span className={`px-1.5 py-0.5 rounded border text-[10px] ${
+            isSuccess
+              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+              : "bg-[#ff2a3a]/10 text-[#ff8a90] border-[#ff2a3a]/30"
+          }`}>
+            {(attempt.result ?? "pending").replace(/_/g, " ")}
+          </span>
+          {attempt.cookie_id && (
+            <span className="text-white/40 inline-flex items-center gap-1">
+              <Cookie className="w-3 h-3" /> {attempt.cookie_id.slice(0, 8)}
+            </span>
+          )}
+          {attempt.proxy_id ? (
+            <span className="text-white/40 inline-flex items-center gap-1">
+              <Globe2 className="w-3 h-3" /> {attempt.proxy_id.slice(0, 8)}
+            </span>
+          ) : attempt.proxy_mode ? (
+            <span className="text-white/30 inline-flex items-center gap-1">
+              <Globe2 className="w-3 h-3" /> proxy fallback → direct
+            </span>
+          ) : null}
+          {r?.admin_retry && (
+            <span className="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200">
+              admin
+            </span>
+          )}
+          {attempt.error && (
+            <span className="text-[#ff8a90]/70 truncate max-w-[240px]" title={attempt.error}>
+              · {attempt.error}
+            </span>
+          )}
         </span>
-        {attempt.cookie_id && (
-          <span className="text-white/40 inline-flex items-center gap-1">
-            <Cookie className="w-3 h-3" /> {attempt.cookie_id.slice(0, 8)}
-          </span>
-        )}
-        {attempt.proxy_id ? (
-          <span className="text-white/40 inline-flex items-center gap-1">
-            <Globe2 className="w-3 h-3" /> {attempt.proxy_id.slice(0, 8)}
-          </span>
-        ) : attempt.proxy_mode ? (
-          <span className="text-white/30 inline-flex items-center gap-1">
-            <Globe2 className="w-3 h-3" /> proxy fallback → direct
-          </span>
-        ) : null}
-        {attempt.error && (
-          <span className="text-[#ff8a90]/70 truncate max-w-[240px]" title={attempt.error}>
-            · {attempt.error}
-          </span>
-        )}
-      </span>
-      <span className={`tabular-nums ${tone}`}>
-        {fmtMs(attempt.duration_ms)}
-      </span>
-      <span className="text-white/30 inline-flex items-center gap-1 tabular-nums">
-        <Clock className="w-3 h-3" />
-        {new Date(attempt.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-      </span>
+        <span className={`tabular-nums ${tone}`}>
+          {fmtMs(attempt.duration_ms)}
+        </span>
+        <span className="text-white/30 inline-flex items-center gap-1 tabular-nums">
+          <Clock className="w-3 h-3" />
+          {new Date(attempt.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+        </span>
+      </div>
+      {r && (r.why || r.cookie) && (
+        <div className="px-2 pb-2 pt-1 -mt-1 border-t border-white/5 grid grid-cols-[auto_1fr] gap-2 items-start">
+          <Info className="w-3 h-3 text-sky-300/70 mt-0.5" />
+          <div className="min-w-0 text-[10px] font-mono">
+            {r.why && (
+              <div className="text-white/70">
+                <span className="text-sky-300">{r.policy?.replace("_", " ") ?? "policy"}</span> · {r.why}
+              </div>
+            )}
+            {r.cookie && (
+              <div className="mt-0.5 flex flex-wrap gap-x-3 text-white/40">
+                <span>status <span className="text-white/70">{r.cookie.status ?? "—"}</span></span>
+                <span>uses <span className="text-white/70">{r.cookie.total_uses ?? 0}</span></span>
+                <span>success <span className="text-emerald-300">{r.cookie.success_count ?? 0}</span></span>
+                <span>fail <span className="text-[#ff8a90]">{r.cookie.fail_count ?? 0}</span></span>
+                <span>rate <span className={
+                  (r.cookie.success_rate ?? 0) >= 70 ? "text-emerald-300"
+                    : (r.cookie.success_rate ?? 0) >= 30 ? "text-amber-300"
+                    : (r.cookie.total_uses ?? 0) > 0 ? "text-rose-300" : "text-white/50"
+                }>{r.cookie.success_rate != null ? `${r.cookie.success_rate}%` : "—"}</span></span>
+                {typeof r.eligible_at_pick === "number" && (
+                  <span>pool <span className="text-white/70">{r.eligible_at_pick}</span></span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

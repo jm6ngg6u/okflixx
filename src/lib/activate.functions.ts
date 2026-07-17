@@ -188,6 +188,11 @@ export const submitActivation = createServerFn({ method: "POST" })
           country,
           proxy_mode: proxyMode,
           attempt_number: attemptNumber,
+          selection_reason: {
+            policy,
+            filters: eligibility,
+            outcome: "no_eligible_cookie",
+          },
         });
         return {
           ok: false,
@@ -196,6 +201,46 @@ export const submitActivation = createServerFn({ method: "POST" })
           message: "Cookie pool is empty — please try again shortly.",
         };
       }
+
+      // Fetch picked cookie's stats at selection time (for the "why chosen" reasoning).
+      const { data: pickedStats } = await supabaseAdmin
+        .from("cookie_pool")
+        .select("status, is_valid, total_uses, success_count, fail_count, last_used_at")
+        .eq("id", cookie.id)
+        .maybeSingle();
+      const { data: eligibleCount } = await supabaseAdmin.rpc("count_eligible_cookies", {
+        _include_statuses: eligibility.include_statuses,
+        _require_valid: eligibility.require_valid,
+        _min_success_rate: eligibility.min_success_rate,
+        _min_total_uses: eligibility.min_total_uses,
+      });
+      const uses = pickedStats?.total_uses ?? 0;
+      const succ = pickedStats?.success_count ?? 0;
+      const sr = uses > 0 ? Math.round((succ / uses) * 1000) / 10 : null; // 1 decimal %
+      const selectionReason = {
+        policy,
+        filters: eligibility,
+        eligible_at_pick: (eligibleCount as number) ?? null,
+        cookie: {
+          status: pickedStats?.status ?? null,
+          is_valid: pickedStats?.is_valid ?? null,
+          total_uses: uses,
+          success_count: succ,
+          fail_count: pickedStats?.fail_count ?? 0,
+          success_rate: sr,
+          last_used_at: pickedStats?.last_used_at ?? null,
+        },
+        why:
+          policy === "quality"
+            ? sr != null
+              ? `Highest-scoring cookie: ${sr}% success across ${uses} uses`
+              : `Unused cookie — grace period (< ${eligibility.min_total_uses} uses required)`
+            : policy === "random"
+              ? `Random pick from ${eligibleCount ?? "?"} eligible cookie(s)`
+              : uses === 0
+                ? `Least-recently-used: never used before`
+                : `Least-recently-used across ${eligibleCount ?? "?"} eligible cookie(s)`,
+      };
 
       // 5b. Optionally lock a proxy.
       let proxyRow: any = null;
@@ -236,6 +281,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         attempt_number: attemptNumber,
         duration_ms: outcome.duration_ms,
         error_message: (outcome as any).error ?? null,
+        selection_reason: selectionReason,
       });
 
       // 5e. Update cookie / proxy state.
