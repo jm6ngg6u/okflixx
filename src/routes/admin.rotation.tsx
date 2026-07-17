@@ -358,6 +358,16 @@ function RotationPage() {
             </button>
             <button
               type="button"
+              onClick={() => sim.mutate()}
+              disabled={sim.isPending || eligibleNow === 0}
+              className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 hover:border-sky-500/50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {sim.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Running…</>
+                : <><FlaskConical className="w-3 h-3" /> Dry-run</>}
+            </button>
+            <button
+              type="button"
               onClick={() => save.mutate()}
               disabled={!dirty || save.isPending || eligibleNow === 0}
               className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-4 py-1.5 rounded border border-[#ff2a3a]/40 bg-gradient-to-r from-[#ff2a3a]/20 to-[#b0060f]/10 text-[#ff8a90] hover:from-[#ff2a3a]/30 hover:border-[#ff2a3a]/60 transition disabled:opacity-40 disabled:cursor-not-allowed"
@@ -368,6 +378,9 @@ function RotationPage() {
             </button>
           </div>
         </div>
+
+        {/* Dry-run result */}
+        {sim.data && <SimResult sim={sim.data} draftPolicy={current} />}
       </div>
 
       {/* How it works */}
