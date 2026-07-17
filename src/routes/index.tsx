@@ -1341,3 +1341,99 @@ function Detail({ label, value, accent, mono }: { label: string; value: string; 
   );
 }
 
+type PoolStatusData = {
+  eligible: number; fresh: number; used: number; total: number;
+  policy: "round_robin" | "random" | "quality"; maxAttempts: number; updatedAt: number;
+} | undefined;
+
+function PoolStatusPanel({ data, loading }: { data: PoolStatusData; loading: boolean }) {
+  const policyLabel = data?.policy === "quality" ? "Quality · highest success first"
+    : data?.policy === "random" ? "Random · pick from pool"
+    : "Round-robin · least-recently-used";
+  const policyIcon = data?.policy === "quality" ? Sparkles
+    : data?.policy === "random" ? Repeat
+    : Database;
+  const PolicyIcon = policyIcon;
+  const eligible = data?.eligible ?? 0;
+  const fresh = data?.fresh ?? 0;
+  const used = data?.used ?? 0;
+  const total = data?.total ?? 0;
+  const freshPct = total > 0 ? Math.round((fresh / total) * 100) : 0;
+  const usedPct = total > 0 ? Math.round((used / total) * 100) : 0;
+  const healthy = eligible > 0;
+
+  return (
+    <div className="mt-10 reveal">
+      <div className="glass p-5 md:p-6">
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${healthy ? "border-emerald-500/30 bg-emerald-500/10" : "border-[#ff2a3a]/30 bg-[#ff2a3a]/10"}`}>
+            <Database className={`w-4 h-4 ${healthy ? "text-emerald-300" : "text-[#ff8a90]"}`} />
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">
+              Cookie pool · live
+            </div>
+            <div className="font-display text-xl mt-0.5">
+              {loading ? "Checking availability…"
+                : healthy ? <>{eligible.toLocaleString()} eligible <span className="text-white/40 text-sm font-mono">/ {total.toLocaleString()} total</span></>
+                : "No eligible cookies right now"}
+            </div>
+            <div className="mt-1 text-xs text-white/50 flex items-center gap-1.5 flex-wrap font-mono">
+              <span className={`w-1.5 h-1.5 rounded-full ${healthy ? "bg-emerald-400 animate-pulse" : "bg-[#ff2a3a] animate-pulse"}`} />
+              <span>{healthy ? "Ready to activate" : "Retry runs automatically"}</span>
+              <span className="text-white/25">·</span>
+              <span>refresh every 5s</span>
+              {data?.maxAttempts && (
+                <>
+                  <span className="text-white/25">·</span>
+                  <span>fallback tries up to {data.maxAttempts} cookies</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div className={`shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-[11px] font-mono uppercase tracking-widest ${healthy ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-[#ff2a3a]/30 bg-[#ff2a3a]/10 text-[#ff8a90]"}`}>
+            <PolicyIcon className="w-3.5 h-3.5" />
+            {data?.policy?.replace("_", " ") ?? "…"}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mt-5">
+          <PoolTile label="Eligible" value={eligible} tone={healthy ? "success" : "danger"} sub="server pick set" />
+          <PoolTile label="Fresh · 0 uses" value={fresh} tone="primary" sub={`${freshPct}% of pool`} />
+          <PoolTile label="Used" value={used} tone="muted" sub={`${usedPct}% of pool`} />
+        </div>
+
+        <div className="mt-4 h-1.5 rounded-full bg-white/5 overflow-hidden flex">
+          <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]" style={{ width: `${freshPct}%` }} />
+          <div className="h-full bg-white/20" style={{ width: `${usedPct}%` }} />
+        </div>
+        <div className="mt-2 text-[10px] font-mono uppercase tracking-widest text-white/35 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#ff2a3a]" /> Fresh</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-white/25" /> Used</span>
+          <span className="text-white/25">·</span>
+          <span>Mode: {policyLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PoolTile({ label, value, sub, tone }: {
+  label: string; value: number; sub?: string; tone: "primary" | "success" | "danger" | "muted";
+}) {
+  const toneMap = {
+    primary: "text-[#ff8a90]",
+    success: "text-emerald-300",
+    danger:  "text-[#ff8a90]",
+    muted:   "text-white/70",
+  } as const;
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+      <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-white/40">{label}</div>
+      <div className={`mt-1 font-display text-2xl leading-none tabular-nums ${toneMap[tone]}`}>{value.toLocaleString()}</div>
+      {sub && <div className="mt-1 text-[10px] font-mono text-white/40 tabular-nums">{sub}</div>}
+    </div>
+  );
+}
+
+
