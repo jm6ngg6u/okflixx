@@ -36,6 +36,39 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { reportLovableError } from "@/lib/lovable-error-reporting";
+
+/**
+ * Wrap an admin data-fetch promise so failures are:
+ *  1. Logged to the browser console with structured detail (op name, args,
+ *     message, stack) — makes prod bug reports actionable.
+ *  2. Forwarded to Lovable's error reporter (same channel as the error
+ *     boundary), tagged as a handled fetch failure.
+ * The original error is rethrown so React Query still sees `isError`.
+ */
+async function logAdminFetch<T>(op: string, args: unknown, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const anyErr = err as any;
+    const detail = {
+      op,
+      args,
+      message: anyErr?.message ?? String(err),
+      name: anyErr?.name,
+      status: anyErr?.status ?? anyErr?.response?.status,
+      body: anyErr?.body ?? anyErr?.response?.data,
+      stack: anyErr?.stack,
+      at: new Date().toISOString(),
+    };
+    // eslint-disable-next-line no-console
+    console.error(`[admin.cookies] ${op} failed`, detail);
+    reportLovableError(err, { source: "admin_cookies_fetch", ...detail });
+    throw err;
+  }
+}
+
+
 
 export const Route = createFileRoute("/admin/cookies")({
   head: () => ({ meta: [{ title: "Cookie pool — Admin" }, { name: "robots", content: "noindex" }] }),
