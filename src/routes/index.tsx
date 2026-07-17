@@ -1020,16 +1020,32 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
     return () => window.clearTimeout(t);
   }, [count, payload.redirectUrl]);
 
+  const expiresLabel = useMemo(() => {
+    if (!payload.sessionExpiresAt) return null;
+    const ms = payload.sessionExpiresAt - Date.now();
+    if (ms <= 0) return "expired";
+    const m = Math.max(1, Math.round(ms / 60000));
+    return m >= 60 ? `${Math.round(m / 60)}h` : `${m}m`;
+  }, [payload.sessionExpiresAt]);
+
   const capture = async () => {
     try {
       // Best-effort: copy a text receipt to clipboard so the user has proof.
       const a = payload.account;
+      const gateLines = payload.gatesPassed.length
+        ? [`Gates passed: ${payload.gatesPassed.map((g) => `${g.label} (${g.detail})`).join(", ")}`]
+        : [];
+      const expLine = payload.sessionExpiresAt
+        ? [`Session expires: ${new Date(payload.sessionExpiresAt).toLocaleString()}`]
+        : [];
       const lines = [
         `EMBERLORD · Netflix TV Activation`,
         `Code: ${payload.code}`,
         `Time: ${new Date().toLocaleString()}`,
         `Attempts: ${payload.attempts}`,
         `Policy: ${payload.policy}`,
+        ...gateLines,
+        ...expLine,
         `Plan: ${a.plan_name ?? "Premium"} · ${a.video_quality ?? "UHD"}`,
         `Country: ${a.country ?? "—"}`,
         `Screens: ${a.max_streams ?? "—"}`,
@@ -1043,6 +1059,7 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
       toast.error("Clipboard blocked — screenshot the panel instead.");
     }
   };
+
 
   const a = payload.account;
   return (
