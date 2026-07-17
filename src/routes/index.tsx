@@ -743,22 +743,47 @@ function HomePage() {
                   </div>
                 </div>
               )}
-
-
+              {/* Per-step activation progress — visible during submit */}
+              {submitting && (
+                <div className="mt-6 rounded-lg border border-[#ff2a3a]/30 bg-[#ff2a3a]/5 p-3">
+                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-[#ff8a90] mb-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {stage === "checking-login" ? "Verifying sign-in"
+                      : stage === "checking-key" ? "Verifying access key"
+                      : stage === "checking-captcha" ? "Verifying human check"
+                      : stage === "checking-cookie" ? "Verifying cookie pool"
+                      : stage === "activating" ? "Activating on Netflix"
+                      : "Working"}
+                  </div>
+                  <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] transition-[width] duration-500 ease-out"
+                      style={{
+                        width: stage === "checking-login" ? "20%"
+                          : stage === "checking-key" ? "40%"
+                          : stage === "checking-captcha" ? "60%"
+                          : stage === "checking-cookie" ? "80%"
+                          : stage === "activating" ? "95%" : "10%",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleActivate}
                 disabled={submitting}
-                className="btn-red w-full mt-7 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {stage === "checking"
-                  ? "◆ Verifying cookie…"
-                  : stage === "activating"
-                    ? "◆ Activating on Netflix…"
-                    : submitting
-                      ? "Working…"
-                      : "Activate Now →"}
+                {stage === "checking-login" ? "◆ Verifying sign-in…"
+                  : stage === "checking-key" ? "◆ Verifying access key…"
+                  : stage === "checking-captcha" ? "◆ Verifying human check…"
+                  : stage === "checking-cookie" ? "◆ Verifying cookie…"
+                  : stage === "activating" ? "◆ Activating on Netflix…"
+                  : submitting ? "Working…"
+                  : "Activate Now →"}
               </button>
+
 
               <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
                 <span>Encrypted End-to-End</span>
