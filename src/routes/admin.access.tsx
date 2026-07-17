@@ -26,7 +26,9 @@ import {
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
   testCaptchaKeys,
+  listUserActivationOverrides, setUserActivationOverride, removeUserActivationOverride,
 } from "@/lib/access-keys.functions";
+
 
 export const Route = createFileRoute("/admin/access")({
   head: () => ({ meta: [{ title: "Access gates — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
