@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { listRecentJobRuns, listSettings } from "@/lib/settings.functions";
 import { Badge } from "@/components/ui/badge";
-import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles } from "lucide-react";
+import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 type JobRow = {
@@ -20,8 +20,10 @@ type JobRow = {
 const JOB_META: Record<string, { label: string; icon: any }> = {
   "cookies-autocheck": { label: "Cookie auto-check", icon: Cookie },
   "proxies-autocheck": { label: "Proxy auto-check", icon: Globe2 },
+  "proxy_recheck": { label: "Proxy recheck", icon: RefreshCw },
   "auto-cleanup": { label: "Nightly cleanup", icon: Sparkles },
 };
+
 
 function fmtDuration(a: string, b: string | null) {
   const start = new Date(a).getTime();
@@ -145,16 +147,26 @@ export function LiveJobsPanel() {
         desc = [a, b, rl].filter(Boolean).join(" • ") + ` • ${dur}`;
       } else if (r.job === "proxies-autocheck") {
         desc = [proxySummaryLine(r.summary), rl].filter(Boolean).join(" • ") + ` • ${dur}`;
+      } else if (r.job === "proxy_recheck") {
+        const s = r.summary ?? {};
+        const parts = [
+          `${s.total ?? 0} checked`,
+          `${s.valid ?? 0} valid`,
+          `${s.invalid ?? 0} invalid`,
+        ];
+        desc = `${parts.join(" • ")} • ${dur}`;
       } else if (r.job === "auto-cleanup") {
         desc = `${cleanupSummaryLine(r.summary)} • ${dur}`;
       } else {
         desc = `Completed in ${dur}`;
       }
+      const label = meta.label.charAt(0).toUpperCase() + meta.label.slice(1);
       if (r.ok === false) {
-        toast.error(`${meta.label} failed`, { description: r.error ?? desc, duration: 8000 });
+        toast.error(`${label} failed`, { description: r.error ?? desc, duration: 8000 });
       } else {
-        toast.success(`${meta.label} complete`, { description: desc, duration: 6000 });
+        toast.success(`${label} complete`, { description: desc, duration: 6000 });
       }
+
     }
   }, [q.data, qc, settings.notify_cookies, settings.notify_proxies, settings.notify_cleanup, settings.notify_quiet_start, settings.notify_quiet_end]);
 
