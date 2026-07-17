@@ -58,6 +58,7 @@ function RotationPage() {
   const fetchElig = useServerFn(getCookieEligibility);
   const saveElig = useServerFn(setCookieEligibility);
   const previewElig = useServerFn(previewCookieEligibility);
+  const simulate = useServerFn(simulateCookieSelection);
   const qc = useQueryClient();
 
   const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
