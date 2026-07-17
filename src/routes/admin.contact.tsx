@@ -42,7 +42,16 @@ function ContactPage() {
 
   const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: 2000 });
   const [local, setLocal] = useState<Record<string, string>>({});
-  useEffect(() => { if (q.data?.settings) setLocal(q.data.settings); }, [q.data]);
+  const [dirty, setDirty] = useState<Record<string, true>>({});
+  useEffect(() => {
+    if (!q.data?.settings) return;
+    setLocal((prev) => {
+      const next: Record<string, string> = { ...q.data.settings };
+      // Preserve any keys the user is currently editing (unsaved).
+      for (const k of Object.keys(dirty)) if (k in prev) next[k] = prev[k];
+      return next;
+    });
+  }, [q.data, dirty]);
 
   const set = (k: string, v: string) => setLocal((s) => ({ ...s, [k]: v }));
   const save = async (k: string, valueOverride?: string) => {
