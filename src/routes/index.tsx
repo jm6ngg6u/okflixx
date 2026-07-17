@@ -123,6 +123,20 @@ function HomePage() {
   const [accessKey, setAccessKey] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
+  // Sent on subsequent activations so the user doesn't have to re-solve for
+  // every retry / new code within the window. Server enforces expiry + binding.
+  const CAPTCHA_PASS_KEY = "cp1";
+  const [captchaPassToken, setCaptchaPassToken] = useState<string | null>(
+    typeof window !== "undefined" ? (() => {
+      const raw = sessionStorage.getItem(CAPTCHA_PASS_KEY);
+      if (!raw) return null;
+      try {
+        const { token, exp } = JSON.parse(raw) as { token: string; exp: number };
+        return exp > Date.now() ? token : null;
+      } catch { return null; }
+    })() : null,
+  );
   // Which provider the widget on this page was actually rendered for —
   // sent to the server so a mismatched admin toggle produces a clear
   // error instead of "captcha failed".
