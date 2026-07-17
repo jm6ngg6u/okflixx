@@ -115,8 +115,8 @@ function ContactPage() {
   );
 }
 
-function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
-  icon: any; label: string; kind: Kind; accent: string;
+function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
+  icon: any; label: string; kind: Kind;
   enableKey: string; nameKey: string; handleKey: string; handlePlaceholder: string;
   local: Record<string, string>; set: (k: string, v: string) => void;
   onSave: (k: string, valueOverride?: string) => void | Promise<void>;
@@ -139,8 +139,7 @@ function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handl
   return (
     <div className={`rounded-md border p-3 space-y-2 ${channelOn ? "border-white/10 bg-white/[0.02]" : "border-white/5 bg-white/[0.01] opacity-70"}`}>
       <div className="flex items-center gap-2">
-        <span className="w-8 h-8 rounded-md flex items-center justify-center icon-glow"
-          style={{ background: `${accent}22`, border: `1px solid ${accent}55`, color: accent, ["--glow-color" as any]: accent }}>
+        <span className="w-8 h-8 rounded-md flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70">
           <Icon className="w-4 h-4" />
         </span>
         <div className="text-sm font-medium">{label}</div>
