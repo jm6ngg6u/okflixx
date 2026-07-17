@@ -236,30 +236,45 @@ function AccessAdminPage() {
         <Section title="Login gate configuration" tone="emerald" icon={<UserCheck className="w-4 h-4" />}>
           <div className="grid md:grid-cols-2 gap-4 items-end">
             <div>
-              <Label className="label-caps mb-2 block">Per-user daily activation limit</Label>
-              <Input
-                type="number" min={1} max={1000}
-                defaultValue={c.userDailyActivationLimit ?? 10}
-                onBlur={(e) => {
-                  const n = Math.max(1, Math.min(1000, parseInt(e.target.value, 10) || 10));
-                  if (n === c.userDailyActivationLimit) return;
-                  saveSettings({ data: { userDailyActivationLimit: n } }).then(() => {
-                    toast.success(`Per-user limit set to ${n}/24h`);
-                    qc.invalidateQueries({ queryKey: ["gate-config"] });
-                  });
-                }}
-              />
-              <p className="mt-1.5 text-[11px] text-white/50">
-                Signed-in users cannot exceed this many activations per rolling 24 hours.
+              <Label className="label-caps mb-2 block">Global daily activation limit</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number" min={0} max={10000}
+                  defaultValue={c.userDailyActivationLimit ?? 10}
+                  key={`gdl-${c.userDailyActivationLimit ?? 10}`}
+                  onBlur={(e) => {
+                    const n = Math.max(0, Math.min(10000, parseInt(e.target.value, 10) || 0));
+                    if (n === c.userDailyActivationLimit) return;
+                    saveSettings({ data: { userDailyActivationLimit: n } }).then(() => {
+                      toast.success(n === 0 ? "Global limit set to ∞ (unlimited)" : `Global limit set to ${n}/24h`);
+                      qc.invalidateQueries({ queryKey: ["gate-config"] });
+                    });
+                  }}
+                />
+                <Badge variant="outline" className={c.userDailyActivationLimit === 0
+                  ? "border-emerald-500/40 text-emerald-300"
+                  : "border-white/10 text-white/60"}>
+                  {c.userDailyActivationLimit === 0 ? "∞ Unlimited" : `${c.userDailyActivationLimit}/24h`}
+                </Badge>
+              </div>
+              <p className="mt-1.5 text-[11px] text-white/50 leading-relaxed">
+                Applies to every signed-in user by default. Set to <b className="text-white/80">0</b> to allow unlimited activations for all accounts. Individual overrides below take precedence.
               </p>
             </div>
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/60 leading-relaxed">
-              <div className="font-mono uppercase tracking-widest text-white/80 mb-1">How it works</div>
-              Every activation is tied to a Google-verified user. Attempts are logged with IP, user agent, and result — filter by user in <code className="text-white/80">/admin/audit</code>.
+              <div className="font-mono uppercase tracking-widest text-white/80 mb-1">How the gates stack</div>
+              <ul className="space-y-1 list-disc list-inside">
+                <li><b className="text-white/80">Login gate</b> — quota is per user, not per IP.</li>
+                <li><b className="text-white/80">Captcha gate</b> — a passed challenge waives the IP rate limit (unlimited for that solved session).</li>
+                <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session. No bypass path.</li>
+              </ul>
             </div>
           </div>
+
+          <UserOverridesPanel />
         </Section>
       )}
+
 
       {/* CAPTCHA CONFIG */}
       {c?.captchaRequired && (
