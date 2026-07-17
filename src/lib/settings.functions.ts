@@ -133,7 +133,7 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
     if (!isAdmin && !isMod) throw new Error("Forbidden");
     const { data, error } = await supabase
       .from("job_runs")
-      .select("id, job, started_at, finished_at, ok, summary, progress, error")
+      .select("id, job, started_at, finished_at, ok, summary, progress, error, control")
       .order("started_at", { ascending: false })
       .limit(20);
     if (error) throw error;
