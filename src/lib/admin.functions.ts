@@ -280,7 +280,8 @@ export const getActivationPipelines = createServerFn({ method: "POST" })
       id: string; code: string | null; result: string | null; country: string | null;
       ip_hash: string | null; cookie_id: string | null; proxy_id: string | null;
       proxy_mode: boolean | null; attempt_number: number | null;
-      duration_ms: number | null; error_message: string | null; created_at: string;
+      duration_ms: number | null; error_message: string | null;
+      selection_reason: any; created_at: string;
     };
 
     // Group by (code, ip_hash). Rows are already newest-first; walk them and
