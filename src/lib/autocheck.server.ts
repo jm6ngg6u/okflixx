@@ -78,6 +78,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
 
     let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, deleted = 0;
     const reasons: Record<string, number> = {};
+    let control: "stop" | "cancel" | null = null;
 
     for (const r of rows ?? []) {
       let proxyPayload: any = null;
@@ -116,10 +117,21 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
           checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
         });
       }
+      // Cooperative stop/cancel: poll every 3 items to keep DB load light.
+      if (checked % 3 === 0) {
+        control = await readJobControl(jobId);
+        if (control) break;
+      }
+    }
+    if (control === "cancel") {
+      const summary = { checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons, cancelled: true };
+      await recordJobFinish(jobId, false, summary, "Cancelled by admin");
+      return { ok: false, error: "cancelled", ...summary };
     }
     await recordJobProgress(jobId, {
       phase: "cleanup", total: rows?.length ?? 0,
       checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
+      stopped: control === "stop" || undefined,
     });
 
     const cleanupOn = map.autocheck_cleanup !== "0";
