@@ -77,6 +77,7 @@ export function ActivationPipelines() {
   const fetchPipelines = useServerFn(getActivationPipelines);
   const fetchRateLimit = useServerFn(getRateLimitStatus);
   const retryFn = useServerFn(retryActivationAdmin);
+  const precheckFn = useServerFn(getRetryPrecheck);
   const qc = useQueryClient();
 
   const q = useQuery({
@@ -89,13 +90,24 @@ export function ActivationPipelines() {
     queryFn: () => fetchRateLimit({ data: { windowMinutes: 15 } }),
     refetchInterval: 20_000,
   });
+  const pc = useQuery({
+    queryKey: ["retry-precheck"],
+    queryFn: () => precheckFn(),
+    refetchInterval: 15_000,
+  });
 
   const retryMut = useMutation({
-    mutationFn: async (code: string) => retryFn({ data: { code } }),
+    mutationFn: async (code: string) => {
+      const pre = await precheckFn();
+      if (!pre.can_retry) throw new Error(pre.reason ?? "Retry blocked");
+      return retryFn({ data: { code } });
+    },
     onSuccess: (r: any) => {
       if (r?.ok) toast.success(`Retry succeeded · ${r.status} · ${r.duration_ms}ms`);
+      else if (r?.status === "no_cookie") toast.error(`Retry blocked · ${r.message ?? "No eligible cookie"}`);
       else toast.error(`Retry → ${r?.status ?? "error"}`);
       qc.invalidateQueries({ queryKey: ["activation-pipelines"] });
+      qc.invalidateQueries({ queryKey: ["retry-precheck"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
   });
