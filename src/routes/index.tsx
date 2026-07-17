@@ -98,13 +98,11 @@ function HomePage() {
   const lastSubmitRef = useRef<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
-  // Multi-step progress: idle → checking-login → checking-key → checking-captcha → checking-cookie → activating.
-  type Stage = "idle" | "checking-login" | "checking-key" | "checking-captcha" | "checking-cookie" | "activating";
-  const [stage, setStage] = useState<Stage>("idle");
+  // Single generic in-flight indicator; internal stages are not exposed.
+  const [stage, setStage] = useState<"idle" | "working">("idle");
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
-  const fetchCaptchaHealth = useServerFn(getCaptchaHealth);
 
 
   // Gate config polled every 10s so admin toggles reach the landing page.
@@ -113,26 +111,6 @@ function HomePage() {
     queryFn: () => fetchGate(),
     refetchInterval: 10_000,
     staleTime: 5_000,
-  });
-
-  // Live captcha health for the status banner (5-min rolling window).
-  const captchaHealth = useQuery({
-    queryKey: ["public-captcha-health"],
-    queryFn: () => fetchCaptchaHealth(),
-    refetchInterval: 15_000,
-    enabled: !!gate.data?.captchaRequired,
-  });
-
-  // Live cookie-pool status shown on the landing page. Mirrors the exact RPC
-  // the server picker uses, so what a user sees here is what actually gets
-  // considered when they submit a code. 5s cadence keeps it feeling live
-  // without hammering the server.
-  const fetchPoolStatus = useServerFn(getPublicPoolStatus);
-  const poolStatus = useQuery({
-    queryKey: ["public-pool-status"],
-    queryFn: () => fetchPoolStatus(),
-    refetchInterval: 5_000,
-    staleTime: 2_000,
   });
 
   const [accessKey, setAccessKey] = useState("");
