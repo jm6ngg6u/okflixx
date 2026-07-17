@@ -1318,6 +1318,7 @@ function BulkUpload({ runUpload, onDone }: { runUpload: (b: string[], l: string)
   const [files, setFiles] = useState<{ name: string; text: string; state: "pending" | "ok" | "dup" | "bad"; note?: string }[]>([]);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function pickFiles(list: FileList | null) {
