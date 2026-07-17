@@ -1,13 +1,55 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
 import { submitActivation } from "@/lib/activate.functions";
+import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
+
+// Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
+async function computeFingerprint(): Promise<string> {
+  try {
+    const parts: string[] = [
+      navigator.userAgent,
+      `${screen.width}x${screen.height}x${screen.colorDepth}`,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      navigator.language,
+      String(navigator.hardwareConcurrency ?? 0),
+    ];
+    // Canvas fingerprint
+    try {
+      const c = document.createElement("canvas");
+      c.width = 200; c.height = 50;
+      const ctx = c.getContext("2d");
+      if (ctx) {
+        ctx.textBaseline = "top";
+        ctx.font = "14px 'Arial'";
+        ctx.fillStyle = "#f60";
+        ctx.fillRect(0, 0, 100, 30);
+        ctx.fillStyle = "#069";
+        ctx.fillText("emberlord-fp", 2, 15);
+        parts.push(c.toDataURL().slice(-64));
+      }
+    } catch {}
+    const s = parts.join("|");
+    // Simple hash (browser-side; server re-hashes with SHA-256).
+    const enc = new TextEncoder().encode(s);
+    const buf = await crypto.subtle.digest("SHA-256", enc);
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return `fallback:${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+const SESSION_KEY = "emberlord_access_session";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
