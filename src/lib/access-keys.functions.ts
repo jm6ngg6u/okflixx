@@ -78,7 +78,7 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
     captchaSiteKey: m.captcha_site_key || "",
     maintenance: m.maintenance_enabled === "1",
     maintenanceMessage: m.maintenance_message || "",
-    userDailyActivationLimit: Math.max(1, parseInt(m.user_daily_activation_limit || "10", 10)),
+    userDailyActivationLimit: Math.max(0, parseInt(m.user_daily_activation_limit || "10", 10) || 0),
   };
 });
 
