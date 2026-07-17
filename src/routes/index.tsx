@@ -127,6 +127,18 @@ function HomePage() {
     enabled: !!gate.data?.captchaRequired,
   });
 
+  // Live cookie-pool status shown on the landing page. Mirrors the exact RPC
+  // the server picker uses, so what a user sees here is what actually gets
+  // considered when they submit a code. 5s cadence keeps it feeling live
+  // without hammering the server.
+  const fetchPoolStatus = useServerFn(getPublicPoolStatus);
+  const poolStatus = useQuery({
+    queryKey: ["public-pool-status"],
+    queryFn: () => fetchPoolStatus(),
+    refetchInterval: 5_000,
+    staleTime: 2_000,
+  });
+
   const [accessKey, setAccessKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
