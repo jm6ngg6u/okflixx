@@ -410,9 +410,9 @@ function displayHandle(kind: "telegram" | "instagram" | "whatsapp", handle: stri
   return kind === "whatsapp" ? `+${handle}` : `@${handle}`;
 }
 
-function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
+function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
   icon: any; label: string; kind: "telegram" | "instagram" | "whatsapp"; accent: string;
-  nameKey: string; handleKey: string; handlePlaceholder: string;
+  enableKey: string; nameKey: string; handleKey: string; handlePlaceholder: string;
   local: Record<string, string>; set: (k: string, v: string) => void;
   onSave: (k: string, valueOverride?: string) => void | Promise<void>;
 }) {
@@ -420,14 +420,20 @@ function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handl
   const normalized = normalizeHandle(kind, rawHandle);
   const filled = !!normalized;
   const invalid = !!rawHandle && !normalized;
+  // Per-channel toggle: default ON when key absent (backward compat).
+  const channelOn = (local[enableKey] ?? "1") === "1";
   const commitHandle = () => {
     if (rawHandle === normalized) { if (rawHandle) onSave(handleKey); return; }
     set(handleKey, normalized);
     onSave(handleKey, normalized);
   };
   const commitName = () => onSave(nameKey);
+  const status = !channelOn ? { label: "DISABLED", cls: "bg-white/10 text-white/50 border-white/15" }
+    : filled ? { label: "SHOWING", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" }
+    : invalid ? { label: "INVALID", cls: "bg-red-500/15 text-red-300 border-red-500/30" }
+    : { label: "EMPTY", cls: "bg-white/10 text-white/50 border-white/15" };
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 space-y-2">
+    <div className={`rounded-md border p-3 space-y-2 ${channelOn ? "border-white/10 bg-white/[0.02]" : "border-white/5 bg-white/[0.01] opacity-70"}`}>
       <div className="flex items-center gap-2">
         <span
           className="w-8 h-8 rounded-md flex items-center justify-center icon-glow"
@@ -436,9 +442,12 @@ function ContactRow({ icon: Icon, label, kind, accent, nameKey, handleKey, handl
           <Icon className="w-4 h-4" />
         </span>
         <div className="text-sm font-medium">{label}</div>
-        <Badge variant="outline" className={filled
-          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 ml-auto"
-          : "bg-white/10 text-white/50 border-white/15 ml-auto"}>{filled ? "SHOWING" : "HIDDEN"}</Badge>
+        <Badge variant="outline" className={`ml-auto ${status.cls}`}>{status.label}</Badge>
+        <Switch
+          checked={channelOn}
+          onCheckedChange={(v) => { set(enableKey, v ? "1" : "0"); setTimeout(() => onSave(enableKey, v ? "1" : "0"), 0); }}
+          aria-label={`Enable ${label}`}
+        />
       </div>
       <div className="grid sm:grid-cols-2 gap-2">
         <div className="space-y-1">
