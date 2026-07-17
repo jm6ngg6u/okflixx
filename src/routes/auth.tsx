@@ -85,8 +85,8 @@ function AuthPage() {
           setStep("totp");
           setStatus("");
         } else {
-          // Signed in at aal1 with no factor → send to enrollment
-          openMfa("enroll");
+          // No verified factor → TOTP is optional. Go straight to admin.
+          navigate({ to: "/admin" });
         }
       } catch (err: any) {
         setStatus("");
