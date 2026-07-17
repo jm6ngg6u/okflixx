@@ -5,12 +5,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
-import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
 
-// --- utilities ---
-function sha256(v: string): string {
-  return createHash("sha256").update(v).digest("hex");
+// --- utilities (Web Crypto — works on Cloudflare Workers, Node, and won't
+// pull node:crypto into the client bundle when this module is scanned by
+// the server-fn plugin) ---
+async function sha256(v: string): Promise<string> {
+  const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function randomBytes(n: number): Uint8Array {
+  const a = new Uint8Array(n);
+  globalThis.crypto.getRandomValues(a);
+  return a;
+}
+function toBase64Url(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function ipSalt(): string {
@@ -25,6 +37,7 @@ function generateKeyCode(): string {
   for (let i = 0; i < 12; i++) chars.push(ALPHABET[bytes[i] % ALPHABET.length]);
   return `NFX-${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}-${chars.slice(8, 12).join("")}`;
 }
+
 
 function normalizeCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, "");
