@@ -334,6 +334,7 @@ export type Database = {
       }
       job_runs: {
         Row: {
+          control: string | null
           error: string | null
           finished_at: string | null
           id: string
@@ -344,6 +345,7 @@ export type Database = {
           summary: Json | null
         }
         Insert: {
+          control?: string | null
           error?: string | null
           finished_at?: string | null
           id?: string
@@ -354,6 +356,7 @@ export type Database = {
           summary?: Json | null
         }
         Update: {
+          control?: string | null
           error?: string | null
           finished_at?: string | null
           id?: string
