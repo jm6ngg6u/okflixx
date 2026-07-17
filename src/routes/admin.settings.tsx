@@ -143,11 +143,14 @@ function SettingsPage() {
   }, [q.data]);
 
   const set = (k: string, v: string) => setLocal((s) => ({ ...s, [k]: v }));
-  const save = async (k: string) => {
+  const save = async (k: string, valueOverride?: string) => {
     try {
-      await doSet({ data: { key: k, value: local[k] ?? "" } });
+      const value = valueOverride ?? local[k] ?? "";
+      if (valueOverride !== undefined) setLocal((s) => ({ ...s, [k]: value }));
+      await doSet({ data: { key: k, value } });
       toast.success(`Saved ${k.replace(/_/g, " ")}`);
       qc.invalidateQueries({ queryKey: ["admin-settings"] });
+      qc.invalidateQueries({ queryKey: ["public-contacts"] });
     } catch (e: any) {
       toast.error(e?.message ?? "Save failed");
     }
