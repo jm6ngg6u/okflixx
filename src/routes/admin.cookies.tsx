@@ -737,6 +737,7 @@ function CookiePoolPage() {
                 <th>Plan · Country</th>
                 <SortableTh label="Uses" active={sort === "total_uses"} dir={sortDir} onClick={() => toggleSort("total_uses")} />
                 <SortableTh label="Success" active={sort === "success_count"} dir={sortDir} onClick={() => toggleSort("success_count")} />
+                <th>Health</th>
                 <SortableTh label="Last check" active={sort === "last_checked_at"} dir={sortDir} onClick={() => toggleSort("last_checked_at")} />
                 <th className="text-right">Actions</th>
               </tr>
