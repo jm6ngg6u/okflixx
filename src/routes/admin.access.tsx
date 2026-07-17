@@ -248,6 +248,28 @@ function AccessAdminPage() {
               </p>
             </div>
           </div>
+          {(() => {
+            const key = (c.captchaSiteKey || "").trim();
+            if (!key) return null;
+            // hCaptcha site keys are UUID-shaped (with dashes). Turnstile keys start with 0x/1x/2x/3x.
+            const looksLikeHcaptcha = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+            const looksLikeTurnstile = /^[0-3]x[A-Za-z0-9_-]{10,}$/.test(key);
+            const inferred = looksLikeHcaptcha ? "hcaptcha" : looksLikeTurnstile ? "turnstile" : null;
+            if (!inferred || inferred === c.captchaProvider) return null;
+            return (
+              <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-[12px] text-red-100 flex items-start gap-2">
+                <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
+                <div>
+                  <div className="font-medium">Provider / site-key mismatch</div>
+                  <div className="text-red-200/80 mt-1">
+                    This site key looks like a <b>{inferred === "hcaptcha" ? "hCaptcha" : "Cloudflare Turnstile"}</b> key,
+                    but the selected provider is <b>{c.captchaProvider === "hcaptcha" ? "hCaptcha" : "Cloudflare Turnstile"}</b>.
+                    Switch the provider above or paste a matching site key — activations will fail otherwise.
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
