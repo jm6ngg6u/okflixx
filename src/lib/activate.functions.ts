@@ -58,6 +58,39 @@ async function getSetting(supabaseAdmin: any, key: string, fallback: string): Pr
   return (data?.value as string) ?? fallback;
 }
 
+export type EligibilityRules = {
+  include_statuses: string[];
+  require_valid: boolean;
+  min_success_rate: number; // 0..1
+  min_total_uses: number;
+};
+
+export const DEFAULT_ELIGIBILITY: EligibilityRules = {
+  include_statuses: ["active"],
+  require_valid: true,
+  min_success_rate: 0,
+  min_total_uses: 0,
+};
+
+export async function loadEligibility(supabaseAdmin: any): Promise<EligibilityRules> {
+  const raw = await getSetting(supabaseAdmin, "cookie_eligibility", "");
+  if (!raw) return DEFAULT_ELIGIBILITY;
+  try {
+    const p = JSON.parse(raw);
+    const statuses = Array.isArray(p.include_statuses) && p.include_statuses.length > 0
+      ? p.include_statuses.filter((s: any) => typeof s === "string")
+      : DEFAULT_ELIGIBILITY.include_statuses;
+    return {
+      include_statuses: statuses,
+      require_valid: typeof p.require_valid === "boolean" ? p.require_valid : true,
+      min_success_rate: Math.max(0, Math.min(1, Number(p.min_success_rate) || 0)),
+      min_total_uses: Math.max(0, Math.min(1000, Math.round(Number(p.min_total_uses) || 0))),
+    };
+  } catch {
+    return DEFAULT_ELIGIBILITY;
+  }
+}
+
 export const submitActivation = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }): Promise<ActivateResult> => {
