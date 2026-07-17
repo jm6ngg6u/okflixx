@@ -36,7 +36,7 @@ function AccountPage() {
 
   const query = useQuery({
     queryKey: ["my-activation-status"],
-    queryFn: () => statusFn({}),
+    queryFn: () => statusFn(),
     enabled: ready && authed,
     refetchInterval: 10_000,
   });
