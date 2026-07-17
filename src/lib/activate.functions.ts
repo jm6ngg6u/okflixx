@@ -276,50 +276,56 @@ export const submitActivation = createServerFn({ method: "POST" })
       }
     }
     let captchaPassed = false;
+    let mintedPass: { token: string; exp: number } | null = null;
+
+    // Fingerprint hash — used to bind captcha_pass tokens to a specific device.
+    const fpRaw = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
+    const fpHash = createHash("sha256").update(fpRaw).digest("hex");
 
     if (captchaRequired) {
-      if (!data.captchaToken) {
+      // 1) Fast path — client sent a valid short-lived captcha_pass. Skips
+      //    re-solving for up to 10 min after a successful verify.
+      if (data.captchaPassToken && (await verifyCaptchaPass(data.captchaPassToken, ipHash, fpHash))) {
+        captchaPassed = true;
+      }
+      // 2) Fresh token path — verify with the provider, then mint a new pass.
+      else if (data.captchaToken) {
+        const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
+        const { verifyCaptcha, detectCaptchaTokenProvider } = await import("@/lib/access-keys.functions");
+
+        const widgetProvider = data.captchaWidgetProvider ?? null;
+        const tokenProvider = detectCaptchaTokenProvider(data.captchaToken);
+        const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
+        if (declared && declared !== provider) {
+          console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
+          return {
+            ok: false,
+            error: "captcha_invalid",
+            message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
+          };
+        }
+
+        const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
+          purpose: "activate", ipHash, userAgent,
+        });
+        if (!v.ok) {
+          const codes = (v.errorCodes ?? []).join(", ");
+          console.warn("[captcha] verify failed", {
+            provider, reason: v.reason, errorCodes: v.errorCodes, hostname: v.hostname,
+            tokenLen: data.captchaToken?.length ?? 0,
+          });
+          const human = humanCaptchaReason(v.reason, v.errorCodes);
+          return {
+            ok: false,
+            error: "captcha_invalid",
+            message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
+          };
+        }
+        captchaPassed = true;
+        mintedPass = await signCaptchaPass(ipHash, fpHash);
+      } else {
         return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
       }
-      const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
-      const { verifyCaptcha, detectCaptchaTokenProvider } = await import("@/lib/access-keys.functions");
-
-      // Guard: if the widget on the page was rendered for the other provider,
-      // reject early with a clear reason instead of a confusing siteverify error.
-      const widgetProvider = data.captchaWidgetProvider ?? null;
-      const tokenProvider = detectCaptchaTokenProvider(data.captchaToken);
-      const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
-      if (declared && declared !== provider) {
-        console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
-        return {
-          ok: false,
-          error: "captcha_invalid",
-          message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
-        };
-      }
-
-      const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
-        purpose: "activate",
-        ipHash,
-        userAgent,
-      });
-      if (!v.ok) {
-        const codes = (v.errorCodes ?? []).join(", ");
-        console.warn("[captcha] verify failed", {
-          provider,
-          reason: v.reason,
-          errorCodes: v.errorCodes,
-          hostname: v.hostname,
-          tokenLen: data.captchaToken?.length ?? 0,
-        });
-        const human = humanCaptchaReason(v.reason, v.errorCodes);
-        return {
-          ok: false,
-          error: "captcha_invalid",
-          message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
-        };
-      }
-      captchaPassed = true;
     }
     if (accessKeyRequired) {
       const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
