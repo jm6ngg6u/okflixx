@@ -171,11 +171,11 @@ export async function verifyAccessCredentials(
   | { ok: true; keyId: string | null; via: "key" | "session" }
   | { ok: false; reason: string }
 > {
-  const fpHash = sha256(opts.fingerprint);
+  const fpHash = await sha256(opts.fingerprint);
 
   // Prefer session token if present (24h mode).
   if (opts.sessionToken) {
-    const tokenHash = sha256(opts.sessionToken);
+    const tokenHash = await sha256(opts.sessionToken);
     const { data: sess } = await supabaseAdmin
       .from("access_sessions")
       .select("id, key_id, ip_hash, fingerprint_hash, expires_at")
@@ -198,10 +198,11 @@ export async function verifyAccessCredentials(
   if (opts.code) {
     const code = normalizeCode(opts.code);
     const { data: rows } = await supabaseAdmin.rpc("consume_access_key", {
-      _code_hash: sha256(code),
+      _code_hash: await sha256(code),
       _ip_hash: opts.ipHash,
       _fingerprint_hash: fpHash,
     });
+
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (!row?.ok) return { ok: false, reason: row?.reason ?? "invalid_key" };
     return { ok: true, keyId: row.key_id, via: "key" };
