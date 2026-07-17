@@ -1,7 +1,7 @@
 // Shared logic for the cookie/proxy auto-check jobs.
 // Used by both the /api/public/hooks/* cron routes and the admin "Run now" server fns.
 
-import { recordJobStart, recordJobFinish, recordJobProgress, readJobControl } from "@/lib/cron.server";
+import { recordJobStart, recordJobFinish, recordJobProgress, readJobControl, isJobRunning } from "@/lib/cron.server";
 
 type CookieRunResult = {
   ok: boolean;
@@ -39,6 +39,10 @@ function bucketReason(msg: string | null | undefined): string {
 
 /** Run the cookie auto-check. When `force=true`, ignores the enabled flag. */
 export async function runCookiesAutocheck(force = false): Promise<CookieRunResult> {
+  // Same-job single-instance guard. Different jobs still run in parallel.
+  if (await isJobRunning("cookies-autocheck")) {
+    return { ok: true, skipped: "already_running" };
+  }
   const jobId = await recordJobStart("cookies-autocheck");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { checkCookieViaWorker } = await import("@/lib/worker.server");
@@ -201,6 +205,10 @@ type ProxyRunResult = {
 };
 
 export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult> {
+  // Same-job single-instance guard. Different jobs still run in parallel.
+  if (await isJobRunning("proxies-autocheck")) {
+    return { ok: true, skipped: "already_running" };
+  }
   const jobId = await recordJobStart("proxies-autocheck");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { checkProxyViaWorker } = await import("@/lib/worker.server");
