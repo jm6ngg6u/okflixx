@@ -1054,16 +1054,19 @@ function HomePage() {
 
       {/* FOOTER */}
       <footer className="relative border-t border-white/5 py-10 px-6 md:px-12 bg-black/40 backdrop-blur">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Emberlord" className="h-7 w-7 object-contain" width={28} height={28} loading="lazy" />
-            <span className="font-display text-lg">EMBER<span className="text-[#ff2a3a]">LORD</span></span>
-          </div>
-          <div className="font-mono text-xs uppercase tracking-widest text-white/40">© 2026 · Encrypted · Everywhere</div>
-          <div className="flex gap-6 text-xs text-white/40">
-            <a href="#" className="hover:text-white">Privacy</a>
-            <a href="#" className="hover:text-white">Terms</a>
-            <a href="#" className="hover:text-white">Help</a>
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+          <ContactStrip />
+          <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <img src={logo} alt="Emberlord" className="h-7 w-7 object-contain" width={28} height={28} loading="lazy" />
+              <span className="font-display text-lg">EMBER<span className="text-[#ff2a3a]">LORD</span></span>
+            </div>
+            <div className="font-mono text-xs uppercase tracking-widest text-white/40">© 2026 · Encrypted · Everywhere</div>
+            <div className="flex gap-6 text-xs text-white/40">
+              <a href="#" className="hover:text-white">Privacy</a>
+              <a href="#" className="hover:text-white">Terms</a>
+              <a href="#" className="hover:text-white">Help</a>
+            </div>
           </div>
         </div>
       </footer>
