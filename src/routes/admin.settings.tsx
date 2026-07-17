@@ -376,68 +376,7 @@ function NumField({ k, label, hint, local, set, onSave, min, max }: any) {
   );
 }
 
-function RotationPolicyPicker({ value, onPick }: { value: string; onPick: (v: "round_robin" | "random" | "quality") => void }) {
-  const options = [
-    {
-      id: "round_robin" as const,
-      icon: Repeat,
-      title: "Round Robin",
-      subtitle: "Even distribution",
-      desc: "Least recently used cookie first. Spreads load evenly across the pool so no single cookie gets burnt out.",
-      tag: "Balanced",
-    },
-    {
-      id: "random" as const,
-      icon: Shuffle,
-      title: "Random",
-      subtitle: "Unpredictable pick",
-      desc: "Chooses any active cookie at random each time. Hard to fingerprint — great when you want maximum variety.",
-      tag: "Stealth",
-    },
-    {
-      id: "quality" as const,
-      icon: Sparkles,
-      title: "Quality",
-      subtitle: "Highest success rate first",
-      desc: "Prefers cookies with the best success-to-failure ratio. Best TV-activation success rate — recommended for production.",
-      tag: "Recommended",
-    },
-  ];
-  return (
-    <div className="grid md:grid-cols-3 gap-3">
-      {options.map((o) => {
-        const active = value === o.id;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onPick(o.id)}
-            className={`text-left rounded-xl border p-4 transition group relative overflow-hidden ${
-              active
-                ? "border-[#ff2a3a]/60 bg-gradient-to-br from-[#ff2a3a]/15 via-[#b0060f]/5 to-transparent shadow-[0_0_0_1px_rgba(255,42,58,0.35),0_10px_40px_-10px_rgba(255,42,58,0.5)]"
-                : "border-white/10 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.04]"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center border ${active ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/15 text-[#ff2a3a]" : "border-white/10 bg-white/5 text-white/70"}`}>
-                <o.icon className="w-4 h-4" />
-              </div>
-              <span className={`text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-full border ${active ? "border-[#ff2a3a]/40 text-[#ff2a3a] bg-[#ff2a3a]/10" : "border-white/10 text-white/40"}`}>
-                {o.tag}
-              </span>
-            </div>
-            <div className="mt-3 font-display text-lg leading-tight">{o.title}</div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-white/50 mt-0.5">{o.subtitle}</div>
-            <div className="text-xs text-white/60 mt-2 leading-relaxed">{o.desc}</div>
-            <div className={`mt-3 h-1 rounded-full overflow-hidden bg-white/5`}>
-              <div className={`h-full transition-all ${active ? "w-full bg-gradient-to-r from-[#ff2a3a] via-[#ff5a4a] to-[#ffb199]" : "w-0"}`} />
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+
 
 
 
