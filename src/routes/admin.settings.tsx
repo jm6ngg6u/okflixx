@@ -374,12 +374,15 @@ function SettingsPage() {
             ) : null
           )}
 
-          <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-          <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+          <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9" enableKey="contact_tg_enabled" nameKey="contact_tg_name" handleKey="contact_tg_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C" enableKey="contact_ig_enabled" nameKey="contact_ig_name" handleKey="contact_ig_username" handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
+          <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366" enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number" handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
 
-          {/* Live preview */}
+          {/* Live preview (local, mirrors public output) */}
           <ContactPreview local={local} />
+
+          {/* Server-side consistency check — reads the exact same fn the public site uses */}
+          <ContactServerCheck local={local} />
         </div>
       </Section>
     </div>
