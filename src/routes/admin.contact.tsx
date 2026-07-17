@@ -98,13 +98,13 @@ function ContactPage() {
       </div>
 
       <div className="glass p-5 space-y-4">
-        <ContactRow icon={Send} label="Telegram" kind="telegram" accent="#229ED9"
+        <ContactRow icon={Send} label="Telegram" kind="telegram"
           enableKey="contact_tg_enabled" nameKey="contact_tg_name" handleKey="contact_tg_username"
           handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-        <ContactRow icon={Instagram} label="Instagram" kind="instagram" accent="#E1306C"
+        <ContactRow icon={Instagram} label="Instagram" kind="instagram"
           enableKey="contact_ig_enabled" nameKey="contact_ig_name" handleKey="contact_ig_username"
           handlePlaceholder="yourhandle" local={local} set={set} onSave={save} />
-        <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp" accent="#25D366"
+        <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp"
           enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number"
           handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
 
@@ -115,8 +115,8 @@ function ContactPage() {
   );
 }
 
-function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
-  icon: any; label: string; kind: Kind; accent: string;
+function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, handlePlaceholder, local, set, onSave }: {
+  icon: any; label: string; kind: Kind;
   enableKey: string; nameKey: string; handleKey: string; handlePlaceholder: string;
   local: Record<string, string>; set: (k: string, v: string) => void;
   onSave: (k: string, valueOverride?: string) => void | Promise<void>;
@@ -139,8 +139,7 @@ function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handl
   return (
     <div className={`rounded-md border p-3 space-y-2 ${channelOn ? "border-white/10 bg-white/[0.02]" : "border-white/5 bg-white/[0.01] opacity-70"}`}>
       <div className="flex items-center gap-2">
-        <span className="w-8 h-8 rounded-md flex items-center justify-center icon-glow"
-          style={{ background: `${accent}22`, border: `1px solid ${accent}55`, color: accent, ["--glow-color" as any]: accent }}>
+        <span className="w-8 h-8 rounded-md flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70">
           <Icon className="w-4 h-4" />
         </span>
         <div className="text-sm font-medium">{label}</div>
@@ -190,16 +189,17 @@ function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handl
 }
 
 function ContactPreview({ local }: { local: Record<string, string> }) {
-  const items: Array<{ kind: Kind; name: string; accent: string; Icon: any; handle: string; href: string }> = [];
-  const push = (kind: Kind, enableKey: string, nameKey: string, handleKey: string, fb: string, accent: string, Icon: any) => {
+  const items: Array<{ kind: Kind; name: string; Icon: any; handle: string; href: string }> = [];
+  const push = (kind: Kind, enableKey: string, nameKey: string, handleKey: string, Icon: any) => {
     if ((local[enableKey] ?? "1") !== "1") return;
     const h = normalizeHandle(kind, local[handleKey] ?? "");
     if (!h) return;
-    items.push({ kind, name: (local[nameKey] ?? "").trim() || fb, accent, Icon, handle: displayHandle(kind, h), href: hrefFor(kind, h) });
+    const name = (local[nameKey] ?? "").trim();
+    items.push({ kind, name, Icon, handle: displayHandle(kind, h), href: hrefFor(kind, h) });
   };
-  push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
-  push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
-  push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
+  push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", Send);
+  push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", Instagram);
+  push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", Phone);
   return (
     <div className="rounded-md border border-white/10 bg-black/40 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -213,18 +213,21 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
       {items.length > 0 ? (
         <div className="flex flex-wrap items-center justify-center gap-3">
           {items.map((c) => (
-            <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
-              className="group flex items-center gap-2.5 rounded-full border bg-black/40 backdrop-blur px-3.5 py-2 transition hover:bg-black/60"
-              style={{ borderColor: `${c.accent}55` }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center icon-glow"
-                style={{ background: `${c.accent}22`, border: `1px solid ${c.accent}66`, color: c.accent, ["--glow-color" as any]: c.accent }}>
+            c.name ? (
+              <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
+                className="group flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 transition hover:border-[#ff2a3a]/40 hover:bg-white/[0.06]">
+                <span className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70 group-hover:text-[#ff2a3a] group-hover:border-[#ff2a3a]/40 transition">
+                  <c.Icon className="w-4 h-4" />
+                </span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-white/70">{c.name}</span>
+              </a>
+            ) : (
+              <a key={c.kind} href={c.href} target="_blank" rel="noopener noreferrer"
+                aria-label={c.kind}
+                className="w-9 h-9 rounded-full flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70 transition hover:text-[#ff2a3a] hover:border-[#ff2a3a]/40 hover:bg-white/[0.06]">
                 <c.Icon className="w-4 h-4" />
-              </span>
-              <span className="flex flex-col leading-tight">
-                <span className="text-[11px] font-mono uppercase tracking-widest text-white/50">{c.name}</span>
-                <span className="text-xs text-white/90 font-medium">{c.handle}</span>
-              </span>
-            </a>
+              </a>
+            )
           ))}
         </div>
       ) : (
