@@ -6,9 +6,10 @@ import { listSettings, setSetting } from "@/lib/settings.functions";
 import { getCookiePoolStats } from "@/lib/pool.functions";
 import {
   getCookieEligibility, setCookieEligibility, previewCookieEligibility,
+  simulateCookieSelection,
 } from "@/lib/admin.functions";
 import { Badge } from "@/components/ui/badge";
-import { Shuffle, Repeat, Sparkles, CheckCircle2, Loader2, RefreshCw, Filter, Save, RotateCcw } from "lucide-react";
+import { Shuffle, Repeat, Sparkles, CheckCircle2, Loader2, RefreshCw, Filter, Save, RotateCcw, FlaskConical, Trophy, Cookie, XCircle, Lock, Ban, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/rotation")({
