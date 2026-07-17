@@ -220,11 +220,12 @@ function HomePage() {
     if (!g) return { needsLogin: false, needsCaptcha: false, needsKey: false, hasSession: false };
     return {
       needsLogin: g.loginRequired && !authUserId,
-      needsCaptcha: g.captchaRequired && !captchaToken,
+      // Captcha is satisfied by either a fresh widget token OR a live pass token.
+      needsCaptcha: g.captchaRequired && !captchaToken && !captchaPassToken,
       needsKey: g.accessKeyRequired && !accessKey && !sessionToken,
       hasSession: !!sessionToken,
     };
-  }, [gate.data, authUserId, captchaToken, accessKey, sessionToken]);
+  }, [gate.data, authUserId, captchaToken, captchaPassToken, accessKey, sessionToken]);
 
   // --- Redeem key ---
   const [redeeming, setRedeeming] = useState(false);
