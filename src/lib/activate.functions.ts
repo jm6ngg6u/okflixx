@@ -100,6 +100,7 @@ type ActivateResult =
         name: string | null;
       };
       policy: string;
+      captchaPass?: { token: string; exp: number } | null;
     }
   | {
       ok: false;
@@ -118,6 +119,7 @@ type ActivateResult =
         | "login_required";
       attempts?: number;
       message?: string;
+      captchaPass?: { token: string; exp: number } | null;
     };
 
 
