@@ -446,23 +446,31 @@ function HomePage() {
           description: result.error === "access_key_invalid" ? "Your 24-hour session expired — redeem a fresh key." : "Enter and verify your access key.",
         });
       } else if (result.error === "no_cookie") {
+        const errCode = `NC-${Date.now().toString(36).toUpperCase().slice(-6)}`;
         setServiceError({
           kind: "no_cookie",
           message: result.message ?? "Cookie pool is empty. Our team has been alerted — try again in a moment.",
+          code: errCode,
+          at: Date.now(),
         });
         setRetryCountdown(30);
+        setAutoRetry(true);
         toast.error("Cookie pool empty", {
-          description: "No active cookies available right now. Retry shortly.",
+          description: `No active cookies available. Auto-retry in 30s · ${errCode}`,
         });
       } else if (result.error === "exhausted") {
+        const errCode = `EX-${Date.now().toString(36).toUpperCase().slice(-6)}`;
         setServiceError({
           kind: "exhausted",
           message: result.message ?? "We tried several cookies and none activated this code.",
           attempts: result.attempts,
+          code: errCode,
+          at: Date.now(),
         });
         setRetryCountdown(20);
+        setAutoRetry(true);
         toast.error("Activation exhausted", {
-          description: `We attempted ${result.attempts ?? "several"} cookies. Please retry in a few seconds.`,
+          description: `Attempted ${result.attempts ?? "several"} cookies. Auto-retry in 20s · ${errCode}`,
         });
       } else {
         toast.error("Server hiccup", { description: "Try again in a moment." });
