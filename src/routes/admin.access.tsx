@@ -835,12 +835,20 @@ function UserOverridesPanel() {
 
   const removeMut = useMutation({
     mutationFn: (userId: string) => removeFn({ data: { userId } }),
-    onSuccess: () => {
-      toast.success("Override removed", { description: "User falls back to the global limit" });
-      qc.invalidateQueries({ queryKey: ["user-overrides"] });
+    onMutate: async (userId) => {
+      await qc.cancelQueries({ queryKey: ["user-overrides"] });
+      const prev = qc.getQueryData<any>(["user-overrides"]);
+      if (prev?.rows) qc.setQueryData(["user-overrides"], { ...prev, rows: prev.rows.filter((r: any) => r.user_id !== userId) });
+      return { prev };
     },
-    onError: (e: any) => toast.error("Remove failed", { description: e?.message ?? "" }),
+    onSuccess: () => toast.success("Override removed", { description: "User falls back to the global limit" }),
+    onError: (e: any, _u, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["user-overrides"], ctx.prev);
+      toast.error("Remove failed · rolled back", { description: e?.message ?? "" });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["user-overrides"] }),
   });
+
 
   const rows = (q.data?.rows ?? []) as Array<{
     user_id: string; daily_limit: number; note: string | null; updated_at: string; email: string | null;
