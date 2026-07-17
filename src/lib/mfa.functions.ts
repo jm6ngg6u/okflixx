@@ -184,12 +184,12 @@ export const logMfaEvent = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("auth_audit_log").insert({
       user_id: userId,
-      event: data.event_type,
+      event: data.event,
       email: data.email ?? null,
       ip_hash: await sha256Hex(readIp()),
       user_agent: getRequestHeader("user-agent") ?? null,
       success: data.success,
-      metadata: data.details ?? null,
+      metadata: data.metadata ?? null,
     });
     return { ok: true };
   });
