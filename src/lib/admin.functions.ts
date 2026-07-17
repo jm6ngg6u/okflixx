@@ -370,6 +370,12 @@ export const getRateLimitStatus = createServerFn({ method: "POST" })
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
 
+    // Fetch rate-limit window setting (per-IP window is 10min in the activation flow).
+    const { data: rlSettingRow } = await supabase
+      .from("app_settings").select("value").eq("key", "rate_limit_per_10min").maybeSingle();
+    const rateLimitPer10Min = Math.max(1, parseInt(String(rlSettingRow?.value ?? "10"), 10) || 10);
+    const RL_WINDOW_SEC = 10 * 60;
+
     const since = new Date(Date.now() - data.windowMinutes * 60_000).toISOString();
     const { data: rows, error } = await supabase
       .from("activation_attempts")
@@ -380,29 +386,56 @@ export const getRateLimitStatus = createServerFn({ method: "POST" })
       .limit(500);
     if (error) throw error;
 
-    const byIp = new Map<string, { ip_hash: string; count: number; last: string; countries: Set<string> }>();
+    const byIp = new Map<string, {
+      ip_hash: string; count: number; last: string; first: string; countries: Set<string>; result: string;
+    }>();
     let rate_limited = 0;
     let bot_detected = 0;
     for (const r of (rows ?? []) as any[]) {
       if (r.result === "rate_limited") rate_limited++;
       else if (r.result === "bot_detected") bot_detected++;
       const key = r.ip_hash ?? "unknown";
-      const b = byIp.get(key) ?? { ip_hash: key, count: 0, last: r.created_at, countries: new Set<string>() };
+      const b = byIp.get(key) ?? {
+        ip_hash: key, count: 0, last: r.created_at, first: r.created_at,
+        countries: new Set<string>(), result: r.result,
+      };
       b.count += 1;
       if (r.country) b.countries.add(r.country);
       if (new Date(r.created_at) > new Date(b.last)) b.last = r.created_at;
+      if (new Date(r.created_at) < new Date(b.first)) b.first = r.created_at;
+      // Prefer bot_detected as tone if any bot attempts exist for this IP.
+      if (r.result === "bot_detected") b.result = "bot_detected";
       byIp.set(key, b);
     }
+    const now = Date.now();
     const top = Array.from(byIp.values())
-      .map((b) => ({ ip_hash: b.ip_hash, count: b.count, last: b.last, countries: Array.from(b.countries) }))
+      .map((b) => {
+        // Sliding 10-min window: cooldown until the oldest in-window attempt ages out.
+        const firstAgeSec = Math.floor((now - new Date(b.first).getTime()) / 1000);
+        const cooldown_seconds = Math.max(0, RL_WINDOW_SEC - firstAgeSec);
+        return {
+          ip_hash: b.ip_hash,
+          count: b.count,
+          last: b.last,
+          first: b.first,
+          countries: Array.from(b.countries),
+          result: b.result,
+          cooldown_seconds,
+        };
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
+
+    const maxCooldown = top.reduce((m, t) => Math.max(m, t.cooldown_seconds), 0);
 
     return {
       windowMinutes: data.windowMinutes,
       total: (rows ?? []).length,
       rate_limited,
       bot_detected,
+      rateLimitPer10Min,
+      windowSeconds: RL_WINDOW_SEC,
+      cooldown_seconds: maxCooldown,
       top,
     };
   });
