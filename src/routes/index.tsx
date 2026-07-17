@@ -1104,7 +1104,7 @@ function ContactStrip() {
     return (
       <div className="mx-auto max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-100 text-xs font-mono p-3 space-y-2">
         <div className="uppercase tracking-widest text-[10px] text-amber-300">// Contact debug (?debug=contacts)</div>
-        <div>Master enabled: <b>{String(q.data?.debug?.masterEnabled ?? false)}</b></div>
+        <div>Channels visible: <b>{String(channels.length)}</b></div>
         {(q.data?.debug?.channels ?? []).map((c: any) => (
           <div key={c.kind} className="flex flex-wrap gap-x-2">
             <span className="text-amber-300">{c.kind}:</span>
