@@ -231,6 +231,28 @@ function SettingsPage() {
         </div>
       </Section>
 
+      {/* Cookie rotation policy */}
+      <Section
+        icon={Shuffle}
+        title="Cookie rotation policy"
+        subtitle="How the pool picks the next active cookie for each TV activation. Only active + valid cookies are ever chosen — free, on-hold, invalid and expired cookies are skipped automatically."
+        pill={<Badge variant="outline" className="bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30 font-mono uppercase tracking-widest text-[10px]">
+          {(local.cookie_rotation_policy ?? "round_robin").replace("_", " ")}
+        </Badge>}
+      >
+        <RotationPolicyPicker
+          value={(local.cookie_rotation_policy ?? "round_robin")}
+          onPick={async (v) => {
+            set("cookie_rotation_policy", v);
+            try {
+              await doSet({ data: { key: "cookie_rotation_policy", value: v } });
+              toast.success(`Rotation policy → ${v.replace("_", " ")}`);
+              qc.invalidateQueries({ queryKey: ["admin-settings"] });
+            } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+          }}
+        />
+      </Section>
+
       {/* Activation flow */}
       <Section
         icon={Timer}
@@ -242,6 +264,7 @@ function SettingsPage() {
           <NumField k="rate_limit_per_10min" label="Rate limit (per IP, 10 min)" hint="Attempts allowed per IP within 10 minutes" local={local} set={set} onSave={save} min={1} max={200} />
         </div>
       </Section>
+
 
       <LiveJobsPanel />
 
