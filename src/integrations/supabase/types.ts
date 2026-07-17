@@ -285,6 +285,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_recovery_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          id: string
+          used_at: string | null
+          used_ip_hash: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          used_ip_hash?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          used_ip_hash?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -786,6 +813,14 @@ export type Database = {
           ok: boolean
           reason: string
           remaining_uses: number
+        }[]
+      }
+      consume_recovery_code: {
+        Args: { _code_hash: string; _ip_hash?: string; _user_id: string }
+        Returns: {
+          ok: boolean
+          reason: string
+          remaining: number
         }[]
       }
       count_eligible_cookies: {
