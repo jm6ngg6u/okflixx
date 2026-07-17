@@ -495,16 +495,17 @@ function ContactRow({ icon: Icon, label, kind, accent, enableKey, nameKey, handl
 function ContactPreview({ local }: { local: Record<string, string> }) {
   const enabled = local.contact_enabled === "1";
   const items: Array<{ kind: "telegram" | "instagram" | "whatsapp"; name: string; accent: string; Icon: any; handle: string; href: string }> = [];
-  const push = (kind: "telegram" | "instagram" | "whatsapp", nameKey: string, handleKey: string, fallbackName: string, accent: string, Icon: any) => {
+  const push = (kind: "telegram" | "instagram" | "whatsapp", enableKey: string, nameKey: string, handleKey: string, fallbackName: string, accent: string, Icon: any) => {
+    if ((local[enableKey] ?? "1") !== "1") return;
     const h = normalizeHandle(kind, local[handleKey] ?? "");
     if (!h) return;
     const href = hrefFor(kind, h);
     if (!href) return;
     items.push({ kind, name: (local[nameKey] ?? "").trim() || fallbackName, accent, Icon, handle: displayHandle(kind, h), href });
   };
-  push("telegram", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
-  push("instagram", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
-  push("whatsapp", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
+  push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", "Telegram", "#229ED9", Send);
+  push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", "Instagram", "#E1306C", Instagram);
+  push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", "WhatsApp", "#25D366", Phone);
 
   return (
     <div className="rounded-md border border-white/10 bg-black/40 p-4">
