@@ -464,9 +464,25 @@ function AccessAdminPage() {
                       <td className="px-3 py-2 text-white/60">{new Date(r.created_at).toLocaleTimeString()}</td>
                       <td className="px-3 py-2 text-white/70">{r.provider}<span className="text-white/30 ml-1">/{r.purpose}</span></td>
                       <td className="px-3 py-2">
-                        <span className={r.success ? "text-emerald-300" : "text-red-300"}>
-                          {r.success ? "ok" : (r.reason ?? "fail")}
-                        </span>
+                        {(() => {
+                          const codes: string[] = r.error_codes ?? [];
+                          const diagnosticOk =
+                            r.purpose === "admin_test" &&
+                            !r.success &&
+                            (codes.includes("invalid-input-response") ||
+                              codes.includes("missing-input-response"));
+                          if (r.success) return <span className="text-emerald-300">ok</span>;
+                          if (diagnosticOk)
+                            return (
+                              <span
+                                className="text-emerald-300"
+                                title="Diagnostic probe sends a dummy token; providers reply invalid-input-response when the secret is valid — this is the expected healthy result."
+                              >
+                                healthy probe
+                              </span>
+                            );
+                          return <span className="text-red-300">{r.reason ?? "fail"}</span>;
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-white/50 font-mono">{(r.error_codes ?? []).join(", ") || "—"}</td>
                       <td className="px-3 py-2 text-white/40 font-mono">
