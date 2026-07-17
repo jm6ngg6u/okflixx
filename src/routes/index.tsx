@@ -1197,33 +1197,8 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
           <Detail label="Account" value={maskEmail(a.email)} mono />
         </div>
 
-        {/* Gates passed receipt — only when at least one gate ran */}
-        {payload.gatesPassed.length > 0 && (
-          <div className="mt-5 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
-            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-300 mb-2">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Security checks passed
-              {expiresLabel && (
-                <span className="ml-auto normal-case tracking-normal text-[11px] text-emerald-100/80">
-                  Session valid for <span className="font-mono text-white">{expiresLabel}</span>
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {payload.gatesPassed.map((g) => (
-                <span
-                  key={g.key}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-100"
-                >
-                  <CheckCircle2 className="w-3 h-3 text-emerald-300" />
-                  <span className="font-mono uppercase tracking-widest text-[10px] text-emerald-200/80">{g.label}</span>
-                  <span className="text-emerald-100/80">·</span>
-                  <span>{g.detail}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+
+
 
 
         {/* Pipeline footer */}
