@@ -282,7 +282,11 @@ export const submitActivation = createServerFn({ method: "POST" })
     const fpRaw = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
     const fpHash = createHash("sha256").update(fpRaw).digest("hex");
 
-    if (captchaRequired) {
+    // Captcha verification runs whenever the client presents a token, even if
+    // the captcha gate is OFF — solving the captcha is the documented way to
+    // bypass the per-IP rate limit ("solve the captcha to unlock unlimited").
+    const hasCaptchaInput = !!(data.captchaPassToken || data.captchaToken);
+    if (captchaRequired || hasCaptchaInput) {
       // 1) Fast path — client sent a valid short-lived captcha_pass. Skips
       //    re-solving for up to 10 min after a successful verify.
       if (data.captchaPassToken && (await verifyCaptchaPass(data.captchaPassToken, ipHash, fpHash))) {
@@ -298,35 +302,39 @@ export const submitActivation = createServerFn({ method: "POST" })
         const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
         if (declared && declared !== provider) {
           console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
-          return {
-            ok: false,
-            error: "captcha_invalid",
-            message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
-          };
-        }
-
-        const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
-          purpose: "activate", ipHash, userAgent,
-        });
-        if (!v.ok) {
-          const codes = (v.errorCodes ?? []).join(", ");
-          console.warn("[captcha] verify failed", {
-            provider, reason: v.reason, errorCodes: v.errorCodes, hostname: v.hostname,
-            tokenLen: data.captchaToken?.length ?? 0,
+          if (captchaRequired) {
+            return {
+              ok: false,
+              error: "captcha_invalid",
+              message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
+            };
+          }
+        } else {
+          const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
+            purpose: "activate", ipHash, userAgent,
           });
-          const human = humanCaptchaReason(v.reason, v.errorCodes);
-          return {
-            ok: false,
-            error: "captcha_invalid",
-            message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
-          };
+          if (v.ok) {
+            captchaPassed = true;
+            mintedPass = await signCaptchaPass(ipHash, fpHash);
+          } else if (captchaRequired) {
+            const codes = (v.errorCodes ?? []).join(", ");
+            console.warn("[captcha] verify failed", {
+              provider, reason: v.reason, errorCodes: v.errorCodes, hostname: v.hostname,
+              tokenLen: data.captchaToken?.length ?? 0,
+            });
+            const human = humanCaptchaReason(v.reason, v.errorCodes);
+            return {
+              ok: false,
+              error: "captcha_invalid",
+              message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
+            };
+          }
         }
-        captchaPassed = true;
-        mintedPass = await signCaptchaPass(ipHash, fpHash);
-      } else {
+      } else if (captchaRequired) {
         return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
       }
     }
+
     if (accessKeyRequired) {
       const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
       if (!data.accessKey && !data.accessSessionToken) {
