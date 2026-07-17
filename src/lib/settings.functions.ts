@@ -144,9 +144,9 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
   const wa = normPhone(m.contact_wa_number ?? "");
 
   const all = [
-    { kind: "telegram", enabled: tgOn, name: (m.contact_tg_name ?? "").trim() || "Telegram", raw: m.contact_tg_username ?? "", handleNorm: tg, handle: tg ? `@${tg}` : "", href: tg ? `https://t.me/${tg}` : "" },
-    { kind: "instagram", enabled: igOn, name: (m.contact_ig_name ?? "").trim() || "Instagram", raw: m.contact_ig_username ?? "", handleNorm: ig, handle: ig ? `@${ig}` : "", href: ig ? `https://instagram.com/${ig}` : "" },
-    { kind: "whatsapp", enabled: waOn, name: (m.contact_wa_name ?? "").trim() || "WhatsApp", raw: m.contact_wa_number ?? "", handleNorm: wa, handle: wa ? `+${wa}` : "", href: wa ? `https://wa.me/${wa}` : "" },
+    { kind: "telegram", enabled: tgOn, name: (m.contact_tg_name ?? "").trim(), raw: m.contact_tg_username ?? "", handleNorm: tg, handle: tg ? `@${tg}` : "", href: tg ? `https://t.me/${tg}` : "" },
+    { kind: "instagram", enabled: igOn, name: (m.contact_ig_name ?? "").trim(), raw: m.contact_ig_username ?? "", handleNorm: ig, handle: ig ? `@${ig}` : "", href: ig ? `https://instagram.com/${ig}` : "" },
+    { kind: "whatsapp", enabled: waOn, name: (m.contact_wa_name ?? "").trim(), raw: m.contact_wa_number ?? "", handleNorm: wa, handle: wa ? `+${wa}` : "", href: wa ? `https://wa.me/${wa}` : "" },
   ];
   const channels = all
     .filter((c) => c.enabled && !!c.handleNorm)
