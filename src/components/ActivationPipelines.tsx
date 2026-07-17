@@ -341,21 +341,43 @@ function PipelineRow({
             <Meta label="IP hash" value={pipeline.ip_hash ? pipeline.ip_hash.slice(0, 10) + "…" : "—"} />
           </div>
 
-          {/* Retry action */}
+          {/* Retry action + pre-check strip */}
           <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-[10px] font-mono text-white/40">
-              admin retry uses the current rotation policy · logged as <span className="text-white/60">activation.admin_retry</span>
+            <div className="text-[10px] font-mono text-white/40 flex items-center gap-2 flex-wrap">
+              <span>admin retry · logged as <span className="text-white/60">activation.admin_retry</span></span>
+              {precheck && (
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border ${
+                  precheck.can_retry
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90]"
+                }`}>
+                  <Filter className="w-3 h-3" />
+                  {precheck.eligible} eligible · {precheck.policy.replace("_", " ")}
+                </span>
+              )}
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); onRetry(); }}
-              disabled={retrying}
-              className="group inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90] hover:bg-[#ff2a3a]/20 hover:border-[#ff2a3a]/60 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={retrying || (precheck ? !precheck.can_retry : false)}
+              title={precheck && !precheck.can_retry ? (precheck.reason ?? "Retry blocked") : `Retry ${pipeline.code}`}
+              className={`group inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-widest px-3 py-1.5 rounded border transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                precheck && !precheck.can_retry
+                  ? "border-[#ff2a3a]/40 bg-[#ff2a3a]/5 text-[#ff8a90]"
+                  : "border-[#ff2a3a]/40 bg-[#ff2a3a]/10 text-[#ff8a90] hover:bg-[#ff2a3a]/20 hover:border-[#ff2a3a]/60"
+              }`}
             >
               {retrying
                 ? <><Loader2 className="w-3 h-3 animate-spin" /> retrying…</>
-                : <><RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-300" /> retry {pipeline.code}</>}
+                : precheck && !precheck.can_retry
+                  ? <><ShieldAlert className="w-3 h-3" /> blocked</>
+                  : <><RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-300" /> retry {pipeline.code}</>}
             </button>
           </div>
+          {precheck && !precheck.can_retry && precheck.reason && (
+            <div className="mt-2 text-[10px] font-mono text-[#ff8a90]/80 border border-[#ff2a3a]/30 bg-[#ff2a3a]/[0.04] rounded px-2 py-1">
+              ⚠ {precheck.reason}
+            </div>
+          )}
         </div>
       )}
     </div>
