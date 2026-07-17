@@ -725,6 +725,13 @@ function HomePage() {
                           </span>
                         )}
                       </div>
+                      <p className="text-[11px] text-white/45 leading-snug mb-2">
+                        {captchaPassToken
+                          ? "You have a captcha pass — no need to solve again for the next few minutes."
+                          : "Solve the challenge once. Successful checks unlock a 10-minute pass on this device."}
+                      </p>
+
+
 
                       {/* Live captcha status banner */}
                       {captchaHealth.data && captchaHealth.data.status !== "idle" && (
