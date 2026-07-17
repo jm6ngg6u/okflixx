@@ -437,9 +437,18 @@ export const retryActivationAdmin = createServerFn({ method: "POST" })
     const policy: "round_robin" | "random" | "quality" =
       rawPolicy === "random" || rawPolicy === "quality" ? (rawPolicy as any) : "round_robin";
 
+    const { loadEligibility } = await import("@/lib/activate.functions");
+    const eligibility = await loadEligibility(supabaseAdmin);
+
     const { data: cookieRows, error: pickErr } = await supabaseAdmin.rpc(
-      "pick_next_cookie_by_policy",
-      { _policy: policy },
+      "pick_next_cookie_filtered",
+      {
+        _policy: policy,
+        _include_statuses: eligibility.include_statuses,
+        _require_valid: eligibility.require_valid,
+        _min_success_rate: eligibility.min_success_rate,
+        _min_total_uses: eligibility.min_total_uses,
+      },
     );
     const cookie = Array.isArray(cookieRows) ? cookieRows[0] : cookieRows;
     if (pickErr || !cookie) {
