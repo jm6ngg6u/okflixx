@@ -112,6 +112,42 @@ function freshnessTone(iso: string | null | undefined): { cls: string; label: st
   return { cls: "bg-red-500", label: "stale" };
 }
 
+/**
+ * Health score (0-100) — a single number that combines success rate, freshness,
+ * status, and lock state so ops can prioritize cookies at a glance.
+ * Formula is client-side and derivable, so no DB migration is needed.
+ */
+function healthScore(r: any): number {
+  const succ = Number(r.success_count ?? 0);
+  const fail = Number(r.fail_count ?? 0);
+  const attempts = succ + fail;
+  let score = attempts > 0 ? (succ / attempts) * 100 : 50; // neutral if untested
+
+  if (r.status === "active") score += 10;
+  else if (r.status === "free") score += 3;
+  else if (r.status === "on_hold") score -= 15;
+  else if (r.status === "invalid") score -= 40;
+  else if (r.status === "unknown") score -= 5;
+
+  const t = r.last_checked_at ? Date.parse(r.last_checked_at) : 0;
+  if (!t) score -= 15;
+  else {
+    const age = Date.now() - t;
+    if (age > 24 * 60 * 60_000) score -= 12;
+    else if (age > 60 * 60_000) score -= 4;
+  }
+  if (r.is_locked && r.locked_at && Date.now() - Date.parse(r.locked_at) > 5 * 60_000) score -= 15;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+function healthTone(h: number): { text: string; bar: string; label: string } {
+  if (h >= 75) return { text: "text-emerald-300", bar: "from-emerald-500 to-emerald-400", label: "excellent" };
+  if (h >= 55) return { text: "text-lime-300",    bar: "from-lime-500 to-emerald-400",    label: "good" };
+  if (h >= 35) return { text: "text-amber-300",   bar: "from-amber-500 to-yellow-400",    label: "fair" };
+  if (h >= 15) return { text: "text-orange-300",  bar: "from-orange-500 to-amber-400",    label: "poor" };
+  return              { text: "text-red-300",     bar: "from-red-600 to-red-400",         label: "critical" };
+}
+
 function CookiePoolPage() {
   const qc = useQueryClient();
   const upload = useServerFn(uploadCookies);
@@ -447,6 +483,7 @@ function CookiePoolPage() {
       {/* KPI health strip */}
       <PoolHealthStrip
         stats={stats}
+        avgHealth={rows.length > 0 ? Math.round(rows.reduce((acc, r) => acc + healthScore(r), 0) / rows.length) : null}
         onFilterStatus={(s) => { setStatus(s); setPage(0); }}
         onFilterStuck={() => { setStuckOnly(true); setStatus(""); setCountry(""); setPage(0); }}
       />
@@ -701,17 +738,18 @@ function CookiePoolPage() {
                 <th>Plan · Country</th>
                 <SortableTh label="Uses" active={sort === "total_uses"} dir={sortDir} onClick={() => toggleSort("total_uses")} />
                 <SortableTh label="Success" active={sort === "success_count"} dir={sortDir} onClick={() => toggleSort("success_count")} />
+                <th>Health</th>
                 <SortableTh label="Last check" active={sort === "last_checked_at"} dir={sortDir} onClick={() => toggleSort("last_checked_at")} />
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i}><td colSpan={8} className="p-0"><div className="skeleton-row" /></td></tr>
+                <tr key={i}><td colSpan={9} className="p-0"><div className="skeleton-row" /></td></tr>
               ))}
               {!isLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="state-block">
                       <div className="state-icon"><Cookie className="w-5 h-5" /></div>
                       <div className="state-title">No cookies match these filters</div>
@@ -801,6 +839,26 @@ function CookiePoolPage() {
                         {" / "}
                         <span className="text-red-400/80">{r.fail_count ?? 0}</span>
                       </div>
+                    </td>
+                    <td className="min-w-[110px]">
+                      {(() => {
+                        const h = healthScore(r);
+                        const tone = healthTone(h);
+                        return (
+                          <div className="flex flex-col gap-1" title={`Health: ${h}/100 · ${tone.label}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`font-mono text-xs tabular-nums font-semibold ${tone.text}`}>{h}</span>
+                              <span className="text-[9px] uppercase tracking-widest text-white/40">{tone.label}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                              <div
+                                className={`h-full bg-gradient-to-r ${tone.bar} transition-all duration-500`}
+                                style={{ width: `${h}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="text-white/60 text-xs">
                       <div className="font-mono">{fmtRel(r.last_checked_at)}</div>
@@ -937,18 +995,30 @@ function LiveIndicator({ realtimeUp, isFetching, isAnyChecking, nextTickIn }: { 
   );
 }
 
-function PoolHealthStrip({ stats, onFilterStatus, onFilterStuck }: {
+function PoolHealthStrip({ stats, avgHealth, onFilterStatus, onFilterStuck }: {
   stats: any;
+  avgHealth: number | null;
   onFilterStatus: (s: string) => void;
   onFilterStuck: () => void;
 }) {
   const s = stats ?? { byStatus: {}, total: 0, locked: 0, stuck: 0, successRate: null, checkedLastHour: 0 };
+  const hTone = avgHealth == null ? "muted"
+    : avgHealth >= 75 ? "emerald"
+    : avgHealth >= 55 ? "sky"
+    : avgHealth >= 35 ? "amber"
+    : "red";
+  const hLabel = avgHealth == null ? "no data"
+    : avgHealth >= 75 ? "excellent"
+    : avgHealth >= 55 ? "good"
+    : avgHealth >= 35 ? "fair"
+    : avgHealth >= 15 ? "poor" : "critical";
   const tiles: { key: string; label: string; value: string; sub?: string; tone: string; Icon: any; onClick?: () => void }[] = [
     { key: "total",    label: "Total",       value: fmt(s.total),                Icon: Cookie,      tone: "muted" },
     { key: "active",   label: "Active",      value: fmt(s.byStatus?.active),     Icon: ShieldCheck, tone: "emerald", onClick: () => onFilterStatus("active") },
     { key: "free",     label: "Free",        value: fmt(s.byStatus?.free),       Icon: Sparkles,    tone: "sky",     onClick: () => onFilterStatus("free") },
     { key: "on_hold",  label: "On hold",     value: fmt(s.byStatus?.on_hold),    Icon: PauseCircle, tone: "amber",   onClick: () => onFilterStatus("on_hold") },
     { key: "invalid",  label: "Invalid",     value: fmt(s.byStatus?.invalid),    Icon: XCircle,     tone: "red",     onClick: () => onFilterStatus("invalid") },
+    { key: "health",   label: "Avg health",  value: avgHealth == null ? "—" : `${avgHealth}`, sub: `page · ${hLabel}`, Icon: TrendingUp, tone: hTone },
     { key: "success",  label: "Success rate",value: s.successRate == null ? "—" : `${s.successRate}%`, sub: `${fmt(s.totalSucc)} ✓ / ${fmt(s.totalFail)} ✗`, Icon: TrendingUp, tone: "emerald" },
     { key: "locked",   label: "Locked now",  value: fmt(s.locked), sub: s.stuck > 0 ? `${s.stuck} stuck` : "healthy", Icon: Lock, tone: s.stuck > 0 ? "amber" : "muted", onClick: s.stuck > 0 ? onFilterStuck : undefined },
     { key: "check1h",  label: "Checks 1h",   value: fmt(s.checkedLastHour), Icon: Zap, tone: "sky" },
