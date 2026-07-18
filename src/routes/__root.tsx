@@ -111,16 +111,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   // first paint — no flash of the activation UI before the client swap.
   loader: async ({ context }) => {
     try {
-      await context.queryClient.ensureQueryData({
+      const gate = await context.queryClient.ensureQueryData({
         queryKey: ["public-gate"],
         queryFn: () => getGateConfig(),
         staleTime: 2000,
       });
+      return { gate };
     } catch {
-      /* non-fatal — MaintenanceGate falls through to <Outlet /> if fetch fails */
+      return { gate: null as null };
     }
   },
 });
+
 
 
 function RootShell({ children }: { children: ReactNode }) {
