@@ -49,7 +49,7 @@ function AccessAdminPage() {
   const removeKeys = useServerFn(deleteAccessKeys);
   const fetchRedemptions = useServerFn(listRedemptions);
   const fetchStats = useServerFn(getAccessStats);
-  const runTestKeys = useServerFn(testCaptchaKeys);
+  
 
   // ─── Queries (2s live refresh) ───────────────────────────────────────
   const config = useQuery({ queryKey: ["gate-config"], queryFn: () => getConfig(), refetchInterval: REFRESH_MS });
