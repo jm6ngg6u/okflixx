@@ -9,6 +9,7 @@ import {
   setIntensity,
   setSensitivity,
   onSilenceChange,
+  resetSilenceWindow,
 } from "@/lib/audio-reactive";
 import { Volume2, VolumeX, Music4, Play } from "lucide-react";
 import { toast } from "sonner";
