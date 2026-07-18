@@ -807,7 +807,17 @@ function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
             <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Reviews</div>
-            <h2 className="font-display text-4xl md:text-6xl">4.9 / 5 · <span className="text-live">82,000+</span> activations</h2>
+            <h2 className="font-display text-4xl md:text-6xl">
+              4.9 / 5 ·{" "}
+              <span className="text-live tabular-nums inline-flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
+                </span>
+                {(successCount.data?.count ?? 0).toLocaleString()}
+              </span>{" "}
+              successful activations
+            </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
