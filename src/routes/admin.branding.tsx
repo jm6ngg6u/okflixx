@@ -288,10 +288,17 @@ function BrandingStudio() {
             </div>
           </Section>
         </TabsContent>
+
+        <TabsContent value="presets" className="mt-4">
+          <Section title="Theme presets" desc="Snapshot the current look as a named preset. Apply any preset instantly across the whole site.">
+            <PresetsPanel />
+          </Section>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
+
 
 function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
   return (
