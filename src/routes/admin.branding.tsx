@@ -90,6 +90,28 @@ const MESSAGES: Row[] = [
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
+// Map every branding key → human label so toasts / progress read cleanly.
+const KEY_LABELS: Partial<Record<BrandingKey, string>> = (() => {
+  const m: Partial<Record<BrandingKey, string>> = {};
+  for (const r of [...IDENTITY, ...MESSAGES]) m[r.key] = r.label;
+  m.font_display = "Display font";
+  m.font_body = "Body font";
+  m.font_mono = "Mono font";
+  m.font_display_weight = "Display weight";
+  m.font_body_weight = "Body weight";
+  m.letter_spacing = "Letter spacing";
+  m.accent_hex = "Accent color";
+  m.glow = "Glow intensity";
+  m.shine_speed = "Shine speed";
+  m.wordmark_pulse = "Wordmark pulse";
+  m.logo_url = "Main logo";
+  m.favicon_url = "Favicon";
+  return m;
+})();
+function labelFor(k: string) {
+  return KEY_LABELS[k as BrandingKey] ?? k.replace(/_/g, " ");
+}
+
 function BrandingStudio() {
   const list = useServerFn(listBranding);
   const save = useServerFn(setBranding);
