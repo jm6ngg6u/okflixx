@@ -48,7 +48,7 @@ const IDENTITY: Row[] = [
 ];
 
 
-const MESSAGES: Row[] = [
+const HOME_MESSAGES: Row[] = [
   { key: "hero_kicker", label: "Hero kicker (live badge)" },
   { key: "hero_headline_1", label: "Hero headline — line 1" },
   { key: "hero_headline_2", label: "Hero headline — line 2 (accent)" },
@@ -70,23 +70,28 @@ const MESSAGES: Row[] = [
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
   { key: "error_generic", label: "Generic activation error", multiline: true },
-  { key: "login_kicker", label: "Login — card kicker" },
-  { key: "login_title", label: "Login — card title" },
-  { key: "login_subtitle", label: "Login — card subtitle" },
-  { key: "login_tagline_1", label: "Login — hero tagline (white)" },
-  { key: "login_tagline_2", label: "Login — hero tagline (accent)" },
-  { key: "login_description", label: "Login — hero description", multiline: true },
-  { key: "login_button", label: "Login — button label" },
-  { key: "login_button_busy", label: "Login — button (loading)" },
-  { key: "login_footer_prompt", label: "Login — footer prompt" },
-  { key: "login_footer_cta", label: "Login — footer CTA" },
-  { key: "login_status", label: "Login — status pill" },
-  { key: "login_error_title", label: "Login — error title" },
-  { key: "login_error_hint", label: "Login — error hint / help copy", multiline: true },
-  { key: "login_help_url", label: "Login — help link URL", placeholder: "https://…" },
-  { key: "login_help_label", label: "Login — help link label" },
-  { key: "login_expected_origin", label: "Login — expected origin (env check)", placeholder: "https://your-site.lovable.app" },
 ];
+
+const LOGIN_MESSAGES: Row[] = [
+  { key: "login_kicker", label: "Card kicker" },
+  { key: "login_title", label: "Card title" },
+  { key: "login_subtitle", label: "Card subtitle" },
+  { key: "login_tagline_1", label: "Hero tagline (white)" },
+  { key: "login_tagline_2", label: "Hero tagline (accent)" },
+  { key: "login_description", label: "Hero description", multiline: true },
+  { key: "login_button", label: "Button label" },
+  { key: "login_button_busy", label: "Button (loading)" },
+  { key: "login_footer_prompt", label: "Footer prompt" },
+  { key: "login_footer_cta", label: "Footer CTA" },
+  { key: "login_status", label: "Status pill" },
+  { key: "login_error_title", label: "Error title" },
+  { key: "login_error_hint", label: "Error hint / help copy", multiline: true },
+  { key: "login_help_url", label: "Help link URL", placeholder: "https://…" },
+  { key: "login_help_label", label: "Help link label" },
+  { key: "login_expected_origin", label: "Expected origin (env check)", placeholder: "https://your-site.lovable.app" },
+];
+
+const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
