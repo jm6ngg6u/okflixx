@@ -163,10 +163,17 @@ export function BackgroundSong() {
     window.setTimeout(() => { retryingRef.current = false; }, 6000);
   };
 
-  // Reset retry budget when the tab becomes visible again (user came back).
+  // Reset retry budget AND silence window when the tab becomes visible.
+  // Prevents throttled rAF during a hidden tab from firing a false STATIC
+  // fallback the moment the user returns.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const h = () => { if (document.visibilityState === "visible") resetBgsRetries(); };
+    const h = () => {
+      if (document.visibilityState === "visible") {
+        resetBgsRetries();
+        resetSilenceWindow();
+      }
+    };
     document.addEventListener("visibilitychange", h);
     return () => document.removeEventListener("visibilitychange", h);
   }, []);
