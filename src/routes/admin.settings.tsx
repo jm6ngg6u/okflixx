@@ -289,8 +289,8 @@ function SettingsPage() {
         subtitle="Attempt limits and rate limiting for the public activation endpoint."
       >
         <div className="grid sm:grid-cols-2 gap-4">
-          <NumField k="max_activation_attempts" label="Max cookies tried per activation" hint="How many cookies to try before giving up" local={local} set={set} onSave={save} min={1} max={10} />
-          <NumField k="rate_limit_per_10min" label="Rate limit (per IP, 10 min)" hint="Attempts allowed per IP within 10 minutes" local={local} set={set} onSave={save} min={1} max={200} />
+          <NumField k="max_activation_attempts" label="Max cookies tried per activation" hint="How many cookies to try before giving up" local={local} set={set} onSave={save} busy={busy} min={1} max={10} />
+          <NumField k="rate_limit_per_10min" label="Rate limit (per IP, 10 min)" hint="Attempts allowed per IP within 10 minutes" local={local} set={set} onSave={save} busy={busy} min={1} max={200} />
         </div>
       </Section>
 
@@ -329,8 +329,8 @@ function SettingsPage() {
             onRun={() => runProxiesMut.mutate()}
             running={runProxiesMut.isPending}
           />
-          <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} />
-          <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} min={1} max={365} />
+          <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} busy={busy} />
+          <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} busy={busy} min={1} max={365} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-white/10">
           <Button size="sm" variant="outline" onClick={exportRunsCSV} className="border-white/15 bg-white/5">
@@ -352,9 +352,9 @@ function SettingsPage() {
         subtitle="Toast notifications when scheduled or manual jobs finish. Quiet hours mute toasts within a time window (24h HH:MM, local time)."
       >
         <div className="grid sm:grid-cols-2 gap-3">
-          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} defaultOn />
-          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} defaultOn />
-          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} defaultOn />
+          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
+          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
+          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
           <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
             <div className="text-sm font-medium mb-2">Quiet hours</div>
             <div className="grid grid-cols-2 gap-2">
@@ -385,8 +385,8 @@ function SettingsPage() {
         subtitle="POST a JSON payload to a webhook when usable cookies fall below the threshold."
       >
         <div className="grid sm:grid-cols-2 gap-4">
-          <NumField k="pool_alert_threshold" label="Alert threshold (usable cookies)" local={local} set={set} onSave={save} min={0} max={10000} />
-          <TextField k="pool_alert_webhook" label="Webhook URL" placeholder="https://…" local={local} set={set} onSave={save} />
+          <NumField k="pool_alert_threshold" label="Alert threshold (usable cookies)" local={local} set={set} onSave={save} busy={busy} min={0} max={10000} />
+          <TextField k="pool_alert_webhook" label="Webhook URL" placeholder="https://…" local={local} set={set} onSave={save} busy={busy} />
         </div>
       </Section>
 
