@@ -772,36 +772,11 @@ function BackgroundSongPage() {
       />
 
       {/* Analytics */}
-      <div className="glass p-5">
-        <div className="flex items-start gap-3 mb-4">
-          <BarChart3 className="w-4 h-4 text-[#ff2a3a] mt-1" />
-          <div>
-            <div className="font-display text-lg leading-tight">Analytics</div>
-            <div className="text-xs text-white/50 mt-1 max-w-xl">
-              Anonymous counts recorded when the song appears on a visitor's homepage. Refreshes every 30s.
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            ["Impressions", "impression"],
-            ["Autoplay unmuted", "autoplay"],
-            ["Tap to play", "tap_play"],
-            ["Unmute clicks", "unmute"],
-            ["Out of schedule", "out_of_schedule"],
-            ["Analyser silent", "silence_detected"],
-          ].map(([label, key]) => (
-            <AnalyticsTile key={key} label={label as string}
-              v24={analytics.data?.total24h?.[key as string] ?? 0}
-              v7d={analytics.data?.total7d?.[key as string] ?? 0}
-            />
-          ))}
-        </div>
-      </div>
+      <AnalyticsCard data={analytics.data} isFetching={analytics.isFetching} onRefresh={() => analytics.refetch()} />
 
       {/* How it plays */}
       <div className="glass p-5">
-        <div className="font-display text-lg mb-2">How it plays on the public site</div>
+        <div className="font-display text-xs uppercase tracking-[0.24em] text-white/60 mb-3">How it plays on the public site</div>
         <ul className="text-sm text-white/70 space-y-1.5">
           <li>◆ Starts automatically when a visitor lands on the site, inside the schedule window.</li>
           <li>◆ Loops seamlessly — the moment the song ends, it restarts.</li>
@@ -811,6 +786,7 @@ function BackgroundSongPage() {
           <li>◆ If the analyser stays silent for 3s (CORS blocked, muted), reactive falls back to STATIC and a warning toast appears.</li>
         </ul>
       </div>
+
     </div>
   );
 }
