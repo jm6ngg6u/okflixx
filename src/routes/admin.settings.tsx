@@ -152,21 +152,47 @@ function SettingsPage() {
     }
   };
 
+  // Merge-preserving sync: never overwrite fields the admin is actively editing.
   useEffect(() => {
-    if (q.data?.settings) setLocal(q.data.settings);
+    const remote = q.data?.settings;
+    if (!remote) return;
+    setLocal((prev) => {
+      const next: Record<string, string> = { ...remote };
+      for (const k of dirtyRef.current) {
+        if (prev[k] !== undefined) next[k] = prev[k];
+      }
+      return next;
+    });
   }, [q.data]);
 
-  const set = (k: string, v: string) => setLocal((s) => ({ ...s, [k]: v }));
+  const set = (k: string, v: string) => {
+    dirtyRef.current.add(k);
+    setLocal((s) => ({ ...s, [k]: v }));
+  };
+
+  // Optimistic save with rollback. Pass an explicit value to bypass stale-closure
+  // bugs from toggles that fire immediately after setState.
   const save = async (k: string, valueOverride?: string) => {
+    if (busy[k]) return;
+    const value = valueOverride ?? local[k] ?? "";
+    const prev = q.data?.settings?.[k];
+    setLocal((s) => ({ ...s, [k]: value }));
+    setBusy((b) => ({ ...b, [k]: true }));
     try {
-      const value = valueOverride ?? local[k] ?? "";
-      if (valueOverride !== undefined) setLocal((s) => ({ ...s, [k]: value }));
       await doSet({ data: { key: k, value } });
+      dirtyRef.current.delete(k);
       toast.success(`Saved ${k.replace(/_/g, " ")}`);
       qc.invalidateQueries({ queryKey: ["admin-settings"] });
       qc.invalidateQueries({ queryKey: ["public-contacts"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Save failed");
+      // Rollback local optimistic value.
+      setLocal((s) => ({ ...s, [k]: prev ?? "" }));
+      dirtyRef.current.delete(k);
+      toast.error(`Couldn't save ${k.replace(/_/g, " ")}`, {
+        description: e?.message ?? "Reverted to previous value.",
+      });
+    } finally {
+      setBusy((b) => { const n = { ...b }; delete n[k]; return n; });
     }
   };
 
