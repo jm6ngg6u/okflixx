@@ -396,7 +396,7 @@ function HomePage() {
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto">
         <Link to="/" className="flex items-center gap-3 group">
           <img src={logo} alt="Emberlord" data-wave-origin className="h-10 w-10 object-contain logo-shine group-hover:scale-110 transition" width={40} height={40} />
-          <span className="font-display text-xl tracking-tight wordmark-pulse"><Wordmark /></span>
+          <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse"><Wordmark /></span>
         </Link>
         <div className="hidden md:flex gap-8 text-sm text-white/70">
           <a href="#activate" className="hover:text-white transition">Activate</a>
