@@ -3,6 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+function plainRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
+}
+
 /** Return every setting as a plain map. Publicly readable subset only for anon,
  *  but this fn requires staff so all keys are returned. */
 export const listSettings = createServerFn({ method: "GET" })
@@ -277,7 +281,7 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
       .is("finished_at", null)
       .or(`started_at.lt.${staleCutoff},control.not.is.null`);
     for (const row of staleRows ?? []) {
-      const previous = row.progress && typeof row.progress === "object" ? row.progress : {};
+      const previous = plainRecord(row.progress);
       const requestedAt = typeof previous.control_requested_at === "string"
         ? new Date(previous.control_requested_at).getTime()
         : new Date(row.started_at).getTime();
@@ -399,7 +403,7 @@ export const requestJobControl = createServerFn({ method: "POST" })
       .from("job_runs").select("id, job, finished_at, progress").eq("id", data.id).maybeSingle();
     if (!row) throw new Error("Job not found");
     if (row.finished_at) throw new Error("Job already finished");
-    const previousProgress = row.progress && typeof row.progress === "object" ? row.progress : {};
+    const previousProgress = plainRecord(row.progress);
     await supabaseAdmin.from("job_runs").update({
       control: data.action,
       progress: {
