@@ -498,8 +498,22 @@ function AuthPage() {
               </button>
             </>
           )}
-        </CardContent>
-      </Card>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <style>{`
+        @keyframes shine {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        @keyframes header-logo-glow {
+          0%, 100% { filter: drop-shadow(0 0 8px rgba(255,42,58,0.55)); }
+          50%      { filter: drop-shadow(0 0 18px rgba(255,42,58,0.95)); }
+        }
+        .header-logo-glow { animation: header-logo-glow 2.6s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }
