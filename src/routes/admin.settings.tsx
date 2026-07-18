@@ -635,3 +635,342 @@ function JobScheduleCard({
     </div>
   );
 }
+
+// ============================================================================
+// Maintenance controls — toggle, banner message w/ live preview, and a
+// start/end schedule. Kept in one component to keep the section self-contained.
+// ============================================================================
+const DEFAULT_MAINT_MSG =
+  "The service is temporarily unavailable. Please try again shortly.";
+
+function toLocalInputValue(iso: string | undefined | null): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (isNaN(t)) return "";
+  const d = new Date(t);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalInputValue(v: string): string {
+  if (!v) return "";
+  const t = Date.parse(v);
+  return isNaN(t) ? "" : new Date(t).toISOString();
+}
+
+function fmtCountdown(ms: number): string {
+  if (ms <= 0) return "now";
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${s}s`;
+}
+
+function MaintenanceControls(props: {
+  local: Record<string, string>;
+  setLocal: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  dirtyRef: React.MutableRefObject<Set<string>>;
+  busy: Record<string, boolean>;
+  setBusy: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  doMaint: (args: { data: { enabled?: boolean; message?: string; starts_at?: string | null; ends_at?: string | null } }) => Promise<any>;
+  qc: ReturnType<typeof useQueryClient>;
+  maintOn: boolean;
+  savedMessage: string;
+}) {
+  const { local, setLocal, dirtyRef, busy, setBusy, doMaint, qc, maintOn, savedMessage } = props;
+  const rawMsg = local.maintenance_message ?? "";
+  const clean = rawMsg.replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim();
+  const messageInvalid = clean.length > 0 && clean.length < 8;
+  const messageTooLong = rawMsg.length > 500;
+  const messageDirty = dirtyRef.current.has("maintenance_message");
+
+  const startsIso = local.maintenance_starts_at ?? "";
+  const endsIso = local.maintenance_ends_at ?? "";
+  const startsLocal = toLocalInputValue(startsIso);
+  const endsLocal = toLocalInputValue(endsIso);
+  const startsMs = startsIso ? Date.parse(startsIso) : NaN;
+  const endsMs = endsIso ? Date.parse(endsIso) : NaN;
+  const scheduleInvalid =
+    !isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs;
+  const scheduleDirty =
+    dirtyRef.current.has("maintenance_starts_at") ||
+    dirtyRef.current.has("maintenance_ends_at");
+
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const withinWindow =
+    !isNaN(startsMs) && !isNaN(endsMs) && nowTick >= startsMs && nowTick < endsMs;
+  const nextTransition = (() => {
+    if (isNaN(startsMs) || isNaN(endsMs)) return null;
+    if (nowTick < startsMs) return { label: "Starts in", ms: startsMs - nowTick };
+    if (nowTick < endsMs) return { label: "Ends in", ms: endsMs - nowTick };
+    return { label: "Ended", ms: 0 };
+  })();
+
+  const previewMsg = clean.length >= 8 ? clean : DEFAULT_MAINT_MSG;
+
+  async function saveMessage() {
+    if (messageInvalid || messageTooLong || busy["maintenance_message"]) return;
+    setBusy((b) => ({ ...b, maintenance_message: true }));
+    try {
+      await doMaint({ data: { message: clean } });
+      setLocal((s) => ({ ...s, maintenance_message: clean }));
+      dirtyRef.current.delete("maintenance_message");
+      toast.success("Banner message saved", { description: "Public site updates instantly." });
+      qc.invalidateQueries({ queryKey: ["admin-settings"] });
+      qc.invalidateQueries({ queryKey: ["public-gate"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save message");
+    } finally {
+      setBusy((b) => { const n = { ...b }; delete n.maintenance_message; return n; });
+    }
+  }
+
+  async function saveSchedule() {
+    if (scheduleInvalid || busy["maintenance_schedule"]) return;
+    setBusy((b) => ({ ...b, maintenance_schedule: true }));
+    try {
+      await doMaint({ data: { starts_at: startsIso || "", ends_at: endsIso || "" } });
+      dirtyRef.current.delete("maintenance_starts_at");
+      dirtyRef.current.delete("maintenance_ends_at");
+      toast.success(startsIso || endsIso ? "Maintenance schedule saved" : "Schedule cleared");
+      qc.invalidateQueries({ queryKey: ["admin-settings"] });
+      qc.invalidateQueries({ queryKey: ["public-gate"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save schedule");
+    } finally {
+      setBusy((b) => { const n = { ...b }; delete n.maintenance_schedule; return n; });
+    }
+  }
+
+  async function clearSchedule() {
+    setLocal((s) => ({ ...s, maintenance_starts_at: "", maintenance_ends_at: "" }));
+    dirtyRef.current.add("maintenance_starts_at");
+    dirtyRef.current.add("maintenance_ends_at");
+    await doMaint({ data: { starts_at: "", ends_at: "" } }).then(() => {
+      dirtyRef.current.delete("maintenance_starts_at");
+      dirtyRef.current.delete("maintenance_ends_at");
+      toast.success("Schedule cleared");
+      qc.invalidateQueries({ queryKey: ["admin-settings"] });
+      qc.invalidateQueries({ queryKey: ["public-gate"] });
+    }).catch((e) => toast.error(e?.message ?? "Failed to clear schedule"));
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Manual toggle */}
+      <div className="flex items-center gap-4">
+        <Switch
+          checked={maintOn}
+          disabled={!!busy["maintenance_enabled"]}
+          onCheckedChange={async (v) => {
+            setBusy((b) => ({ ...b, maintenance_enabled: true }));
+            const prev = local.maintenance_enabled;
+            setLocal((s) => ({ ...s, maintenance_enabled: v ? "1" : "0" }));
+            try {
+              await doMaint({ data: { enabled: v } });
+              dirtyRef.current.delete("maintenance_enabled");
+              toast.success(`Maintenance ${v ? "enabled" : "disabled"}`, {
+                description: v
+                  ? "Public site is now showing the maintenance banner."
+                  : "Public site is live again.",
+              });
+              qc.invalidateQueries({ queryKey: ["admin-settings"] });
+              qc.invalidateQueries({ queryKey: ["public-gate"] });
+            } catch (e: any) {
+              setLocal((s) => ({ ...s, maintenance_enabled: prev }));
+              toast.error(e?.message ?? "Toggle failed");
+            } finally {
+              setBusy((b) => { const n = { ...b }; delete n.maintenance_enabled; return n; });
+            }
+          }}
+        />
+        <span className="text-sm text-white/60">
+          {maintOn
+            ? "Public site is in maintenance"
+            : withinWindow
+              ? "Public site is in maintenance (scheduled window)"
+              : "Public site is live"}
+        </span>
+        {busy["maintenance_enabled"] && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/50" />}
+      </div>
+
+      {/* Message editor + preview */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Banner message</label>
+          <Textarea
+            value={rawMsg}
+            onChange={(e) => {
+              const v = e.target.value.slice(0, 500);
+              dirtyRef.current.add("maintenance_message");
+              setLocal((s) => ({ ...s, maintenance_message: v }));
+            }}
+            rows={3}
+            placeholder={DEFAULT_MAINT_MSG}
+            maxLength={500}
+            className={`bg-white/5 border-white/10 ${messageInvalid || messageTooLong ? "border-rose-500/50" : ""}`}
+          />
+          <div className="flex items-center justify-between text-[10px] font-mono">
+            <span className={messageTooLong ? "text-rose-300" : "text-white/40"}>
+              {rawMsg.length}/500 characters
+              {clean.length > 0 && clean.length < 8 && (
+                <span className="ml-2 text-rose-300">· min 8 non-whitespace chars</span>
+              )}
+              {clean.length === 0 && rawMsg.length === 0 && (
+                <span className="ml-2 text-white/40">· empty = default message</span>
+              )}
+            </span>
+            {messageDirty && <span className="text-amber-300/80">UNSAVED CHANGES</span>}
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!busy["maintenance_message"] || !messageDirty}
+              onClick={() => {
+                setLocal((s) => ({ ...s, maintenance_message: savedMessage }));
+                dirtyRef.current.delete("maintenance_message");
+                toast("Reverted to saved message");
+              }}
+              className="border-white/10 bg-white/5 hover:bg-white/10"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Revert
+            </Button>
+            <Button
+              size="sm"
+              disabled={!!busy["maintenance_message"] || messageInvalid || messageTooLong || !messageDirty}
+              onClick={saveMessage}
+              className="btn-red"
+            >
+              {busy["maintenance_message"]
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving…</>
+                : <><Save className="w-3.5 h-3.5 mr-1.5" /> Save message</>}
+            </Button>
+          </div>
+        </div>
+
+        {/* Live preview — matches the public banner styling. */}
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Live preview</label>
+          <div className="relative overflow-hidden rounded-2xl border border-amber-400/25 bg-gradient-to-r from-amber-500/[0.10] via-[#ff2a3a]/[0.10] to-amber-500/[0.10] backdrop-blur-xl px-4 py-4 shadow-[0_0_40px_-10px_rgba(255,42,58,0.45)]">
+            <div className="absolute inset-0 pointer-events-none opacity-40 [background:radial-gradient(600px_120px_at_20%_0%,rgba(255,180,80,0.18),transparent),radial-gradient(600px_120px_at_80%_100%,rgba(255,42,58,0.18),transparent)]" />
+            <div className="relative flex items-start gap-3">
+              <div className="shrink-0 mt-0.5">
+                <div className="relative">
+                  <img src={brandLogo} alt="" className="h-8 w-8 object-contain" width={32} height={32} />
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
+                  </span>
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-amber-300/90 mb-1">
+                  Maintenance in progress
+                </div>
+                <div className="font-display text-base leading-tight text-white">Service temporarily unavailable</div>
+                <div className="mt-1 text-[13px] text-white/75 leading-relaxed break-words">
+                  {previewMsg}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="text-[10px] text-white/40 font-mono">
+            {clean.length >= 8 ? "Shown to users." : "Empty / too short — using default message."}
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule */}
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-white/60" />
+          <div className="text-sm font-medium">Scheduled window</div>
+          <Badge
+            variant="outline"
+            className={
+              withinWindow
+                ? "bg-red-500/15 text-red-300 border-red-500/30"
+                : startsIso || endsIso
+                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                  : "bg-white/10 text-white/60 border-white/15"
+            }
+          >
+            {withinWindow ? "ACTIVE" : startsIso || endsIso ? "SCHEDULED" : "NONE"}
+          </Badge>
+          {nextTransition && (
+            <span className="text-[11px] font-mono text-white/50 ml-auto">
+              {nextTransition.label} {fmtCountdown(nextTransition.ms)}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-white/50">
+          Maintenance auto-enables at start and auto-disables at end. Manual toggle above still overrides.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Starts at (local)</label>
+            <Input
+              type="datetime-local"
+              value={startsLocal}
+              onChange={(e) => {
+                const iso = fromLocalInputValue(e.target.value);
+                dirtyRef.current.add("maintenance_starts_at");
+                setLocal((s) => ({ ...s, maintenance_starts_at: iso }));
+              }}
+              className="bg-white/5 border-white/10 font-mono mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Ends at (local)</label>
+            <Input
+              type="datetime-local"
+              value={endsLocal}
+              onChange={(e) => {
+                const iso = fromLocalInputValue(e.target.value);
+                dirtyRef.current.add("maintenance_ends_at");
+                setLocal((s) => ({ ...s, maintenance_ends_at: iso }));
+              }}
+              className={`bg-white/5 border-white/10 font-mono mt-1 ${scheduleInvalid ? "border-rose-500/50" : ""}`}
+            />
+          </div>
+        </div>
+        {scheduleInvalid && (
+          <div className="text-[11px] text-rose-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> End time must be after start time.
+          </div>
+        )}
+        <div className="flex flex-wrap justify-end gap-2 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!!busy["maintenance_schedule"] || (!startsIso && !endsIso)}
+            onClick={clearSchedule}
+            className="border-white/10 bg-white/5 hover:bg-white/10"
+          >
+            <X className="w-3.5 h-3.5 mr-1.5" /> Clear window
+          </Button>
+          <Button
+            size="sm"
+            disabled={!!busy["maintenance_schedule"] || scheduleInvalid || !scheduleDirty}
+            onClick={saveSchedule}
+            className="btn-red"
+          >
+            {busy["maintenance_schedule"]
+              ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving…</>
+              : <><Save className="w-3.5 h-3.5 mr-1.5" /> Save schedule</>}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
