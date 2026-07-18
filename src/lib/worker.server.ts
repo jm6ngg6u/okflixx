@@ -51,10 +51,13 @@ function workerConfig() {
   return { url: url.replace(/\/+$/, ""), token };
 }
 
-async function callWorker<T>(path: string, body: unknown, timeoutMs = 45_000): Promise<T> {
+async function callWorker<T>(path: string, body: unknown, timeoutMs = 45_000, signal?: AbortSignal): Promise<T> {
   const { url, token } = workerConfig();
   if (!url) throw new Error("NETFLIX_WORKER_URL is not configured");
   const controller = new AbortController();
+  const abortFromCaller = () => controller.abort(signal?.reason);
+  if (signal?.aborted) controller.abort(signal.reason);
+  else signal?.addEventListener("abort", abortFromCaller, { once: true });
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${url}${path}`, {
@@ -73,6 +76,7 @@ async function callWorker<T>(path: string, body: unknown, timeoutMs = 45_000): P
     }
     return (await res.json()) as T;
   } finally {
+    signal?.removeEventListener("abort", abortFromCaller);
     clearTimeout(timeout);
   }
 }
@@ -80,12 +84,13 @@ async function callWorker<T>(path: string, body: unknown, timeoutMs = 45_000): P
 export async function checkCookieViaWorker(args: {
   cookies: { name: string; value: string; domain?: string }[];
   proxy?: ProxyPayload | null;
+  signal?: AbortSignal;
 }): Promise<WorkerCookieCheck> {
   try {
     return await callWorker<WorkerCookieCheck>("/check", {
       cookies: args.cookies,
       proxy: args.proxy ?? null,
-    });
+    }, 45_000, args.signal);
   } catch (e: any) {
     return { status: "invalid", is_valid: false, error: String(e?.message ?? e) };
   }
@@ -113,14 +118,14 @@ export async function activateTVViaWorker(args: {
   }
 }
 
-export async function checkProxyViaWorker(args: { proxy: ProxyPayload }): Promise<{
+export async function checkProxyViaWorker(args: { proxy: ProxyPayload; signal?: AbortSignal }): Promise<{
   ok: boolean;
   latency_ms?: number | null;
   country?: string | null;
   error?: string | null;
 }> {
   try {
-    return await callWorker("/check-proxy", args, 15_000);
+    return await callWorker("/check-proxy", { proxy: args.proxy }, 15_000, args.signal);
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };
   }

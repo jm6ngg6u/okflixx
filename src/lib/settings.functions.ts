@@ -3,6 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+function plainRecord(value: unknown): Record<string, any> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
+}
+
 /** Return every setting as a plain map. Publicly readable subset only for anon,
  *  but this fn requires staff so all keys are returned. */
 export const listSettings = createServerFn({ method: "GET" })
@@ -268,6 +272,42 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const staleCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const controlCutoffMs = Date.now() - 2 * 60 * 1000;
+    const { data: staleRows } = await supabaseAdmin
+      .from("job_runs")
+      .select("id, control, progress, started_at")
+      .is("finished_at", null)
+      .or(`started_at.lt.${staleCutoff},control.not.is.null`);
+    for (const row of staleRows ?? []) {
+      const previous = plainRecord(row.progress);
+      const requestedAt = typeof previous.control_requested_at === "string"
+        ? new Date(previous.control_requested_at).getTime()
+        : new Date(row.started_at).getTime();
+      const isStaleRuntime = new Date(row.started_at).toISOString() < staleCutoff;
+      const isStaleControl = !!row.control && requestedAt < controlCutoffMs;
+      if (!isStaleRuntime && !isStaleControl) continue;
+      const action = row.control === "stop" || row.control === "cancel" ? row.control : "timeout";
+      await supabaseAdmin
+        .from("job_runs")
+        .update({
+          finished_at: new Date().toISOString(),
+          ok: action === "stop",
+          summary: {
+            ...previous,
+            stopped: action === "stop" || undefined,
+            cancelled: action === "cancel" || undefined,
+            timed_out: action === "timeout" || undefined,
+          },
+          error: action === "cancel"
+            ? "Cancelled by admin"
+            : action === "timeout"
+              ? "Worker timed out before reporting completion"
+              : null,
+        })
+        .eq("id", row.id);
+    }
     const { data, error } = await supabase
       .from("job_runs")
       .select("id, job, started_at, finished_at, ok, summary, progress, error, control")
@@ -360,10 +400,19 @@ export const requestJobControl = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
-      .from("job_runs").select("id, job, finished_at").eq("id", data.id).maybeSingle();
+      .from("job_runs").select("id, job, finished_at, progress").eq("id", data.id).maybeSingle();
     if (!row) throw new Error("Job not found");
     if (row.finished_at) throw new Error("Job already finished");
-    await supabaseAdmin.from("job_runs").update({ control: data.action }).eq("id", data.id);
+    const previousProgress = plainRecord(row.progress);
+    await supabaseAdmin.from("job_runs").update({
+      control: data.action,
+      progress: {
+        ...previousProgress,
+        control_action: data.action,
+        control_requested_at: new Date().toISOString(),
+        phase: data.action === "stop" ? "stopping" : "cancelling",
+      },
+    }).eq("id", data.id);
     await supabaseAdmin.from("admin_activity_log").insert({
       admin_id: userId,
       action: data.action === "stop" ? "job.stop_requested" : "job.cancel_requested",

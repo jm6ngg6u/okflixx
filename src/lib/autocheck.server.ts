@@ -21,6 +21,67 @@ type CookieRunResult = {
   error?: string;
 };
 
+type CookieSnapshot = {
+  id: string;
+  status: string | null;
+  is_valid: boolean | null;
+  email: string | null;
+  country: string | null;
+  plan_name: string | null;
+  video_quality: string | null;
+  name: string | null;
+  member_since: string | null;
+  max_streams: number | null;
+  payment_method: string | null;
+  last_checked_at: string | null;
+  last_checked_mode: string | null;
+  last_error: string | null;
+};
+
+type ProxySnapshot = {
+  id: string;
+  is_valid: boolean | null;
+  last_error: string | null;
+  last_latency_ms: number | null;
+  country: string | null;
+  last_checked_at: string | null;
+};
+
+async function restoreCookieSnapshots(supabaseAdmin: any, snapshots: CookieSnapshot[]) {
+  for (const row of snapshots) {
+    const { id, ...values } = row;
+    await supabaseAdmin.from("cookie_pool").update(values).eq("id", id);
+  }
+}
+
+async function restoreProxySnapshots(supabaseAdmin: any, snapshots: ProxySnapshot[]) {
+  for (const row of snapshots) {
+    const { id, ...values } = row;
+    await supabaseAdmin.from("proxy_pool").update(values).eq("id", id);
+  }
+}
+
+function watchJobControl(
+  jobId: string | null,
+  onSignal: (signal: "stop" | "cancel") => void,
+  intervalMs = 1000,
+) {
+  if (!jobId) return () => {};
+  let closed = false;
+  const timer = setInterval(async () => {
+    if (closed) return;
+    const signal = await readJobControl(jobId);
+    if (!signal) return;
+    onSignal(signal);
+    closed = true;
+    clearInterval(timer);
+  }, intervalMs);
+  return () => {
+    closed = true;
+    clearInterval(timer);
+  };
+}
+
 function bucketReason(msg: string | null | undefined): string {
   const s = String(msg ?? "").toLowerCase().trim();
   if (!s) return "unknown";
@@ -73,7 +134,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     const cutoff = new Date(Date.now() - intervalHours * 3600 * 1000).toISOString();
     const query = supabaseAdmin
       .from("cookie_pool")
-      .select("id, cookies_json")
+      .select("id, cookies_json, status, is_valid, email, country, plan_name, video_quality, name, member_since, max_streams, payment_method, last_checked_at, last_checked_mode, last_error")
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .limit(200);
     const { data: rows } = force
@@ -83,8 +144,34 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, deleted = 0;
     const reasons: Record<string, number> = {};
     let control: "stop" | "cancel" | null = null;
+    const snapshots: CookieSnapshot[] = [];
+    const abortCurrentCheck = new AbortController();
+    const stopWatchingControl = watchJobControl(jobId, (signal) => {
+      control = signal;
+      if (signal === "cancel") abortCurrentCheck.abort(signal);
+    });
 
     for (const r of rows ?? []) {
+      control = await readJobControl(jobId);
+      if (control) break;
+
+      snapshots.push({
+        id: r.id,
+        status: r.status ?? null,
+        is_valid: r.is_valid ?? null,
+        email: r.email ?? null,
+        country: r.country ?? null,
+        plan_name: r.plan_name ?? null,
+        video_quality: r.video_quality ?? null,
+        name: r.name ?? null,
+        member_since: r.member_since ?? null,
+        max_streams: r.max_streams ?? null,
+        payment_method: r.payment_method ?? null,
+        last_checked_at: r.last_checked_at ?? null,
+        last_checked_mode: r.last_checked_mode ?? null,
+        last_error: r.last_error ?? null,
+      });
+
       let proxyPayload: any = null;
       let proxyId: string | null = null;
       if (proxyMode) {
@@ -103,10 +190,26 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
             last_error: "Proxy mode ON but no proxies available.",
           }).eq("id", r.id);
           checked++;
+          await recordJobProgress(jobId, {
+            phase: "checking", total: rows?.length ?? 0,
+            checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
+          });
+          control = await readJobControl(jobId);
+          if (control) break;
           continue;
         }
       }
-      const out = await checkCookieViaWorker({ cookies: r.cookies_json as any[], proxy: proxyPayload });
+      const out = await checkCookieViaWorker({
+        cookies: r.cookies_json as any[],
+        proxy: proxyPayload,
+        signal: abortCurrentCheck.signal,
+      });
+      if (control === "cancel") {
+        if (proxyId) {
+          await supabaseAdmin.from("proxy_pool").update({ is_locked: false, locked_at: null }).eq("id", proxyId);
+        }
+        break;
+      }
       if (proxyId) {
         await supabaseAdmin.rpc("release_proxy", {
           _id: proxyId,
@@ -140,14 +243,15 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
           checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
         });
       }
-      // Cooperative stop/cancel: poll every 3 items to keep DB load light.
-      if (checked % 3 === 0) {
-        control = await readJobControl(jobId);
-        if (control) break;
-      }
+      // Cooperative stop/cancel: poll after every item so the admin control is immediate.
+      control = await readJobControl(jobId);
+      if (control) break;
     }
+    stopWatchingControl();
     if (control === "cancel") {
       const summary = { checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons, cancelled: true };
+      await recordJobProgress(jobId, { ...summary, phase: "rolling_back", total: rows?.length ?? 0 });
+      await restoreCookieSnapshots(supabaseAdmin, snapshots);
       await recordJobFinish(jobId, false, summary, "Cancelled by admin");
       return { ok: false, error: "cancelled", ...summary };
     }
@@ -254,17 +358,37 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
     }
     const { data: rows } = await supabaseAdmin
       .from("proxy_pool")
-      .select("id, scheme, ip, port, username, password")
+      .select("id, scheme, ip, port, username, password, is_valid, last_error, last_latency_ms, country, last_checked_at")
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .limit(500);
 
     let ok = 0, dead = 0;
     const reasons: Record<string, number> = {};
     let control: "stop" | "cancel" | null = null;
+    const snapshots: ProxySnapshot[] = [];
+    const abortCurrentCheck = new AbortController();
+    const stopWatchingControl = watchJobControl(jobId, (signal) => {
+      control = signal;
+      if (signal === "cancel") abortCurrentCheck.abort(signal);
+    });
     for (const p of rows ?? []) {
+      control = await readJobControl(jobId);
+      if (control) break;
+
+      snapshots.push({
+        id: p.id,
+        is_valid: p.is_valid ?? null,
+        last_error: p.last_error ?? null,
+        last_latency_ms: p.last_latency_ms ?? null,
+        country: p.country ?? null,
+        last_checked_at: p.last_checked_at ?? null,
+      });
+
       const res = await checkProxyViaWorker({
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
+        signal: abortCurrentCheck.signal,
       });
+      if (control === "cancel") break;
       await supabaseAdmin.from("proxy_pool").update({
         is_valid: res.ok,
         last_error: res.error ?? null,
@@ -280,13 +404,14 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
           phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, reasons,
         });
       }
-      if (done % 4 === 0) {
-        control = await readJobControl(jobId);
-        if (control) break;
-      }
+      control = await readJobControl(jobId);
+      if (control) break;
     }
+    stopWatchingControl();
     if (control === "cancel") {
       const summary = { checked: ok + dead, ok_count: ok, dead, reasons, cancelled: true };
+      await recordJobProgress(jobId, { ...summary, phase: "rolling_back", total: rows?.length ?? 0 });
+      await restoreProxySnapshots(supabaseAdmin, snapshots);
       await recordJobFinish(jobId, false, summary, "Cancelled by admin");
       return { ok: false, error: "cancelled", ...summary };
     }

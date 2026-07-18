@@ -442,7 +442,7 @@ function RunningRow({ row }: { row: JobRow }) {
       toast.message(action === "stop" ? "Stop requested" : "Cancel requested", {
         description: action === "stop"
           ? "Job will finish the current item and save progress."
-          : "Job will abort and progress will be discarded.",
+          : "Job will abort, roll back checked rows, and discard progress.",
       });
       qc.invalidateQueries({ queryKey: ["job-runs"] });
     } catch (e: any) {
@@ -521,7 +521,7 @@ function RunningRow({ row }: { row: JobRow }) {
               {confirm === "stop" ? (
                 <>The job will finish the current item, skip the cleanup sweep, and save everything that was checked so far. Safe to resume later.</>
               ) : (
-                <>The job will abort at the next checkpoint. Cleanup is skipped, the run cursor is <span className="text-white">not</span> advanced, and this run is marked <span className="text-red-300">cancelled</span>. Rows already updated cannot be reverted.</>
+                <>The job will abort immediately, skip cleanup, roll back checked row changes from this run, keep the run cursor unchanged, and mark the run <span className="text-red-300">cancelled</span>.</>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
