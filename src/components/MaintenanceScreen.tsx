@@ -237,13 +237,3 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
     </div>
   );
 }
-
-
-        {/* Footer */}
-        <div className="mt-12 text-[10px] font-mono uppercase tracking-[0.25em] text-white/30">
-          {b.footer_legal || "© Emberlord"}
-        </div>
-      </div>
-    </div>
-  );
-}
