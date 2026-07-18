@@ -171,8 +171,18 @@ function BackgroundSongPage() {
   const [uploadName, setUploadName] = useState("");
   const [uploadSize, setUploadSize] = useState(0);
   const [uploadError, setUploadError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const successTimerRef = useRef<number | null>(null);
+
+  const isUploadBusy = uploadStatus === "uploading" || uploadStatus === "reading";
 
   const handleUpload = async (file: File) => {
+    if (isUploadBusy) {
+      toast.error("An upload is already in progress", { description: "Cancel it first to start a new one." });
+      return;
+    }
+    if (successTimerRef.current) { window.clearTimeout(successTimerRef.current); successTimerRef.current = null; }
     setUploadError("");
     setUploadName(file.name);
     setUploadSize(file.size);
@@ -180,9 +190,14 @@ function BackgroundSongPage() {
     setUploadStatus("reading");
     setUploadMsg("Preparing file…");
 
-    if (!file.type.startsWith("audio/") && !/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name)) {
+    const audioExt = /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name);
+    if (!file.type.startsWith("audio/") && !audioExt) {
       setUploadStatus("error"); setUploadError("File must be audio (mp3, wav, ogg, m4a, aac, flac).");
       toast.error("Not an audio file"); return;
+    }
+    if (file.size <= 0) {
+      setUploadStatus("error"); setUploadError("File is empty (0 bytes).");
+      toast.error("Empty file"); return;
     }
     if (file.size > 15 * 1024 * 1024) {
       setUploadStatus("error"); setUploadError("File is larger than 15 MB.");
@@ -197,14 +212,25 @@ function BackgroundSongPage() {
     form.append("file", file);
     await new Promise<void>((resolve) => {
       const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
       xhr.open("POST", "/api/admin/upload-background-song");
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.timeout = 120_000; // 2 min hard ceiling
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
           setUploadPct(pct); setUploadStatus("uploading");
           setUploadMsg(pct >= 100 ? "Finalizing on server…" : `Uploading… ${pct}%`);
         }
+      };
+      xhr.ontimeout = () => {
+        setUploadStatus("error");
+        setUploadError("Upload timed out after 2 minutes. Try a smaller file or a faster network.");
+        toast.error("Upload timed out"); resolve();
+      };
+      xhr.onabort = () => {
+        setUploadStatus("error"); setUploadError("Upload cancelled.");
+        setUploadPct(0); resolve();
       };
       xhr.onerror = () => { setUploadStatus("error"); setUploadError("Network error during upload."); toast.error("Upload failed"); resolve(); };
       xhr.onload = () => {
@@ -215,9 +241,15 @@ function BackgroundSongPage() {
             setUploadMsg("Upload complete · New track live on the public site.");
             toast.success("New background song uploaded", { description: `${res.name} · ${fmtSize(res.size)}` });
             invalidateAll();
+            // Auto-clear the success card after 8s so the panel returns to a clean state.
+            successTimerRef.current = window.setTimeout(() => {
+              setUploadStatus("idle"); setUploadPct(0); setUploadMsg(""); setUploadName(""); setUploadSize(0);
+              successTimerRef.current = null;
+            }, 8000);
           } else {
             setUploadStatus("error");
             const label = res.error === "file_too_large" ? "File too large (max 15 MB)"
+              : res.error === "empty_file" ? "File is empty (0 bytes)"
               : res.error === "not_audio" ? "File is not audio"
               : res.error === "forbidden" ? "You are not authorized"
               : res.error === "unauthorized" ? "Session expired"
@@ -229,12 +261,33 @@ function BackgroundSongPage() {
       };
       xhr.send(form);
     });
+    xhrRef.current = null;
   };
+
+  const cancelUpload = () => {
+    if (xhrRef.current) {
+      try { xhrRef.current.abort(); } catch { /* noop */ }
+      xhrRef.current = null;
+    }
+  };
+
+  // Clean up any pending success-clear timer on unmount.
+  useEffect(() => () => {
+    if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
+    if (xhrRef.current) { try { xhrRef.current.abort(); } catch { /* noop */ } }
+  }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) handleUpload(f);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false);
+    if (isUploadBusy) return;
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleUpload(f);
   };
 
   const togglePreview = () => {
@@ -610,22 +663,56 @@ function BackgroundSongPage() {
         <div className="flex items-start gap-3 mb-4">
           <Upload className="w-4 h-4 text-[#ff2a3a] mt-1" />
           <div>
-            <div className="font-display text-lg leading-tight">Upload new track</div>
+            <div className="font-display text-lg leading-tight uppercase tracking-wide">Upload new track</div>
             <div className="text-xs text-white/50 mt-1">Max 15 MB · mp3 / wav / ogg / m4a / aac / flac. The new file replaces the current track and is added to version history.</div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" className="hidden" onChange={onFileChange} />
-          <Button className="btn-red" disabled={uploadStatus === "uploading" || uploadStatus === "reading"}
-            onClick={() => fileRef.current?.click()}>
-            {uploadStatus === "uploading" || uploadStatus === "reading" ? (
+        {/* Drag-and-drop zone */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => { if (!isUploadBusy) fileRef.current?.click(); }}
+          onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isUploadBusy) { e.preventDefault(); fileRef.current?.click(); } }}
+          onDragOver={(e) => { e.preventDefault(); if (!isUploadBusy) setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={onDrop}
+          className={`rounded-md border border-dashed p-6 text-center transition-colors cursor-pointer select-none ${
+            isDragging ? "border-[#ff2a3a] bg-[#ff2a3a]/[0.08]"
+            : isUploadBusy ? "border-white/10 bg-white/[0.02] cursor-not-allowed opacity-70"
+            : "border-white/15 bg-white/[0.02] hover:border-[#ff2a3a]/50 hover:bg-white/[0.04]"
+          }`}
+          aria-disabled={isUploadBusy}
+        >
+          <Upload className={`w-6 h-6 mx-auto mb-2 ${isDragging ? "text-[#ff2a3a]" : "text-white/60"}`} />
+          <div className="font-display text-sm uppercase tracking-wide">
+            {isDragging ? "Drop to upload" : "Drag & drop or click to choose"}
+          </div>
+          <div className="mt-1 text-[10px] font-mono uppercase tracking-widest text-white/40">
+            mp3 · wav · ogg · m4a · aac · flac · max 15&nbsp;MB
+          </div>
+        </div>
+
+        <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" className="hidden" onChange={onFileChange} />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button className="btn-red" disabled={isUploadBusy} onClick={() => fileRef.current?.click()}>
+            {isUploadBusy ? (
               <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Uploading…</>
             ) : (
               <><Upload className="w-3.5 h-3.5 mr-1.5" /> Choose audio file</>
             )}
           </Button>
-          {d?.path && (
+          {isUploadBusy && (
+            <Button
+              variant="outline"
+              className="border-white/15 bg-white/5 text-red-200 hover:text-red-100"
+              onClick={cancelUpload}
+            >
+              Cancel upload
+            </Button>
+          )}
+          {d?.path && !isUploadBusy && (
             <Button variant="outline" className="border-white/15 bg-white/5 text-red-200 hover:text-red-100"
               disabled={removeMut.isPending}
               onClick={() => { if (confirm("Remove the current background song? The public site will go silent (previous versions kept in history).")) removeMut.mutate(); }}>
@@ -644,7 +731,7 @@ function BackgroundSongPage() {
             <div className="flex items-center gap-2 text-sm">
               {uploadStatus === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-300" />}
               {uploadStatus === "error" && <AlertCircle className="w-4 h-4 text-red-300" />}
-              {(uploadStatus === "uploading" || uploadStatus === "reading") && <Loader2 className="w-4 h-4 animate-spin text-[#ff2a3a]" />}
+              {isUploadBusy && <Loader2 className="w-4 h-4 animate-spin text-[#ff2a3a]" />}
               <span className={
                 uploadStatus === "success" ? "text-emerald-200"
                 : uploadStatus === "error" ? "text-red-200"
@@ -656,7 +743,7 @@ function BackgroundSongPage() {
             {uploadName && (
               <div className="mt-1 text-[11px] text-white/50 font-mono">{uploadName} · {fmtSize(uploadSize)}</div>
             )}
-            {(uploadStatus === "uploading" || uploadStatus === "reading" || uploadStatus === "success") && (
+            {(isUploadBusy || uploadStatus === "success") && (
               <div className="mt-2">
                 <Progress value={uploadStatus === "success" ? 100 : uploadPct} className="h-1.5" />
                 <div className="mt-1 text-[10px] font-mono text-white/40 uppercase tracking-widest">
@@ -667,6 +754,7 @@ function BackgroundSongPage() {
           </div>
         )}
       </div>
+
 
       {/* Version history */}
       <div className="glass p-5">
