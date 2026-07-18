@@ -63,18 +63,30 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
       "login_required",
       "maintenance_enabled",
       "maintenance_message",
+      "maintenance_starts_at",
+      "maintenance_ends_at",
       "user_daily_activation_limit",
     ]);
   const m: Record<string, string> = {};
   for (const row of data ?? []) m[row.key] = row.value;
+  const manual = m.maintenance_enabled === "1";
+  const now = Date.now();
+  const startsAt = m.maintenance_starts_at ? Date.parse(m.maintenance_starts_at) : NaN;
+  const endsAt = m.maintenance_ends_at ? Date.parse(m.maintenance_ends_at) : NaN;
+  const withinWindow =
+    !isNaN(startsAt) && !isNaN(endsAt) && now >= startsAt && now < endsAt;
   return {
     accessKeyRequired: m.access_key_required === "1",
     loginRequired: m.login_required === "1",
-    maintenance: m.maintenance_enabled === "1",
+    maintenance: manual || withinWindow,
     maintenanceMessage: m.maintenance_message || "",
+    maintenanceStartsAt: m.maintenance_starts_at || null,
+    maintenanceEndsAt: m.maintenance_ends_at || null,
+    maintenanceScheduled: withinWindow && !manual,
     userDailyActivationLimit: Math.max(0, parseInt(m.user_daily_activation_limit || "10", 10) || 0),
   };
 });
+
 
 // ==========================================================================
 // PUBLIC — redeem a key. Returns a session token if key_type is session_24h.
