@@ -447,6 +447,60 @@ function BrandingStudio() {
                 <p className="text-[11px] text-white/40 mt-2">Scales every heading, message and label on the maintenance page — 100% keeps defaults.</p>
               </div>
             </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>Timezone</Label>
+                <select
+                  className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+                  value={values.maint_timezone || "UTC"}
+                  onChange={(e) => commit("maint_timezone", e.target.value)}
+                >
+                  {[
+                    "UTC","America/Los_Angeles","America/Denver","America/Chicago","America/New_York",
+                    "America/Sao_Paulo","Europe/London","Europe/Paris","Europe/Berlin","Europe/Istanbul",
+                    "Africa/Lagos","Africa/Cairo","Asia/Dubai","Asia/Karachi","Asia/Kolkata",
+                    "Asia/Bangkok","Asia/Shanghai","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
+                  ].map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                </select>
+                <p className="text-[11px] text-white/40 mt-1">Countdown end time is rendered in this timezone.</p>
+              </div>
+              <div>
+                <Label>Clock format</Label>
+                <select
+                  className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+                  value={values.maint_time_format || "24h"}
+                  onChange={(e) => commit("maint_time_format", e.target.value)}
+                >
+                  <option value="24h">24-hour</option>
+                  <option value="12h">12-hour</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-white/10 p-4">
+              <div className="text-[11px] font-mono uppercase tracking-widest text-white/50 mb-3">Per-element size (%)</div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {([
+                  ["maint_size_status", "Status pill"],
+                  ["maint_size_wordmark", "Wordmark"],
+                  ["maint_size_headline", "Headline"],
+                  ["maint_size_message", "Body message"],
+                  ["maint_size_countdown", "Countdown"],
+                  ["maint_size_contacts", "Contacts"],
+                  ["maint_size_footer", "Footer"],
+                ] as const).map(([k, label]) => (
+                  <div key={k}>
+                    <Label>{label} — {values[k] || "100"}%</Label>
+                    <Slider className="mt-3" min={60} max={160} step={2}
+                      value={[parseInt(values[k] || "100", 10) || 100]}
+                      onValueChange={(v) => stage(k, String(v[0]))}
+                      onValueCommit={(v) => commit(k, String(v[0]))} />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-white/40 mt-3">Multiplies with the global font scale above.</p>
+            </div>
           </Section>
         </TabsContent>
 
