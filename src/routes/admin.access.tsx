@@ -220,8 +220,8 @@ function AccessAdminPage() {
 
 
   const c = config.data;
-  const anyGateOn = !!(c?.accessKeyRequired || c?.captchaRequired || c?.loginRequired);
-  const providerMismatch = detectProviderMismatch(c?.captchaSiteKey, c?.captchaProvider);
+  const anyGateOn = !!(c?.accessKeyRequired || c?.loginRequired);
+
 
   return (
     <div className="space-y-8">
