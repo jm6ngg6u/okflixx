@@ -23,10 +23,38 @@
   --color-red-500: #ff2a3a;
   --color-red-600: #e50914;
   --color-red-700: #b0060f;
-  --font-display: "Sora", sans-serif;
-  --font-body: "Inter", sans-serif;
+  --font-display: var(--brand-font-display, "Sora"), sans-serif;
+  --font-body: var(--brand-font-body, "Inter"), sans-serif;
   --font-ops: "Work Sans", "Inter", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-mono: var(--brand-font-mono, "JetBrains Mono"), monospace;
+}
+
+/* Branding-driven runtime tokens (populated by BrandingProvider). */
+:root {
+  --brand-accent: #ff2a3a;
+  --brand-accent-rgb: 255,42,58;
+  --brand-glow: 0.6;
+  --brand-shine-duration: 4.8s;
+  --brand-letter-spacing: 0em;
+  --brand-font-display-weight: 700;
+  --brand-font-body-weight: 400;
+}
+
+.text-brand-accent { color: var(--brand-accent); }
+.bg-brand-accent { background-color: var(--brand-accent); }
+.border-brand-accent { border-color: var(--brand-accent); }
+
+/* Wordmark glow — pulses when enabled via CSS var --brand-glow. */
+.wordmark-pulse {
+  text-shadow:
+    0 0 calc(6px * var(--brand-glow, 0)) rgba(var(--brand-accent-rgb), calc(0.55 * var(--brand-glow, 0))),
+    0 0 calc(18px * var(--brand-glow, 0)) rgba(var(--brand-accent-rgb), calc(0.35 * var(--brand-glow, 0)));
+  animation: wordmarkPulse var(--brand-shine-duration, 4.8s) ease-in-out infinite;
+  letter-spacing: var(--brand-letter-spacing, 0em);
+}
+@keyframes wordmarkPulse {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50% { filter: brightness(1.18) saturate(1.35); }
 }
 
 /* Uppercase label utility for admin/ops surfaces */

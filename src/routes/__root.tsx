@@ -13,6 +13,7 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import "../lib/toast-format";
+import { BrandingProvider } from "../lib/branding-context";
 
 function NotFoundComponent() {
   return (
@@ -122,8 +123,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <BrandingProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
       <Toaster
         theme="dark"
         position="top-center"
@@ -146,6 +148,7 @@ function RootComponent() {
         }}
       />
 
+      </BrandingProvider>
     </QueryClientProvider>
   );
 }

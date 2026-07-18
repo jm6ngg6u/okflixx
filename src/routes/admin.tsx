@@ -9,7 +9,7 @@ import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
   Shield, ShieldAlert, KeyRound, Menu, X, Music4, Shuffle, FileClock, MessageCircle,
-
+  Palette,
 } from "lucide-react";
 
 import logo from "@/assets/brand-logo.png";
@@ -207,6 +207,7 @@ function AdminLayout() {
     { to: "/admin/staff", label: "Staff & roles", icon: Users, adminOnly: true },
     { to: "/admin/security", label: "Security (TOTP)", icon: KeyRound },
     { to: "/admin/contact", label: "Contact channels", icon: MessageCircle, adminOnly: true },
+    { to: "/admin/branding", label: "Branding studio", icon: Palette, adminOnly: true },
     { to: "/admin/settings", label: "Settings", icon: Settings, adminOnly: true },
     { to: "/admin/background-song", label: "Background song", icon: Music4, adminOnly: true },
 

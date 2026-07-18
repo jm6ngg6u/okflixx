@@ -13,6 +13,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { KeyRound, Lock, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
+import { useBrand } from "@/lib/branding-context";
+
+function Wordmark() {
+  const b = useBrand();
+  return (
+    <>
+      {b.name_prefix}
+      <span className="text-brand-accent">{b.name_suffix}</span>
+    </>
+  );
+}
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
 async function computeFingerprint(): Promise<string> {
@@ -92,6 +103,7 @@ type SuccessPayload = {
 
 function HomePage() {
   useReveal();
+  const b = useBrand();
   const codeRef = useRef<CodeInputHandle>(null);
   const honeypotRef = useRef<HTMLInputElement>(null);
   const mountedAtRef = useRef<number>(Date.now());
@@ -351,7 +363,7 @@ function HomePage() {
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto">
         <Link to="/" className="flex items-center gap-3 group">
           <img src={logo} alt="Emberlord" data-wave-origin className="h-10 w-10 object-contain logo-shine group-hover:scale-110 transition" width={40} height={40} />
-          <span className="font-display text-xl tracking-tight">EMBER<span className="text-[#ff2a3a]">LORD</span></span>
+          <span className="font-display text-xl tracking-tight wordmark-pulse"><Wordmark /></span>
         </Link>
         <div className="hidden md:flex gap-8 text-sm text-white/70">
           <a href="#activate" className="hover:text-white transition">Activate</a>
@@ -391,16 +403,16 @@ function HomePage() {
         <div className="relative z-10 max-w-4xl mx-auto px-6 md:px-12 pt-16 pb-24 text-center flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-xs text-white/75 mb-8 reveal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse" />
-            <span className="font-mono uppercase tracking-widest">Live · 82,431 TVs activated</span>
+            <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
           </div>
 
           <h1 className="font-display text-[clamp(2.6rem,6.5vw,5.4rem)] leading-[0.98] tracking-tight reveal">
-            Stream <span className="text-live">Netflix</span> <br />
-            on any TV <span className="text-shine">instantly.</span>
+            {b.hero_headline_1} <br />
+            <span className="text-shine">{b.hero_headline_2}</span>
           </h1>
 
           <p className="mt-6 max-w-lg text-white/65 text-base md:text-lg leading-relaxed reveal">
-            Type your 8-digit TV code. We handle the rest — encrypted, latency-free, on every screen you own.
+            {b.hero_sub}
           </p>
 
           {/* CODE PANEL — CENTER */}
@@ -414,8 +426,8 @@ function HomePage() {
                   <span className="w-2 h-2 rounded-full bg-white/20" />
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-1">Enter TV Code</h3>
-              <p className="text-white/50 text-sm mb-6">Find the 8-character code on your Netflix TV screen.</p>
+              <h3 className="font-display text-2xl mb-1">{b.code_card_title}</h3>
+              <p className="text-white/50 text-sm mb-6">{b.code_card_help}</p>
 
               <CodeInput ref={codeRef} />
 
@@ -588,7 +600,7 @@ function HomePage() {
                 disabled={submitting}
                 className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? "Activating…" : "Activate Now →"}
+                {submitting ? "Activating…" : b.activate_cta}
               </button>
 
 
@@ -634,8 +646,8 @@ function HomePage() {
       <section id="features" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Why Emberlord</div>
-            <h2 className="font-display text-4xl md:text-6xl">Built for <span className="text-shine">2026 TVs</span>.</h2>
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_features_kicker}</div>
+            <h2 className="font-display text-4xl md:text-6xl">{b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
@@ -657,8 +669,8 @@ function HomePage() {
       <section id="plans" className="relative py-28 px-6 md:px-12">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Access</div>
-            <h2 className="font-display text-4xl md:text-6xl">One plan. <span className="text-live">Free forever.</span></h2>
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_plan_kicker}</div>
+            <h2 className="font-display text-4xl md:text-6xl">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
             <p className="mt-5 text-white/60 max-w-xl mx-auto">Premium UHD unlocked for every activated TV — every country, every device. No card, no trial, no catch.</p>
           </div>
 
@@ -689,8 +701,8 @@ function HomePage() {
       <section id="devices" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Compatible</div>
-            <h2 className="font-display text-4xl md:text-6xl">Every screen. <span className="text-shine">One code.</span></h2>
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_devices_kicker}</div>
+            <h2 className="font-display text-4xl md:text-6xl">{b.section_devices_title_1} <span className="text-shine">{b.section_devices_title_2}</span></h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {["Smart TV", "Apple TV", "Roku", "Fire TV", "Chromecast", "PS5 / PS4", "Xbox", "Nvidia Shield"].map((d) => (
@@ -732,7 +744,7 @@ function HomePage() {
       {/* CTA */}
       <section className="relative py-32 px-6 md:px-12">
         <div className="relative max-w-3xl mx-auto text-center reveal">
-          <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">Ready to <span className="text-shine">press play?</span></h2>
+          <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">{b.section_cta_title_1} <span className="text-shine">{b.section_cta_title_2}</span></h2>
           <p className="mt-6 text-white/60 max-w-lg mx-auto">Your TV is waiting. Grab your code and start streaming in seconds.</p>
           <div className="mt-9 flex justify-center gap-3">
             <a href="#activate" className="btn-red">Activate TV →</a>
@@ -748,9 +760,9 @@ function HomePage() {
           <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
             <div className="flex items-center gap-2">
               <img src={logo} alt="Emberlord" className="h-7 w-7 object-contain" width={28} height={28} loading="lazy" />
-              <span className="font-display text-lg">EMBER<span className="text-[#ff2a3a]">LORD</span></span>
+              <span className="font-display text-lg wordmark-pulse"><Wordmark /></span>
             </div>
-            <div className="font-mono text-xs uppercase tracking-widest text-white/40">© 2026 · Encrypted · Everywhere</div>
+            <div className="font-mono text-xs uppercase tracking-widest text-white/40">{b.footer_legal}</div>
             <div className="flex gap-6 text-xs text-white/40">
               <a href="#" className="hover:text-white">Privacy</a>
               <a href="#" className="hover:text-white">Terms</a>
@@ -857,6 +869,7 @@ function maskEmail(email: string | null): string {
 }
 
 function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose: () => void }) {
+  const b = useBrand();
   const [count, setCount] = useState(6);
   const [captured, setCaptured] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -925,8 +938,8 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
               <span className="absolute inset-0 rounded-full ring-2 ring-[#ff2a3a]/40 animate-ping" />
             </div>
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#ff2a3a]">// Activation complete</div>
-              <h3 className="font-display text-3xl md:text-4xl leading-none mt-1">You're in.</h3>
+              <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-brand-accent">{b.success_kicker}</div>
+              <h3 className="font-display text-3xl md:text-4xl leading-none mt-1">{b.success_title}</h3>
             </div>
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white text-xl leading-none" aria-label="Close">✕</button>
