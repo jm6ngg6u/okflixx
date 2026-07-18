@@ -748,7 +748,11 @@ function MaintenanceControls(props: {
   }
 
   async function saveSchedule() {
-    if (scheduleInvalid || busy["maintenance_schedule"]) return;
+    if (scheduleInvalid) {
+      toast.error("Can't save maintenance window", { description: scheduleError ?? "Fix the highlighted fields." });
+      return;
+    }
+    if (busy["maintenance_schedule"]) return;
     setBusy((b) => ({ ...b, maintenance_schedule: true }));
     try {
       await doMaint({ data: { starts_at: startsIso || "", ends_at: endsIso || "" } });
