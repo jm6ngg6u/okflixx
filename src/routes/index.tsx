@@ -173,6 +173,7 @@ function HomePage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+  }, [qc]);
   // Auto-tick every 30s so a scheduled window flips on/off in-place without user action.
   useEffect(() => {
     if (!gate.data?.maintenanceStartsAt && !gate.data?.maintenanceEndsAt) return;
