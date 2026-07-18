@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  KeyRound, Plus, Copy, ShieldCheck, ShieldAlert, Ban, Trash2, Infinity as Inf,
+  KeyRound, Plus, Copy, ShieldCheck, Ban, Trash2, Infinity as Inf,
   UserCheck, Clock3, Search, RefreshCw, CheckCircle2, XCircle, Play, Activity,
   Save, Loader2, AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
@@ -231,7 +231,7 @@ function AccessAdminPage() {
           <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-[#ff2a3a]">// SECURITY · ACCESS GATES</div>
           <h1 className="font-display text-3xl md:text-4xl mt-1">Access gates &amp; keys</h1>
           <p className="text-white/60 text-sm mt-2 max-w-2xl">
-            Three independent gates protect activation. All checks run server-side; toggles apply instantly. Live refresh every 2s.
+            Two independent gates protect activation. All checks run server-side; toggles apply instantly. Live refresh every 2s.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -259,7 +259,7 @@ function AccessAdminPage() {
       )}
 
       {/* GATE MASTER SWITCHES */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 gap-4">
         <GateCard
           icon={<KeyRound className="w-5 h-5" />}
           title="Access key gate"
@@ -631,7 +631,6 @@ function AccessOpsPanels() {
     mutationFn: () => runPreview({ data: {
       email: pvEmail.trim() || null,
       hasAccessKey: pvHasKey,
-      hasCaptchaPass: false,
     } }),
   });
 
@@ -733,7 +732,7 @@ function AccessOpsPanels() {
             <h2 className="font-display text-xl">Audit timeline</h2>
           </div>
           <p className="text-white/55 text-xs mb-4">
-            Every change to gates, captcha config, per-user overrides, and access keys. Newest first.
+            Every change to gates, per-user overrides, and access keys. Newest first.
           </p>
           <div className="max-h-[420px] overflow-auto pr-1 space-y-2">
             {(audit.data?.rows ?? []).map((r: any) => (
@@ -784,16 +783,6 @@ function relTime(iso: string): string {
 // ───────────────────────────────────────────────────────────────────────
 function prettyKey(k: string): string {
   return k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
-}
-
-function detectProviderMismatch(siteKey?: string, provider?: string): "hcaptcha" | "turnstile" | null {
-  const key = (siteKey ?? "").trim();
-  if (!key || !provider) return null;
-  const isHcaptcha = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
-  const isTurnstile = /^[0-3]x[A-Za-z0-9_-]{10,}$/.test(key);
-  const inferred = isHcaptcha ? "hcaptcha" : isTurnstile ? "turnstile" : null;
-  if (!inferred || inferred === provider) return null;
-  return inferred;
 }
 
 function keyTypeLabel(t: KeyType): string {

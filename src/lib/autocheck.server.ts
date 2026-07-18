@@ -28,7 +28,7 @@ function bucketReason(msg: string | null | undefined): string {
   if (s.includes("proxy")) return "proxy_error";
   if (s.includes("network") || s.includes("econn") || s.includes("fetch")) return "network";
   if (s.includes("expired") || s.includes("session")) return "session_expired";
-  if (s.includes("captcha") || s.includes("challenge")) return "captcha";
+  if (s.includes("challenge")) return "challenge_blocked";
   if (s.includes("forbidden") || s.includes("403")) return "forbidden";
   if (s.includes("unauth") || s.includes("401") || s.includes("login")) return "auth_failed";
   if (s.includes("hold")) return "on_hold";

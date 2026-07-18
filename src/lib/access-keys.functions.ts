@@ -60,10 +60,7 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
     .select("key,value")
     .in("key", [
       "access_key_required",
-      "captcha_required",
       "login_required",
-      "captcha_provider",
-      "captcha_site_key",
       "maintenance_enabled",
       "maintenance_message",
       "user_daily_activation_limit",
@@ -72,10 +69,7 @@ export const getGateConfig = createServerFn({ method: "GET" }).handler(async () 
   for (const row of data ?? []) m[row.key] = row.value;
   return {
     accessKeyRequired: m.access_key_required === "1",
-    captchaRequired: m.captcha_required === "1",
     loginRequired: m.login_required === "1",
-    captchaProvider: (m.captcha_provider || "turnstile") as "turnstile" | "hcaptcha",
-    captchaSiteKey: m.captcha_site_key || "",
     maintenance: m.maintenance_enabled === "1",
     maintenanceMessage: m.maintenance_message || "",
     userDailyActivationLimit: Math.max(0, parseInt(m.user_daily_activation_limit || "10", 10) || 0),
@@ -222,10 +216,7 @@ export async function verifyAccessCredentials(
 // ==========================================================================
 const GateSettingsInput = z.object({
   accessKeyRequired: z.boolean().optional(),
-  captchaRequired: z.boolean().optional(),
   loginRequired: z.boolean().optional(),
-  captchaProvider: z.enum(["turnstile", "hcaptcha"]).optional(),
-  captchaSiteKey: z.string().max(200).optional(),
   userDailyActivationLimit: z.number().int().min(0).max(10000).optional(),
 });
 
@@ -239,14 +230,8 @@ export const setGateSettings = createServerFn({ method: "POST" })
     const rows: Array<{ key: string; value: string; updated_at: string; updated_by: string }> = [];
     if (data.accessKeyRequired !== undefined)
       rows.push({ key: "access_key_required", value: data.accessKeyRequired ? "1" : "0", updated_at: now, updated_by: userId });
-    if (data.captchaRequired !== undefined)
-      rows.push({ key: "captcha_required", value: data.captchaRequired ? "1" : "0", updated_at: now, updated_by: userId });
     if (data.loginRequired !== undefined)
       rows.push({ key: "login_required", value: data.loginRequired ? "1" : "0", updated_at: now, updated_by: userId });
-    if (data.captchaProvider !== undefined)
-      rows.push({ key: "captcha_provider", value: data.captchaProvider, updated_at: now, updated_by: userId });
-    if (data.captchaSiteKey !== undefined)
-      rows.push({ key: "captcha_site_key", value: data.captchaSiteKey, updated_at: now, updated_by: userId });
     if (data.userDailyActivationLimit !== undefined)
       rows.push({ key: "user_daily_activation_limit", value: String(data.userDailyActivationLimit), updated_at: now, updated_by: userId });
     if (rows.length > 0) {
@@ -535,8 +520,7 @@ export const getGateLastUpdated = createServerFn({ method: "GET" })
     await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const KEYS = [
-      "access_key_required", "captcha_required", "login_required",
-      "captcha_provider", "captcha_site_key", "user_daily_activation_limit",
+      "access_key_required", "login_required", "user_daily_activation_limit",
     ];
     const { data: rows } = await supabaseAdmin
       .from("app_settings")
@@ -571,7 +555,7 @@ export const getGateLastUpdated = createServerFn({ method: "GET" })
 
 // ==========================================================================
 // ADMIN — access-related audit timeline. Merges admin_activity_log entries
-// prefixed with `access_gates`, `access_keys`, `captcha.`, `user_override.`
+// prefixed with `access_gates`, `access_keys`, `user_override.`
 // with actor emails and target metadata. Read-only.
 // ==========================================================================
 export const listAccessAudit = createServerFn({ method: "POST" })
@@ -582,7 +566,7 @@ export const listAccessAudit = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const PREFIXES = ["access_gates", "access_keys", "captcha", "user_override"];
+    const PREFIXES = ["access_gates", "access_keys", "user_override"];
     const orFilter = PREFIXES.map((p) => `action.like.${p}.%,action.like.${p}%`).join(",");
     const { data: rows, error } = await supabaseAdmin
       .from("admin_activity_log")
@@ -624,7 +608,6 @@ export const previewActivationPolicy = createServerFn({ method: "POST" })
     z.object({
       email: z.string().email().max(320).optional().nullable(),
       hasAccessKey: z.boolean().default(false),
-      hasCaptchaPass: z.boolean().default(false),
     }).parse(d),
   )
   .handler(async ({ context, data }) => {
@@ -632,11 +615,10 @@ export const previewActivationPolicy = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: settingRows } = await supabaseAdmin
       .from("app_settings").select("key,value")
-      .in("key", ["access_key_required", "captcha_required", "login_required", "user_daily_activation_limit", "maintenance_enabled"]);
+      .in("key", ["access_key_required", "login_required", "user_daily_activation_limit", "maintenance_enabled"]);
     const s: Record<string, string> = {};
     for (const r of settingRows ?? []) s[r.key] = r.value;
     const loginRequired = s.login_required === "1";
-    const captchaRequired = s.captcha_required === "1";
     const accessKeyRequired = s.access_key_required === "1";
     const maintenance = s.maintenance_enabled === "1";
     const globalCap = Math.max(0, parseInt(s.user_daily_activation_limit ?? "10", 10) || 0);
@@ -675,12 +657,6 @@ export const previewActivationPolicy = createServerFn({ method: "POST" })
         : user ? `Signed in as ${user.email}` : "Not signed in — visitor is blocked.",
     });
     gates.push({
-      key: "captcha", label: "Captcha gate",
-      verdict: !captchaRequired ? "na" : data.hasCaptchaPass ? "pass" : "block",
-      reason: !captchaRequired ? "off"
-        : data.hasCaptchaPass ? "Fresh captcha_pass token present." : "Must solve captcha (no pass token).",
-    });
-    gates.push({
       key: "access_key", label: "Access-key gate",
       verdict: !accessKeyRequired ? "na" : data.hasAccessKey ? "pass" : "block",
       reason: !accessKeyRequired ? "off"
@@ -700,7 +676,7 @@ export const previewActivationPolicy = createServerFn({ method: "POST" })
       allow,
       user: user ? { id: user.id, email: user.email } : null,
       gates,
-      config: { loginRequired, captchaRequired, accessKeyRequired, globalCap, maintenance },
+      config: { loginRequired, accessKeyRequired, globalCap, maintenance },
       cap: { effective: effectiveCap, override: overrideCap, used24h, unlimited: capUnlimited },
     };
   });
