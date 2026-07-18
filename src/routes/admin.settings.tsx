@@ -32,6 +32,12 @@ function SettingsPage() {
 
   const doRunCookies = useServerFn(runCookiesAutocheckNow);
   const doRunProxies = useServerFn(runProxiesAutocheckNow);
+  const fetchProxyStatus = useServerFn(getProxyModeStatus);
+  const proxyStatusQ = useQuery({
+    queryKey: ["admin-proxy-status"],
+    queryFn: () => fetchProxyStatus(),
+    refetchInterval: 2000,
+  });
 
   // Live poll every 2s so job "next-run" ticks down and remote edits appear.
   const q = useQuery({
