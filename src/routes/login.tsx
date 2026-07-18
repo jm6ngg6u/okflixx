@@ -154,17 +154,28 @@ function LoginPage() {
           className="flex min-w-0 items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           aria-label={`${brandName} home`}
         >
-          <img src={heroLogo} alt="" className="h-8 w-8 shrink-0 drop-shadow-[0_0_14px_rgba(255,42,58,0.55)] sm:h-9 sm:w-9" />
+          <img
+            src={heroLogo}
+            alt=""
+            className="header-logo-glow h-8 w-8 shrink-0 sm:h-9 sm:w-9"
+          />
           <span
             className="truncate text-base font-extrabold tracking-[0.14em] sm:text-lg"
-            style={{ fontFamily: "var(--brand-font-display, Sora), sans-serif" }}
+            style={{
+              fontFamily: "var(--brand-font-display, Sora), sans-serif",
+              textShadow: "0 0 18px rgba(255,42,58,0.55)",
+            }}
           >
-            {brandName}
+            <span className="text-white">{namePrefix}</span>
+            <span className="bg-gradient-to-r from-[#ff2a3a] via-[#ff6b3d] to-[#ff2a3a] bg-clip-text text-transparent [background-size:200%_100%] motion-safe:animate-[shine_var(--brand-shine-duration,4.8s)_linear_infinite]">
+              {nameSuffix}
+            </span>
           </span>
         </Link>
         <Link
           to="/"
           className="shrink-0 rounded-md px-1 text-[10px] uppercase tracking-[0.22em] text-white/50 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a] focus-visible:ring-offset-2 focus-visible:ring-offset-black sm:text-xs"
+          style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
         >
           ← Back to site
         </Link>
