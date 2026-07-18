@@ -240,8 +240,11 @@ function LoginPage() {
             </span>
           </h1>
 
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/65">
-            Create your account to access our private gateway and start activating Netflix on any Smart TV, Apple TV, Roku, or console.
+          <p
+            className="mt-5 max-w-md text-[15px] leading-relaxed text-white/65"
+            style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+          >
+            {loginDescription}
           </p>
 
           {/* Feature pills — 4 items, wrapping */}
