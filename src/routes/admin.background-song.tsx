@@ -68,10 +68,11 @@ function BackgroundSongPage() {
   const doTitle = useServerFn(setBackgroundSongTrackTitle);
   const doRestore = useServerFn(restoreBackgroundSong);
   const doDelete = useServerFn(deleteBackgroundSongVersion);
+  const fetchVersionUrl = useServerFn(getBackgroundSongVersionUrl);
   const qc = useQueryClient();
 
   const info = useQuery({ queryKey: ["bg-song-admin"], queryFn: () => fetchInfo(), refetchInterval: 15_000 });
-  const history = useQuery({ queryKey: ["bg-song-history"], queryFn: () => fetchHistory() });
+  const history = useQuery({ queryKey: ["bg-song-history"], queryFn: () => fetchHistory(), refetchInterval: 10_000 });
   const analytics = useQuery({ queryKey: ["bg-song-analytics"], queryFn: () => fetchAnalytics(), refetchInterval: 30_000 });
   const telemetry = useQuery({
     queryKey: ["bg-song-telemetry"],
