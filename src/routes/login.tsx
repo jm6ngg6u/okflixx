@@ -381,7 +381,7 @@ function LoginPage() {
 
               {/* Google button — the ONLY sign-in method */}
               <button
-                onClick={handleGoogle}
+                onClick={() => handleGoogle()}
                 disabled={busy}
                 aria-busy={busy}
                 aria-label={busy ? loginButtonBusy : loginButton}
