@@ -280,7 +280,7 @@ export function MaintenanceView({
   );
 }
 
-export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
+export function MaintenanceScreen({ message, startsAt, endsAt, onCleared }: Props) {
   const b = useBrand();
   const qc = useQueryClient();
   const fetchContacts = useServerFn(getPublicContacts);
