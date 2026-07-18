@@ -136,14 +136,28 @@ export function attachAudio(el: HTMLAudioElement) {
   try {
     if (!ctx) {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return;
-      ctx = new AC();
+      if (!AC) { audioBlocked = true; return; }
+      try {
+        ctx = new AC();
+      } catch {
+        audioBlocked = true;
+        return;
+      }
     }
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
     if (attachedEl !== el) {
       try { source?.disconnect(); } catch { /* ignore */ }
-      source = sourceMap.get(el) ?? ctx.createMediaElementSource(el);
+      const cached = sourceMap.get(el);
+      try {
+        source = cached ?? ctx.createMediaElementSource(el);
+      } catch {
+        // Element already bound to a source in a previous context that got GC'd
+        // or was replaced. Reuse the cached node if available; otherwise bail
+        // gracefully — analyser stays null and getLevels returns zeros.
+        if (cached) source = cached;
+        else { audioBlocked = true; return; }
+      }
       sourceMap.set(el, source);
 
       const hp = ctx.createBiquadFilter();
@@ -168,18 +182,35 @@ export function attachAudio(el: HTMLAudioElement) {
       analyser.smoothingTimeConstant = 0.72;
       data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
 
-      source.connect(hp);
-      hp.connect(comp);
-      comp.connect(shelf);
-      shelf.connect(analyser);
-      analyser.connect(ctx.destination);
+      try {
+        source.connect(hp);
+        hp.connect(comp);
+        comp.connect(shelf);
+        shelf.connect(analyser);
+        analyser.connect(ctx.destination);
+      } catch {
+        // Node already connected in previous graph — safe to ignore.
+      }
 
       attachedEl = el;
+      audioBlocked = false;
     }
   } catch {
-    // createMediaElementSource may only be called once per element; if we hit
-    // that path the earlier graph is still valid — leave it alone.
+    // Any unexpected failure — mark blocked so admin surfaces it.
+    audioBlocked = true;
   }
+}
+
+/** Detach the analyser from an element. Safe to call on unmount. */
+export function detachAudio(el: HTMLAudioElement) {
+  if (attachedEl !== el) return;
+  try { source?.disconnect(); } catch { /* ignore */ }
+  try { analyser?.disconnect(); } catch { /* ignore */ }
+  analyser = null;
+  data = null;
+  attachedEl = null;
+  last = { ...ZERO };
+  setSilent(false);
 }
 
 /** Resume the audio context on a user gesture (call from click handlers). */
