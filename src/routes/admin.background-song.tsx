@@ -800,17 +800,103 @@ function StatBlock({ label, value, mono }: { label: string; value: string; mono?
   );
 }
 
-function AnalyticsTile({ label, v24, v7d }: { label: string; v24: number; v7d: number }) {
+function AnalyticsCard({
+  data, isFetching, onRefresh,
+}: {
+  data: {
+    total24h: Record<string, number>;
+    total7d: Record<string, number>;
+    prev24h: Record<string, number>;
+    unique24h: number;
+    unique7d: number;
+    lastEventAt: string | null;
+    generatedAt: string;
+  } | undefined;
+  isFetching: boolean;
+  onRefresh: () => void;
+}) {
+  const t24 = data?.total24h ?? {};
+  const t7d = data?.total7d ?? {};
+  const prev = data?.prev24h ?? {};
+  const get = (o: Record<string, number>, k: string) => Number(o[k] ?? 0);
+  const impressions24 = get(t24, "impression");
+  const autoplay24 = get(t24, "autoplay");
+  const tap24 = get(t24, "tap_play");
+  const unmute24 = get(t24, "unmute");
+  const oos24 = get(t24, "out_of_schedule");
+  const silent24 = get(t24, "silence_detected");
+  const audibleReach = autoplay24 + tap24;
+  const audibleRate = impressions24 > 0 ? Math.round((audibleReach / impressions24) * 100) : 0;
+  const silentRate = impressions24 > 0 ? Math.round((silent24 / impressions24) * 100) : 0;
+  const unmuteRate = autoplay24 > 0 ? Math.round((unmute24 / autoplay24) * 100) : 0;
+  const lastEvent = data?.lastEventAt ? new Date(data.lastEventAt) : null;
+  const lastAgo = lastEvent ? Math.max(0, Math.round((Date.now() - lastEvent.getTime()) / 1000)) : null;
+
+  const tiles: Array<[string, string, number, number, number]> = [
+    ["Impressions", "impression", impressions24, get(t7d, "impression"), get(prev, "impression")],
+    ["Autoplay unmuted", "autoplay", autoplay24, get(t7d, "autoplay"), get(prev, "autoplay")],
+    ["Tap to play", "tap_play", tap24, get(t7d, "tap_play"), get(prev, "tap_play")],
+    ["Unmute clicks", "unmute", unmute24, get(t7d, "unmute"), get(prev, "unmute")],
+    ["Out of schedule", "out_of_schedule", oos24, get(t7d, "out_of_schedule"), get(prev, "out_of_schedule")],
+    ["Analyser silent", "silence_detected", silent24, get(t7d, "silence_detected"), get(prev, "silence_detected")],
+  ];
+
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-      <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</div>
-      <div className="mt-1 font-display text-2xl leading-none text-white">{v24.toLocaleString()}</div>
-      <div className="mt-1 text-[10px] font-mono text-white/40">
-        <span className="text-white/60">24h</span> · {v7d.toLocaleString()} <span className="text-white/40">7d</span>
+    <div className="glass p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <BarChart3 className="w-4 h-4 text-[#ff2a3a] mt-1" />
+        <div className="flex-1">
+          <div className="font-display text-xs uppercase tracking-[0.24em] text-white/60">Analytics</div>
+          <div className="text-xs text-white/50 mt-1 max-w-xl">
+            Anonymous counts recorded when the song appears on a visitor's homepage. Aggregated server-side, refreshes every 30s.
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-white/60">
+            <span className={`w-1.5 h-1.5 rounded-full ${isFetching ? "bg-[#ff2a3a] animate-pulse" : "bg-emerald-400"}`} />
+            {isFetching ? "Syncing" : "Live"}
+          </span>
+          <Button size="sm" variant="ghost" onClick={onRefresh} className="h-7 px-2 text-[10px] font-mono uppercase tracking-widest">
+            <RotateCcw className="w-3 h-3 mr-1" /> Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <KpiTile label="Unique sessions 24h" value={(data?.unique24h ?? 0).toLocaleString()} sub={`${(data?.unique7d ?? 0).toLocaleString()} 7d`} />
+        <KpiTile label="Audible reach 24h" value={`${audibleRate}%`} sub={`${audibleReach.toLocaleString()} of ${impressions24.toLocaleString()}`} tone={audibleRate >= 50 ? "good" : audibleRate >= 20 ? "warn" : "bad"} />
+        <KpiTile label="Unmute rate 24h" value={`${unmuteRate}%`} sub={`${unmute24.toLocaleString()} of ${autoplay24.toLocaleString()} muted starts`} />
+        <KpiTile label="Silent analyser 24h" value={`${silentRate}%`} sub={`${silent24.toLocaleString()} fallbacks`} tone={silentRate >= 10 ? "bad" : silentRate >= 3 ? "warn" : "good"} />
+      </div>
+
+      {/* Event tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {tiles.map(([label, key, v24, v7d, vPrev]) => (
+          <AnalyticsTile key={key as string} label={label as string} v24={v24 as number} v7d={v7d as number} vPrev={vPrev as number} />
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono uppercase tracking-widest text-white/40">
+        <span>Last event · {lastAgo === null ? "—" : lastAgo < 60 ? `${lastAgo}s ago` : lastAgo < 3600 ? `${Math.round(lastAgo / 60)}m ago` : `${Math.round(lastAgo / 3600)}h ago`}</span>
+        <span>Generated · {data?.generatedAt ? new Date(data.generatedAt).toLocaleTimeString() : "—"}</span>
+        <span>Δ vs previous 24h shown per tile</span>
       </div>
     </div>
   );
 }
+
+function KpiTile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "good" | "warn" | "bad" }) {
+  const toneCls = tone === "good" ? "text-emerald-300" : tone === "warn" ? "text-amber-300" : tone === "bad" ? "text-[#ff6b7a]" : "text-white";
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+      <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</div>
+      <div className={`mt-1 font-display text-2xl leading-none ${toneCls}`}>{value}</div>
+      <div className="mt-1 text-[10px] font-mono text-white/40">{sub}</div>
+    </div>
+  );
+}
+
 
 function SliderRow({
   icon, title, hint, value, display, onChange, onCommit, saving,
