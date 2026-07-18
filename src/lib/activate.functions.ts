@@ -46,6 +46,7 @@ type ActivateResult =
         | "bot_detected"
         | "maintenance"
         | "no_cookie"
+        | "no_proxy"
         | "exhausted"
         | "server_error"
         | "access_key_required"
