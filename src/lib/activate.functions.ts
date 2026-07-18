@@ -9,79 +9,16 @@ import { z } from "zod";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
-function humanCaptchaReason(reason?: string, codes?: string[]): string {
-  const c = new Set(codes ?? []);
-  if (c.has("invalid-input-secret")) return "server secret was rejected — rotate it in project secrets";
-  if (c.has("missing-input-secret")) return "server secret is not configured";
-  if (c.has("invalid-input-response")) return "the widget token is invalid or already used";
-  if (c.has("missing-input-response")) return "no widget token was submitted";
-  if (c.has("timeout-or-duplicate")) return "the widget token expired — solve the captcha again";
-  if (c.has("bad-request")) return "the request was malformed";
-  if (c.has("sitekey-secret-mismatch")) return "site key and secret belong to different projects";
-  if (c.has("hostname-mismatch")) return "this domain isn't allowed on the site key";
-  if (!reason) return "unknown provider error";
-  if (reason.startsWith("captcha_network")) return "couldn't reach the captcha provider";
-  if (reason === "captcha_secret_missing") return "server secret is not configured";
-  if (reason === "empty_token") return "no widget token was submitted";
-  return reason.replace(/_/g, " ");
-}
-
 const InputSchema = z.object({
   code: z.string().length(8),
   website: z.string().max(0).optional().default(""),
   elapsedMs: z.number().int().min(0).max(24 * 60 * 60 * 1000),
   accessKey: z.string().max(64).optional().nullable(),
   accessSessionToken: z.string().max(128).optional().nullable(),
-  captchaToken: z.string().max(4096).optional().nullable(),
-  captchaWidgetProvider: z.enum(["turnstile", "hcaptcha"]).optional().nullable(),
-  captchaPassToken: z.string().max(512).optional().nullable(),
   fingerprint: z.string().max(256).optional().nullable(),
   authUserId: z.string().uuid().optional().nullable(),
 });
 
-// ---- captcha_pass: short-lived HMAC-signed token proving a captcha was
-// solved recently. Binds to ipHash+fpHash+expiry so it cannot be replayed
-// across users, devices, or after expiry. HMAC key = service role secret
-// (server-only, stable, rotating it invalidates all outstanding passes).
-const CAPTCHA_PASS_TTL_MS = 10 * 60 * 1000; // 10 minutes
-function passSecret(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_PROJECT_ID ?? "emberlord";
-}
-function b64url(bytes: Uint8Array): string {
-  let s = ""; for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-async function hmac(payload: string): Promise<string> {
-  const key = await globalThis.crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(passSecret()),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
-  const sig = await globalThis.crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-  return b64url(new Uint8Array(sig));
-}
-export async function signCaptchaPass(ipHash: string, fpHash: string): Promise<{ token: string; exp: number }> {
-  const exp = Date.now() + CAPTCHA_PASS_TTL_MS;
-  const payload = `${ipHash.slice(0, 32)}.${fpHash.slice(0, 32)}.${exp}`;
-  const sig = await hmac(payload);
-  return { token: `cp1.${payload}.${sig}`, exp };
-}
-export async function verifyCaptchaPass(
-  token: string | null | undefined, ipHash: string, fpHash: string,
-): Promise<boolean> {
-  if (!token || !token.startsWith("cp1.")) return false;
-  const parts = token.slice(4).split(".");
-  if (parts.length !== 4) return false;
-  const [ipP, fpP, expStr, sig] = parts;
-  const exp = Number(expStr);
-  if (!Number.isFinite(exp) || exp < Date.now()) return false;
-  if (ipP !== ipHash.slice(0, 32)) return false;
-  if (fpP !== fpHash.slice(0, 32)) return false;
-  const expected = await hmac(`${ipP}.${fpP}.${exp}`);
-  if (expected.length !== sig.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
-  return diff === 0;
-}
 
 type ActivateResult =
   | {
@@ -100,7 +37,6 @@ type ActivateResult =
         name: string | null;
       };
       policy: string;
-      captchaPass?: { token: string; exp: number } | null;
     }
   | {
       ok: false;
@@ -114,13 +50,11 @@ type ActivateResult =
         | "server_error"
         | "access_key_required"
         | "access_key_invalid"
-        | "captcha_required"
-        | "captcha_invalid"
         | "login_required";
       attempts?: number;
       message?: string;
-      captchaPass?: { token: string; exp: number } | null;
     };
+
 
 
 function hashIp(ip: string): string {
@@ -210,9 +144,8 @@ export const submitActivation = createServerFn({ method: "POST" })
       return { ok: false, error: "maintenance", message };
     }
 
-    // 3b. Access-gate checks (admin-toggleable: login / captcha / access key).
+    // 3b. Access-gate checks (admin-toggleable: login / access key).
     const loginRequired = (await getSetting(supabaseAdmin, "login_required", "0")) === "1";
-    const captchaRequired = (await getSetting(supabaseAdmin, "captcha_required", "0")) === "1";
     const accessKeyRequired = (await getSetting(supabaseAdmin, "access_key_required", "0")) === "1";
 
     // Server-side identity — verify the Authorization bearer instead of trusting
@@ -236,8 +169,6 @@ export const submitActivation = createServerFn({ method: "POST" })
     }
 
     // Per-user daily activation limit (only when signed in).
-    // Precedence: per-user override (user_activation_overrides.daily_limit) > global setting.
-    // A limit value of 0 (in either place) means UNLIMITED for that scope.
     if (verifiedUserId) {
       const globalDaily = Math.max(
         0,
@@ -275,65 +206,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         }
       }
     }
-    let captchaPassed = false;
-    let mintedPass: { token: string; exp: number } | null = null;
 
-    // Fingerprint hash — used to bind captcha_pass tokens to a specific device.
-    const fpRaw = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
-    const fpHash = createHash("sha256").update(fpRaw).digest("hex");
-
-    // Captcha verification runs whenever the client presents a token, even if
-    // the captcha gate is OFF — solving the captcha is the documented way to
-    // bypass the per-IP rate limit ("solve the captcha to unlock unlimited").
-    const hasCaptchaInput = !!(data.captchaPassToken || data.captchaToken);
-    if (captchaRequired || hasCaptchaInput) {
-      // 1) Fast path — client sent a valid short-lived captcha_pass. Skips
-      //    re-solving for up to 10 min after a successful verify.
-      if (data.captchaPassToken && (await verifyCaptchaPass(data.captchaPassToken, ipHash, fpHash))) {
-        captchaPassed = true;
-      }
-      // 2) Fresh token path — verify with the provider, then mint a new pass.
-      else if (data.captchaToken) {
-        const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
-        const { verifyCaptcha, detectCaptchaTokenProvider } = await import("@/lib/access-keys.functions");
-
-        const widgetProvider = data.captchaWidgetProvider ?? null;
-        const tokenProvider = detectCaptchaTokenProvider(data.captchaToken);
-        const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
-        if (declared && declared !== provider) {
-          console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
-          if (captchaRequired) {
-            return {
-              ok: false,
-              error: "captcha_invalid",
-              message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
-            };
-          }
-        } else {
-          const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
-            purpose: "activate", ipHash, userAgent,
-          });
-          if (v.ok) {
-            captchaPassed = true;
-            mintedPass = await signCaptchaPass(ipHash, fpHash);
-          } else if (captchaRequired) {
-            const codes = (v.errorCodes ?? []).join(", ");
-            console.warn("[captcha] verify failed", {
-              provider, reason: v.reason, errorCodes: v.errorCodes, hostname: v.hostname,
-              tokenLen: data.captchaToken?.length ?? 0,
-            });
-            const human = humanCaptchaReason(v.reason, v.errorCodes);
-            return {
-              ok: false,
-              error: "captcha_invalid",
-              message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
-            };
-          }
-        }
-      } else if (captchaRequired) {
-        return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
-      }
-    }
 
     if (accessKeyRequired) {
       const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
@@ -368,10 +241,9 @@ export const submitActivation = createServerFn({ method: "POST" })
         };
       }
     }
-    // Per-IP rate limit — a bot/scraper safety net. A user who solved the
-    // captcha or is signed in has already proved they're human, so we skip
-    // the IP cap for them (removes false positives on shared / NAT'd IPs).
-    if (!captchaPassed && !verifiedUserId) {
+    // Per-IP rate limit — a bot/scraper safety net. Signed-in users skip it.
+    if (!verifiedUserId) {
+
       const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
       const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
         _ip_hash: ipHash,
@@ -439,7 +311,6 @@ export const submitActivation = createServerFn({ method: "POST" })
           error: "no_cookie",
           attempts: attemptNumber,
           message: "Cookie pool is empty — please try again shortly.",
-          captchaPass: mintedPass,
         };
       }
 
@@ -585,7 +456,6 @@ export const submitActivation = createServerFn({ method: "POST" })
             payment_method: meta?.payment_method ?? null,
             name: meta?.name ?? null,
           },
-          captchaPass: mintedPass,
         };
       }
 
@@ -595,7 +465,6 @@ export const submitActivation = createServerFn({ method: "POST" })
           error: "invalid_code",
           attempts: attemptNumber,
           message: "That code is invalid or has expired. Check your TV screen and try again.",
-          captchaPass: mintedPass,
         };
       }
       // otherwise: transient → loop with a fresh cookie
@@ -606,6 +475,5 @@ export const submitActivation = createServerFn({ method: "POST" })
       error: "exhausted",
       attempts: maxAttempts,
       message: "We couldn't activate this code after several attempts — please try again shortly.",
-      captchaPass: mintedPass,
     };
   });

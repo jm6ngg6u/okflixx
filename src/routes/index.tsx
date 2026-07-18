@@ -11,7 +11,7 @@ import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
 import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { KeyRound, Lock, ShieldCheck, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
+import { KeyRound, Lock, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
@@ -115,8 +115,6 @@ function HomePage() {
 
   const [accessKey, setAccessKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<
     | { kind: "no_cookie" | "exhausted"; message: string; attempts?: number; code: string; at: number }
@@ -125,24 +123,6 @@ function HomePage() {
   const [retryCountdown, setRetryCountdown] = useState(0);
   const [autoRetry, setAutoRetry] = useState(true);
 
-  // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
-  // Sent on subsequent activations so the user doesn't have to re-solve for
-  // every retry / new code within the window. Server enforces expiry + binding.
-  const CAPTCHA_PASS_KEY = "cp1";
-  const [captchaPassToken, setCaptchaPassToken] = useState<string | null>(
-    typeof window !== "undefined" ? (() => {
-      const raw = sessionStorage.getItem(CAPTCHA_PASS_KEY);
-      if (!raw) return null;
-      try {
-        const { token, exp } = JSON.parse(raw) as { token: string; exp: number };
-        return exp > Date.now() ? token : null;
-      } catch { return null; }
-    })() : null,
-  );
-  // Which provider the widget on this page was actually rendered for —
-  // sent to the server so a mismatched admin toggle produces a clear
-  // error instead of "captcha failed".
-  const captchaWidgetProviderRef = useRef<"turnstile" | "hcaptcha" | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("");
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
@@ -161,7 +141,6 @@ function HomePage() {
       setRetryCountdown((n) => {
         const next = Math.max(0, n - 1);
         if (next === 0 && autoRetry && serviceError) {
-          // Fire on next tick so state settles.
           window.setTimeout(() => handleActivateRef.current?.(), 0);
         }
         return next;
@@ -183,68 +162,16 @@ function HomePage() {
     return () => { sub.subscription.unsubscribe(); };
   }, []);
 
-  // Load Turnstile / hCaptcha script when captcha gate is on, then explicitly render the widget.
-  const captchaWidgetRef = useRef<HTMLDivElement>(null);
-  const captchaRenderedRef = useRef(false);
-  useEffect(() => {
-    if (!gate.data?.captchaRequired || !gate.data.captchaSiteKey) return;
-    const provider = gate.data.captchaProvider;
-    const src = provider === "hcaptcha"
-      ? "https://js.hcaptcha.com/1/api.js?render=explicit"
-      : "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-    const ensureScript = () => new Promise<void>((resolve) => {
-      const existing = document.querySelector(`script[src="${src}"]`);
-      if (existing) { resolve(); return; }
-      const s = document.createElement("script");
-      s.src = src; s.async = true; s.defer = true;
-      s.onload = () => resolve();
-      document.head.appendChild(s);
-    });
-    let cancelled = false;
-    (async () => {
-      await ensureScript();
-      const start = Date.now();
-      while (!cancelled) {
-        const api: any = provider === "hcaptcha" ? (window as any).hcaptcha : (window as any).turnstile;
-        if (api && captchaWidgetRef.current && !captchaRenderedRef.current) {
-          try {
-            api.render(captchaWidgetRef.current, {
-              sitekey: gate.data!.captchaSiteKey,
-              theme: "dark",
-              callback: (token: string) => {
-                setCaptchaToken(token);
-                setCaptchaError(null);
-                captchaWidgetProviderRef.current = provider;
-              },
-              "expired-callback": () => setCaptchaToken(""),
-              "error-callback": (err?: string) => {
-                setCaptchaToken("");
-                setCaptchaError(err ? `Widget error: ${err}` : "Widget error — refresh and try again.");
-              },
-            });
-            captchaRenderedRef.current = true;
-            captchaWidgetProviderRef.current = provider;
-          } catch { /* already rendered */ }
-          return;
-        }
-        if (Date.now() - start > 8000) return;
-        await new Promise((r) => setTimeout(r, 150));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [gate.data?.captchaRequired, gate.data?.captchaSiteKey, gate.data?.captchaProvider]);
-
   const gateBlocks = useMemo(() => {
     const g = gate.data;
-    if (!g) return { needsLogin: false, needsCaptcha: false, needsKey: false, hasSession: false };
+    if (!g) return { needsLogin: false, needsKey: false, hasSession: false };
     return {
       needsLogin: g.loginRequired && !authUserId,
-      // Captcha is satisfied by either a fresh widget token OR a live pass token.
-      needsCaptcha: g.captchaRequired && !captchaToken && !captchaPassToken,
       needsKey: g.accessKeyRequired && !accessKey && !sessionToken,
       hasSession: !!sessionToken,
     };
-  }, [gate.data, authUserId, captchaToken, captchaPassToken, accessKey, sessionToken]);
+  }, [gate.data, authUserId, accessKey, sessionToken]);
+
 
   // --- Redeem key ---
   const [redeeming, setRedeeming] = useState(false);
@@ -292,13 +219,8 @@ function HomePage() {
   }
 
   // Reset just the *attempt* state. Keeps the code the user typed but drops
-  // captcha tokens / pass / 24h session / key input / inline errors, then
-  // re-solves whichever gates are currently enabled.
+  // access key input / 24h session / inline errors.
   const resetAttempt = () => {
-    setCaptchaToken("");
-    setCaptchaError(null);
-    setCaptchaPassToken(null);
-    try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
     setAccessKey("");
     setKeyError(null);
     if (sessionToken) {
@@ -306,14 +228,9 @@ function HomePage() {
       setSessionToken(null);
     }
     setLoginError(null);
-    // Reset the captcha widget so a fresh challenge renders.
-    try {
-      const api: any = captchaWidgetProviderRef.current === "hcaptcha"
-        ? (window as any).hcaptcha : (window as any).turnstile;
-      api?.reset?.();
-    } catch { /* noop */ }
-    toast("Attempt reset", { description: "Re-run the security checks below." });
+    toast("Attempt reset", { description: "Re-run the checks below." });
   };
+
 
   const handleActivate = async () => {
     // Client throttle — 3s cooldown between submits.
@@ -343,13 +260,8 @@ function HomePage() {
       toast.error("Access key required");
       return;
     }
-    if (gateBlocks.needsCaptcha) {
-      setCaptchaError("Please complete the verification below.");
-      toast.error("Verification required");
-      return;
-    }
 
-    setLoginError(null); setKeyError(null); setCaptchaError(null); setServiceError(null); setRetryCountdown(0);
+    setLoginError(null); setKeyError(null); setServiceError(null); setRetryCountdown(0);
     setSubmitting(true);
     setStage("working");
 
@@ -361,19 +273,10 @@ function HomePage() {
           elapsedMs: now - mountedAtRef.current,
           accessKey: accessKey || null,
           accessSessionToken: sessionToken,
-          captchaToken: captchaToken || null,
-          captchaWidgetProvider: captchaWidgetProviderRef.current,
-          captchaPassToken: captchaPassToken || null,
           fingerprint: fingerprint || null,
           authUserId,
         },
       });
-      // Cache the server-issued verification pass (internal — not shown to user).
-      const cp = (result as any).captchaPass as { token: string; exp: number } | null | undefined;
-      if (cp && cp.token) {
-        setCaptchaPassToken(cp.token);
-        try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
-      }
       if (result.ok) {
         setSuccess({
           code,
@@ -387,17 +290,6 @@ function HomePage() {
       } else if (result.error === "login_required") {
         setLoginError("Please sign in to continue.");
         toast.error("Sign in required");
-      } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
-        setCaptchaError("Verification failed. Please try again.");
-        setCaptchaToken("");
-        setCaptchaPassToken(null);
-        try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
-        try {
-          const api: any = captchaWidgetProviderRef.current === "hcaptcha"
-            ? (window as any).hcaptcha : (window as any).turnstile;
-          api?.reset?.();
-        } catch { /* noop */ }
-        toast.error("Verification failed", { description: "Please complete the check below and try again." });
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
         if (result.error === "access_key_invalid" && sessionToken) {
           localStorage.removeItem(SESSION_KEY);
@@ -416,7 +308,6 @@ function HomePage() {
         setAutoRetry(true);
         toast.error("Activation failed", { description: "Please try again in a moment." });
       } else {
-        // Generic bucket: rate_limited, bot_detected, unknown → same message.
         toast.error("Activation failed", { description: "Please try again in a moment." });
       }
     } catch (err) {
@@ -431,21 +322,19 @@ function HomePage() {
 
 
 
-  const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
+  const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.loginRequired));
 
-  // Ordered list of enabled gates with satisfaction state → drives the header,
-  // progress bar, and numbered badges. Only reads gate.data; never invents gates.
   const gateItems = useMemo(() => {
     const g = gate.data;
-    if (!g) return [] as { key: "login" | "key" | "captcha"; label: string; done: boolean }[];
-    const out: { key: "login" | "key" | "captcha"; label: string; done: boolean }[] = [];
+    if (!g) return [] as { key: "login" | "key"; label: string; done: boolean }[];
+    const out: { key: "login" | "key"; label: string; done: boolean }[] = [];
     if (g.loginRequired) out.push({ key: "login", label: "Sign in", done: !!authUserId });
     if (g.accessKeyRequired) out.push({ key: "key", label: "Access key", done: !!sessionToken });
-    if (g.captchaRequired) out.push({ key: "captcha", label: "Human check", done: !!(captchaToken || captchaPassToken) });
     return out;
-  }, [gate.data, authUserId, sessionToken, captchaToken, captchaPassToken]);
+  }, [gate.data, authUserId, sessionToken]);
   const doneCount = gateItems.filter((g) => g.done).length;
   const allSatisfied = gateItems.length > 0 && doneCount === gateItems.length;
+
 
 
 
@@ -635,33 +524,8 @@ function HomePage() {
                     </div>
                   )}
 
-                  {/* Captcha gate */}
-                  {gate.data?.captchaRequired && gate.data.captchaSiteKey && (
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
-                        <ShieldCheck className="w-3.5 h-3.5 text-[#ff8a90]" />
-                        <span>Verify you're human</span>
-                        {captchaToken && (
-                          <span className="ml-auto inline-flex items-center gap-1 text-emerald-300">
-                            <CheckCircle2 className="w-3 h-3" /> Verified
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-white/45 leading-snug mb-2">
-                        Please complete the check below to continue.
-                      </p>
 
-                      <div
-                        ref={captchaWidgetRef}
-                        className="min-h-[78px]"
-                      />
-                      {captchaError && (
-                        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-200">
-                          {captchaError}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
                   </div>
                 </div>
               )}

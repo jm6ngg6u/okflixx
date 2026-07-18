@@ -25,7 +25,7 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
-  testCaptchaKeys,
+  
   listUserActivationOverrides, setUserActivationOverride, removeUserActivationOverride,
   getGateLastUpdated, listAccessAudit, previewActivationPolicy,
 } from "@/lib/access-keys.functions";
@@ -49,7 +49,7 @@ function AccessAdminPage() {
   const removeKeys = useServerFn(deleteAccessKeys);
   const fetchRedemptions = useServerFn(listRedemptions);
   const fetchStats = useServerFn(getAccessStats);
-  const runTestKeys = useServerFn(testCaptchaKeys);
+  
 
   // ─── Queries (2s live refresh) ───────────────────────────────────────
   const config = useQuery({ queryKey: ["gate-config"], queryFn: () => getConfig(), refetchInterval: REFRESH_MS });
@@ -104,22 +104,7 @@ function AccessAdminPage() {
   });
 
 
-  // ─── Captcha config (site key + provider) ────────────────────────────
-  const [siteKeyDraft, setSiteKeyDraft] = useState<string | null>(null);
-  const savedSiteKey = config.data?.captchaSiteKey ?? "";
-  const siteKeyDirty = siteKeyDraft !== null && siteKeyDraft !== savedSiteKey;
 
-  // ─── Captcha test panel ──────────────────────────────────────────────
-  const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
-  const testMut = useMutation({
-    mutationFn: () => runTestKeys(),
-    onSuccess: (r) => {
-      setTestResult(r);
-      if (r.ok) toast.success("Captcha handshake healthy");
-      else toast.error("Captcha test failed", { description: r.summary });
-    },
-    onError: (e: any) => toast.error("Test failed", { description: e?.message ?? "" }),
-  });
 
   // ─── Key generator ───────────────────────────────────────────────────
   const [genType, setGenType] = useState<KeyType>("unlimited");
@@ -235,8 +220,8 @@ function AccessAdminPage() {
 
 
   const c = config.data;
-  const anyGateOn = !!(c?.accessKeyRequired || c?.captchaRequired || c?.loginRequired);
-  const providerMismatch = detectProviderMismatch(c?.captchaSiteKey, c?.captchaProvider);
+  const anyGateOn = !!(c?.accessKeyRequired || c?.loginRequired);
+
 
   return (
     <div className="space-y-8">
@@ -283,14 +268,8 @@ function AccessAdminPage() {
           onToggle={(v) => gateMut.mutate({ accessKeyRequired: v })}
           loading={gateMut.isPending}
         />
-        <GateCard
-          icon={<ShieldCheck className="w-5 h-5" />}
-          title="Captcha gate"
-          desc="Cloudflare Turnstile or hCaptcha check on every submit. Blocks bots and headless clients."
-          enabled={!!c?.captchaRequired}
-          onToggle={(v) => gateMut.mutate({ captchaRequired: v })}
-          loading={gateMut.isPending}
-        />
+
+
         <GateCard
           icon={<UserCheck className="w-5 h-5" />}
           title="Login gate"
@@ -335,8 +314,8 @@ function AccessAdminPage() {
               <div className="font-mono uppercase tracking-widest text-white/80 mb-1">How the gates stack</div>
               <ul className="space-y-1 list-disc list-inside">
                 <li><b className="text-white/80">Login gate</b> — quota is per user, not per IP.</li>
-                <li><b className="text-white/80">Captcha gate</b> — a passed challenge waives the IP rate limit (unlimited for that solved session).</li>
-                <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session. No bypass path.</li>
+                <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session.</li>
+                
               </ul>
             </div>
           </div>
@@ -346,86 +325,8 @@ function AccessAdminPage() {
       )}
 
 
-      {/* CAPTCHA CONFIG */}
-      {c?.captchaRequired && (
-        <Section title="Captcha configuration" tone="amber" icon={<ShieldAlert className="w-4 h-4" />}>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <Label className="label-caps mb-2 block">Provider</Label>
-              <Select
-                value={c.captchaProvider}
-                onValueChange={(v) =>
-                  saveSettings({ data: { captchaProvider: v as any } }).then(() => {
-                    toast.success(`Provider set to ${v}`);
-                    qc.invalidateQueries({ queryKey: ["gate-config"] });
-                  })
-                }
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="turnstile">Cloudflare Turnstile</SelectItem>
-                  <SelectItem value="hcaptcha">hCaptcha</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="md:col-span-2">
-              <Label className="label-caps mb-2 block">Site key (public)</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={siteKeyDraft ?? savedSiteKey}
-                  placeholder="0x4AAAA… or hCaptcha UUID"
-                  onChange={(e) => setSiteKeyDraft(e.target.value)}
-                />
-                <Button
-                  variant={siteKeyDirty ? "default" : "outline"}
-                  disabled={!siteKeyDirty}
-                  onClick={() => {
-                    const v = (siteKeyDraft ?? "").trim();
-                    saveSettings({ data: { captchaSiteKey: v } }).then(() => {
-                      toast.success("Site key saved");
-                      setSiteKeyDraft(null);
-                      qc.invalidateQueries({ queryKey: ["gate-config"] });
-                    });
-                  }}
-                >
-                  <Save className="w-4 h-4 mr-1.5" /> Save
-                </Button>
-              </div>
-              <p className="text-[11px] text-white/40 mt-2 leading-relaxed">
-                Secret is stored in <code className="text-white/70">HCAPTCHA_SECRET</code> / <code className="text-white/70">TURNSTILE_SECRET</code> and is never exposed to the browser.
-              </p>
-            </div>
-          </div>
-          {providerMismatch && (
-            <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-[12px] text-red-100 flex items-start gap-2">
-              <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
-              <div>
-                <div className="font-medium">Provider / site-key mismatch</div>
-                <div className="text-red-200/80 mt-1">
-                  This site key looks like a <b>{providerMismatch}</b> key but the selected provider is <b>{c.captchaProvider}</b>. Activations will fail until they match.
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Live test */}
-          <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-3 flex flex-wrap items-center gap-3">
-            <Activity className="w-4 h-4 text-[#ff8a90]" />
-            <div className="text-[11px] font-mono uppercase tracking-widest text-white/60">Live handshake test</div>
-            <Button size="sm" variant="secondary" disabled={testMut.isPending} onClick={() => testMut.mutate()}>
-              {testMut.isPending
-                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing…</>
-                : <><Play className="w-3.5 h-3.5 mr-1.5" /> Test now</>}
-            </Button>
-            {testResult && (
-              <div className={`text-[11px] flex items-center gap-1.5 ${testResult.ok ? "text-emerald-300" : "text-red-300"}`}>
-                {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                <span>{testResult.summary}</span>
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
+
 
       {/* STATS STRIP */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -726,14 +627,14 @@ function AccessOpsPanels() {
 
   const [pvEmail, setPvEmail] = useState("");
   const [pvHasKey, setPvHasKey] = useState(false);
-  const [pvHasCaptcha, setPvHasCaptcha] = useState(false);
   const preview = useMutation({
     mutationFn: () => runPreview({ data: {
       email: pvEmail.trim() || null,
       hasAccessKey: pvHasKey,
-      hasCaptchaPass: pvHasCaptcha,
+      hasCaptchaPass: false,
     } }),
   });
+
 
   const l = lastUpdated.data?.latest;
   const rel = l ? relTime(l.updated_at) : null;
@@ -777,10 +678,8 @@ function AccessOpsPanels() {
               <label className="flex items-center gap-2 text-xs text-white/70">
                 <Switch checked={pvHasKey} onCheckedChange={setPvHasKey} /> Has access key
               </label>
-              <label className="flex items-center gap-2 text-xs text-white/70">
-                <Switch checked={pvHasCaptcha} onCheckedChange={setPvHasCaptcha} /> Captcha solved
-              </label>
             </div>
+
           </div>
           <Button onClick={() => preview.mutate()} disabled={preview.isPending}
             className="bg-[#ff2a3a] hover:bg-[#ff2a3a]/90">
