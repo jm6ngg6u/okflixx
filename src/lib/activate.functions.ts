@@ -147,9 +147,8 @@ export const submitActivation = createServerFn({ method: "POST" })
       return { ok: false, error: "maintenance", message };
     }
 
-    // 3b. Access-gate checks (admin-toggleable: login / captcha / access key).
+    // 3b. Access-gate checks (admin-toggleable: login / access key).
     const loginRequired = (await getSetting(supabaseAdmin, "login_required", "0")) === "1";
-    const captchaRequired = (await getSetting(supabaseAdmin, "captcha_required", "0")) === "1";
     const accessKeyRequired = (await getSetting(supabaseAdmin, "access_key_required", "0")) === "1";
 
     // Server-side identity — verify the Authorization bearer instead of trusting
@@ -173,8 +172,6 @@ export const submitActivation = createServerFn({ method: "POST" })
     }
 
     // Per-user daily activation limit (only when signed in).
-    // Precedence: per-user override (user_activation_overrides.daily_limit) > global setting.
-    // A limit value of 0 (in either place) means UNLIMITED for that scope.
     if (verifiedUserId) {
       const globalDaily = Math.max(
         0,
@@ -212,65 +209,7 @@ export const submitActivation = createServerFn({ method: "POST" })
         }
       }
     }
-    let captchaPassed = false;
-    let mintedPass: { token: string; exp: number } | null = null;
 
-    // Fingerprint hash — used to bind captcha_pass tokens to a specific device.
-    const fpRaw = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
-    const fpHash = createHash("sha256").update(fpRaw).digest("hex");
-
-    // Captcha verification runs whenever the client presents a token, even if
-    // the captcha gate is OFF — solving the captcha is the documented way to
-    // bypass the per-IP rate limit ("solve the captcha to unlock unlimited").
-    const hasCaptchaInput = !!(data.captchaPassToken || data.captchaToken);
-    if (captchaRequired || hasCaptchaInput) {
-      // 1) Fast path — client sent a valid short-lived captcha_pass. Skips
-      //    re-solving for up to 10 min after a successful verify.
-      if (data.captchaPassToken && (await verifyCaptchaPass(data.captchaPassToken, ipHash, fpHash))) {
-        captchaPassed = true;
-      }
-      // 2) Fresh token path — verify with the provider, then mint a new pass.
-      else if (data.captchaToken) {
-        const provider = ((await getSetting(supabaseAdmin, "captcha_provider", "turnstile")) as "turnstile" | "hcaptcha");
-        const { verifyCaptcha, detectCaptchaTokenProvider } = await import("@/lib/access-keys.functions");
-
-        const widgetProvider = data.captchaWidgetProvider ?? null;
-        const tokenProvider = detectCaptchaTokenProvider(data.captchaToken);
-        const declared = widgetProvider ?? (tokenProvider === "unknown" ? null : tokenProvider);
-        if (declared && declared !== provider) {
-          console.warn("[captcha] provider mismatch", { configured: provider, widget: widgetProvider, tokenShape: tokenProvider });
-          if (captchaRequired) {
-            return {
-              ok: false,
-              error: "captcha_invalid",
-              message: `Captcha provider mismatch — page is showing ${declared} but the admin panel is set to ${provider}. Refresh the page.`,
-            };
-          }
-        } else {
-          const v = await verifyCaptcha(provider, data.captchaToken, rawIp, {
-            purpose: "activate", ipHash, userAgent,
-          });
-          if (v.ok) {
-            captchaPassed = true;
-            mintedPass = await signCaptchaPass(ipHash, fpHash);
-          } else if (captchaRequired) {
-            const codes = (v.errorCodes ?? []).join(", ");
-            console.warn("[captcha] verify failed", {
-              provider, reason: v.reason, errorCodes: v.errorCodes, hostname: v.hostname,
-              tokenLen: data.captchaToken?.length ?? 0,
-            });
-            const human = humanCaptchaReason(v.reason, v.errorCodes);
-            return {
-              ok: false,
-              error: "captcha_invalid",
-              message: `Captcha check failed — ${human}${codes ? ` (${codes})` : ""}.`,
-            };
-          }
-        }
-      } else if (captchaRequired) {
-        return { ok: false, error: "captcha_required", message: "Please complete the captcha." };
-      }
-    }
 
     if (accessKeyRequired) {
       const fingerprint = data.fingerprint || `${userAgent ?? "ua"}::${ipHash}`;
