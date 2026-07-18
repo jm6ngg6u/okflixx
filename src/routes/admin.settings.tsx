@@ -871,7 +871,9 @@ function MaintenanceControls(props: {
             <MaintenanceView
               b={brand}
               message={previewMsg}
-              remainingLabel={withinWindow ? fmtCountdown(endsMs - nowTick) : null}
+              remainingLabel={!isNaN(endsMs) ? fmtCountdown(Math.max(0, endsMs - nowTick)) : null}
+              startsAt={startsIso || null}
+              endsAt={endsIso || null}
               channels={[]}
               user={null}
               compact
@@ -909,7 +911,37 @@ function MaintenanceControls(props: {
         </div>
         <p className="text-xs text-white/50">
           Maintenance auto-enables at start and auto-disables at end. Manual toggle above still overrides.
+          Users see times in <span className="font-mono text-white/70">{brand.maint_timezone || "UTC"}</span>
+          {" · "}<span className="font-mono text-white/70">{brand.maint_time_format === "12h" ? "12h" : "24h"}</span>
+          {" "}(change in Admin → Branding → Maintenance).
         </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-white/40 mr-1">Quick window</span>
+          {[
+            { label: "Next 15m", start: 0, end: 15 },
+            { label: "Next 30m", start: 0, end: 30 },
+            { label: "Next 1h", start: 0, end: 60 },
+            { label: "Next 4h", start: 0, end: 240 },
+            { label: "Tonight", start: 60, end: 60 * 5 },
+          ].map((p) => (
+            <Button
+              key={p.label}
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-[11px] border-white/10 bg-white/5 hover:bg-white/10"
+              onClick={() => {
+                const now = Date.now();
+                const s = new Date(now + p.start * 60_000).toISOString();
+                const e = new Date(now + (p.start + p.end) * 60_000).toISOString();
+                dirtyRef.current.add("maintenance_starts_at");
+                dirtyRef.current.add("maintenance_ends_at");
+                setLocal((st) => ({ ...st, maintenance_starts_at: s, maintenance_ends_at: e }));
+              }}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Starts at (local)</label>

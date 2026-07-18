@@ -244,6 +244,7 @@ function MaintenanceGate({ children }: { children: ReactNode }) {
     return (
       <MaintenanceScreen
         message={gate.data.maintenanceMessage || ""}
+        startsAt={gate.data.maintenanceStartsAt ?? null}
         endsAt={gate.data.maintenanceEndsAt ?? null}
         onCleared={() => qc.invalidateQueries({ queryKey: ["public-gate"] })}
       />
