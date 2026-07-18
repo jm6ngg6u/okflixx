@@ -12,6 +12,9 @@ export const BRANDING_DEFAULTS = {
   name_prefix: "EMBER",
   name_suffix: "LORD",
   tagline: "Command Netflix on any TV",
+  browser_title: "Emberlord — Activate Netflix on any TV",
+  logo_url: "",
+  favicon_url: "",
   meta_description:
     "Enter your 8-digit code and stream Netflix instantly on any Smart TV, Apple TV, Roku, PS5 or Xbox. Encrypted, always-on, 2026-ready.",
   footer_legal: "© 2026 · Encrypted · Everywhere",
@@ -51,6 +54,7 @@ export const BRANDING_DEFAULTS = {
   letter_spacing: "normal", // tight | normal | loose
   wordmark_pulse: "1", // "1" on / "0" off
 };
+
 
 export type BrandingKey = keyof typeof BRANDING_DEFAULTS;
 const KEYS = Object.keys(BRANDING_DEFAULTS) as BrandingKey[];
