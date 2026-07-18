@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
-  listSettings, setSetting, toggleProxyMode, setMaintenance,
   runCookiesAutocheckNow, runProxiesAutocheckNow, testPoolAlertWebhook, getProxyModeStatus,
 } from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
