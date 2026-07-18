@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { getLevels, getIntensity, noteFrame } from "@/lib/audio-reactive";
+import { getLevels, getIntensity, getSensitivity, getFps, noteFrame, setFpsPaused } from "@/lib/audio-reactive";
 
 /**
  * Florzin-style light beam background.
@@ -271,11 +271,18 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       mq.addEventListener?.("change", onMQ);
     }
     let hidden = typeof document !== "undefined" ? document.hidden : false;
-    const onVis = () => { hidden = document.hidden; };
+    const onVis = () => {
+      hidden = document.hidden;
+      setFpsPaused(hidden);
+    };
     document.addEventListener("visibilitychange", onVis);
+    setFpsPaused(hidden || reducedMotion);
 
     // Frame limiter — cap when tab is hidden or reduced-motion is on.
     let lastDraw = 0;
+    // Adaptive quality — drop beams when fps stays under 30 for 3s.
+    let lowFpsSince = 0;
+    let beamStride = 1; // 1=all beams, 2=half, 3=third.
 
     let raf = 0;
     const tStart = performance.now();
@@ -290,6 +297,20 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       lastDraw = now;
       noteFrame();
 
+      // Adaptive quality guard — only when running full-speed.
+      if (!reducedMotion && !hidden) {
+        if (getFps() < 30) {
+          if (!lowFpsSince) lowFpsSince = now;
+          else if (now - lowFpsSince > 3000 && beamStride < 3) {
+            beamStride++;
+            lowFpsSince = now;
+          }
+        } else if (getFps() > 50) {
+          lowFpsSince = 0;
+          if (beamStride > 1 && getFps() > 55) beamStride--;
+        }
+      }
+
       const tGlobal = (now - tStart) / 1000;
 
       if (mouse.active) {
@@ -303,13 +324,14 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       trackOrigin();
 
       // Audio reactivity — cheap when disabled (getLevels returns zeros).
-      // Live intensity multiplier from the admin slider — no rerender needed.
+      // Live intensity + sensitivity multipliers from the admin sliders.
       const inten2 = getIntensity();
+      const sens2 = getSensitivity();
       const lv = getLevels();
-      audioLevel = audioLevel * 0.75 + lv.level * 0.25 * inten2;
-      audioBeat = audioBeat * 0.7 + lv.beat * 0.3 * inten2;
+      audioLevel = audioLevel * 0.75 + lv.level * 0.25 * inten2 * sens2;
+      audioBeat = audioBeat * 0.7 + lv.beat * 0.3 * inten2 * sens2;
       if (lv.beat > 0.05) {
-        pulse.v = Math.max(pulse.v, lv.beat * 0.9 * inten2);
+        pulse.v = Math.max(pulse.v, lv.beat * 0.9 * inten2 * sens2);
         pulse.x = w * 0.5 + Math.sin(tGlobal * 0.7) * w * 0.15;
         pulse.y = h * 0.35 + Math.cos(tGlobal * 0.9) * 40;
       }
@@ -325,8 +347,11 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       }
 
       ctx.globalCompositeOperation = "lighter";
-      for (const b of beams) {
+      for (let i = 0; i < beams.length; i++) {
+        const b = beams[i];
         if (!reducedMotion) b.phase += b.speed * 16;
+        // Adaptive quality: skip beams under sustained low FPS.
+        if (beamStride > 1 && (i % beamStride) !== 0) continue;
         drawBeam(b, tGlobal);
       }
       ctx.globalCompositeOperation = "source-over";

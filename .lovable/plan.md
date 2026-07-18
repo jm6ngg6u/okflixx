@@ -1,69 +1,80 @@
-# Playback Status — Deep Hardening Plan
+# Audio-Reactive Background — Deep Hardening Plan
 
-The admin "Playback status" card currently just mirrors the `enabled` toggle (`PLAYING` / `OFF`). It does not reflect what 2000+ real visitors' browsers are doing. This plan fixes correctness end-to-end and adds only the signals that matter.
+Goal: make the reactive engine correct, safe, and scalable for 2000+ concurrent visitors, with a clear admin experience. No cosmetic bloat.
 
-## Problems found
+## Real issues found (grounded in code)
 
-1. **Fake status** — `PLAYING` shows even when zero visitors can play (autoplay blocked, 404 signed URL, silent analyser, out-of-schedule). No admin ever learns their song is dead.
-2. **No aggregated telemetry** — `background-song-health.ts` is per-tab only; nothing reaches the admin.
-3. **Signed URL expiry** — `/api/public/background-song-audio` returns a 10-min signed URL; long listeners get 403 mid-song. No refresh path recorded.
-4. **Retry storm risk** — `bumpBgsRetries` has no backoff cap; a broken track could hammer the endpoint from every visitor.
-5. **Quiet-hours edge** — `out_of_schedule` status is not surfaced in admin; admins think playback is broken.
-6. **Preview `<audio>` double-fetch** — admin preview and background song may both open a MediaElementSource on the same element on re-render, throwing (currently swallowed but leaves preview mute).
-7. **No error visibility** — `recordBgsError` is only in the floating debug panel behind `?bgs-health=1`.
-8. **UI/UX** — status pill is a single color; no distinction between "playing muted (autoplay-block)", "playing audible", "waiting for gesture", "quiet hours", "error".
+1. **Live slider = local state only.** In `admin.background-song.tsx` the "Beam intensity" and "Bass sensitivity" sliders update React state but never call `setIntensity()` / `setSensitivity()` from `src/lib/audio-reactive.ts`. Values only take effect after Save + reload. The card even claims "no reload needed" — currently false for these two controls.
+2. **Sensitivity not read on public site.** `LiveBackground.tsx` reads `getIntensity()` per frame but never reads `getSensitivity()`; visitors' bass response is stuck at 1× regardless of the admin slider.
+3. **Silence auto-fallback is one-way.** `BackgroundSong.tsx` calls `setReactiveEnabled(false)` on 3s silence, but never re-enables when the analyser recovers (e.g. after unmute / URL refresh). Reactive stays STATIC until page reload.
+4. **AudioContext leak on iOS Safari.** `createMediaElementSource` throws if called twice on same element; try/catch swallows it but the graph then has no analyser — analyser stays silent, reactive silently dies. No `blocked` status is reported.
+5. **No FPS/thermal guard.** On low-end phones the beam loop can drop below 20 fps; there is no auto-downshift (beam count, layer count, blur). At 2000+ users this shows up as janky first-paint on cheap Android.
+6. **Tab hidden throttle correct, but `noteFrame()` still ticks at 8 fps hidden** → FPS meter shows misleading "8" in admin. Meter should freeze / mark "hidden".
+7. **`reduced-motion` disables beam bob but still runs the loop at 6 fps forever** — fine, but analyser still hits `getByteFrequencyData` unnecessarily. Small CPU waste at scale.
+8. **No visibility in admin of what visitors' engines are actually doing** (reactive on/off, silent-fallback rate, avg fps). The bg-heartbeat added last turn only tracks playback, not reactive health.
+9. **Admin preview shares the global AudioContext** via `attachAudio(previewEl)` in Live Preview. If admin has main site open in another tab the same MediaElementSource error can fire. Preview should own its own context or be explicitly documented as sharing.
+10. **`prefers-reduced-motion` ignored for admin preview** — preview keeps running full-frame even for accessibility users.
 
-## Implementation (one file per step, no skipped items)
+## Implementation (one file per fix, no skipped items)
 
-### 1. Backend telemetry endpoint
-- New public route `src/routes/api/public/hooks/bgs-heartbeat.ts` — accepts POST `{ status, muted, needsGesture, silent, retries, lastError, activeIndex, duration, currentTime }` from visitors (rate-limited, no PII).
-- Aggregates into new table `background_song_events` (existing) via `supabaseAdmin`. Add small migration ONLY if missing columns (`status`, `muted`, `needs_gesture`, `silent`, `error`, `created_at`).
-- Admin server fn `getPlaybackTelemetry` in `src/lib/background-song.functions.ts` — returns last 5 min aggregate: total sessions, playing_audible, playing_muted, gesture_wait, quiet_hours, error_rate, top 3 errors.
+### 1. Wire sliders to live engine (`admin.background-song.tsx`)
+- On slider `onChange`, call `setIntensity(v)` / `setSensitivity(v)` from `@/lib/audio-reactive` so admin sees instant response in Live Preview and the change takes effect for visitors on next `getLevels()` tick (already imported client-side via the audio module).
+- Keep `onCommit` → server save. No debounce change.
 
-### 2. Client beacon
-- In `src/components/BackgroundSong.tsx`, on every status change (throttled 15s, dedup identical payload), send `navigator.sendBeacon` to the heartbeat endpoint. No cookies, no user id.
-- Cap `bumpBgsRetries` at 6 with exponential backoff (2s, 4s, 8s, 16s, 32s, 60s) then park in `error` state until visibility change.
-- Refresh signed URL proactively: when `currentTime > duration - 30s` OR every 8 minutes, re-`load()` from `/api/public/background-song-audio` (server already returns a fresh signed URL each hit). Uses the standby `<audio>` element already in the component to avoid an audible gap.
+### 2. Public site reads sensitivity (`LiveBackground.tsx`)
+- Import `getSensitivity` and multiply the bass/beat contributions by it inside the frame loop (single multiply — no extra allocations). This is the only change to the public renderer.
 
-### 3. Fix preview double-source
-- `previewRef` audio: guard `attachAudio` so it is never called on the admin preview element (it currently isn't, but add an explicit "no analyser for preview" comment + assert).
-- Make preview element unmount cleanly (`pause() + src=""`) when navigating away to avoid orphaned MediaElementSource on the shared context.
+### 3. Silence recovery (`BackgroundSong.tsx`)
+- Track `wantReactive` (admin setting). When `onSilenceChange(false)` fires and `wantReactive` is true, re-enable via `setReactiveEnabled(true)` and clear the "fell back to STATIC" toast state so it can fire again on the next real failure.
+- Add a 10s cooldown to avoid oscillation.
 
-### 4. Real "Playback status" card
-Replace the single `PLAYING/OFF` pill in `src/routes/admin.background-song.tsx` with:
-- **Master state pill**: `OFF` / `SCHEDULED-OFF` (quiet hours active) / `LIVE` (≥1 audible session in last 60s) / `MUTED-ONLY` (all sessions muted / needs gesture) / `DEGRADED` (>20% error rate) / `DOWN` (0 sessions in 5 min while enabled).
-- **6 stat tiles** (2s live refresh via `useQuery` refetchInterval): Active listeners, Audible %, Gesture-wait %, Error rate %, Signed-URL refreshes (last hour), Avg current-time drift.
-- **Error strip**: top 3 error messages with counts and last-seen; empty state when clean.
-- **Quiet-hours banner** when schedule is currently silencing playback (uses existing `isQuietHoursNow`), so admins know PLAYING=SCHEDULED-OFF is intentional.
-- Reuse `--brand-*` tokens, uppercase mono labels matching the rest of admin. No new colors invented.
+### 4. Hardened AudioContext (`audio-reactive.ts`)
+- If `new AudioContext()` throws (iOS lockdown / older Safari), set an internal `blocked=true` flag and expose `isAudioBlocked()`. `getLevels()` returns zero without touching a null analyser (already does — keep).
+- On `createMediaElementSource` throw when the element already has a source in the WeakMap, reuse the cached node (already works) — but when the *context* is different (e.g. after a suspend/close cycle), rebuild the chain instead of leaving analyser=null.
+- Add `detachAudio(el)` for preview unmount (`pause + src="" + disconnect source cleanly`).
 
-### 5. Resilience hardening in `BackgroundSong.tsx`
-- Add `AbortController` around fetch-based checks so a page unload cannot leak.
-- Handle `MediaError` code 4 (SRC_NOT_SUPPORTED) by switching to `audio/mpeg` fallback then giving up gracefully (not retrying forever).
-- Respect `prefers-reduced-motion` for reactive analyser only, keep audio playing.
-- Guard against `AudioContext` failure on iOS Safari — surface `blocked` status instead of throwing.
+### 5. Adaptive quality guard (`LiveBackground.tsx`)
+- Rolling 60-frame fps sample already exists via `noteFrame`. Add a lightweight quality controller:
+  - fps < 30 for 3s → drop to 2 layers per beam (currently 4) and halve `beamsPerBand`
+  - fps < 20 for 3s → freeze bob, keep only base line
+  - fps recovers > 50 for 5s → restore
+- Store level in a ref; no re-render.
 
-### 6. Deduplication & rate limits
-- Heartbeat endpoint: per-IP 1 request / 10s (leaky bucket in `job_runs`-style memory table `bgs_heartbeat_rate` or reuse existing `activation_attempts` pattern — pick lighter option: in-memory `Map` per worker + `X-Forwarded-For` sample cap of 500/min global).
-- Drop payloads if body > 1 KB.
+### 6. FPS meter accuracy (`audio-reactive.ts` + admin)
+- When `document.hidden` or `reduced-motion` throttled: `noteFrame` skips FPS averaging; getter returns last "active" fps and a flag. Admin card labels it "PAUSED (hidden)" or "REDUCED-MOTION" instead of showing 6/8.
 
-### 7. Verification (deep, one by one)
-- Playwright script `scripts/bgs-status-e2e.py` covering: enabled+song present → LIVE, toggled off → OFF within 3s, delete song → DOWN, quiet-hours active → SCHEDULED-OFF, force 404 on audio → DEGRADED and error strip populated, autoplay blocked (Chromium `--autoplay-policy=user-required`) → MUTED-ONLY then LIVE after synthetic click.
-- Build + typecheck + `bunx tsgo --noEmit`.
+### 7. Skip analyser reads when reactive off (`audio-reactive.ts`)
+- Already short-circuits when `enabled=false`. Also short-circuit when `attachedEl.paused` — avoids one FFT copy per frame per visitor with reactive-on but paused audio. Big deal at 2000 concurrent tabs.
 
-## Not doing (explicitly rejected as low-value)
-- Per-user playback history (privacy + noise).
-- Waveform preview in admin (visual bloat, no operational value).
-- Client-side crossfade between tracks (only one background song supported).
-- Volume master slider in admin (browser autoplay policy overrides it anyway).
+### 8. Reactive telemetry (piggyback existing heartbeat)
+- Extend the `bgs-heartbeat` payload built last turn with `reactive: boolean`, `reactiveFps: number` (rounded), `analyserSilent: boolean`, `audioBlocked: boolean`. No new endpoint, no new table columns — write into the existing `error` JSON slot only when non-nominal (silent/blocked). Purely additive on the client; server just accepts extra fields.
+- Admin card gains a compact "Reactive engine" strip below the master pill: Median FPS · Silent-fallback % · Blocked-context % · Reactive-on % (query already refetches every 2s).
+
+### 9. Admin preview isolation (`admin.background-song.tsx`)
+- Preview `<audio>` element stays on the shared context (documented), but on unmount call the new `detachAudio(el)` so leaving the page frees the source and stops analyser reads.
+- Respect `prefers-reduced-motion` in preview: show "Reduced-motion active — meters paused" instead of running the analyser loop.
+
+### 10. UI polish (only what improves signal, no bloat)
+- The "REACTIVE / STATIC" pill picks up a third state "BLOCKED" when `audioBlocked` is true (iOS lockdown) and a fourth "FALLBACK" when silence auto-disabled. Same admin brand tokens, no new palette.
+- Slider rows show a tiny live "×N applied" bubble that pulses when the value differs from the last saved value, so admins see local-vs-saved clearly.
+
+## Not doing (explicitly rejected)
+- Per-visitor waveform recording (privacy + bandwidth).
+- Additional visualizers / presets (visual bloat, no operational value).
+- WebGL/Shader rewrite (not warranted; 2D canvas is fine with the adaptive guard).
+- Server-side FFT (unnecessary; browsers do this natively).
 
 ## Files touched
-- `src/routes/api/public/hooks/bgs-heartbeat.ts` (new)
-- `src/lib/background-song.functions.ts` (add `getPlaybackTelemetry`)
-- `src/lib/background-song-health.ts` (backoff cap, type additions)
-- `src/components/BackgroundSong.tsx` (beacon, signed-URL refresh, backoff, error handling)
-- `src/routes/admin.background-song.tsx` (new status card + tiles + error strip)
-- `scripts/bgs-status-e2e.py` (new)
-- Migration: extend `background_song_events` columns if missing.
+- `src/lib/audio-reactive.ts` — blocked flag, detach, paused-skip, FPS accuracy.
+- `src/components/LiveBackground.tsx` — read sensitivity, adaptive quality guard.
+- `src/components/BackgroundSong.tsx` — silence recovery, heartbeat payload extension.
+- `src/routes/admin.background-song.tsx` — live slider wiring, preview detach, reactive telemetry strip, pill states.
+
+## Verification (deep, one by one)
+- Slider drag on `/admin/background-song` → beams visibly change in Live Preview within the same frame; visitors on `/` see the same change on next `getLevels()` frame.
+- Mute the current track → after ~3s the pill shows FALLBACK; unmute → returns to REACTIVE within 10s cooldown.
+- iOS Safari private mode (AudioContext blocked) → pill shows BLOCKED, no console errors, no retry storm.
+- Chromium `--enable-features=LowEndDeviceMode` throttled 4x CPU → adaptive guard drops layers within 3s; fps recovers to 50+.
+- Playwright script `scripts/reactive-engine-e2e.py` covering the four states above + heartbeat payload assertion.
 
 Approve to start implementation.

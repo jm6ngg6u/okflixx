@@ -19,6 +19,7 @@ import {
   getPlaybackTelemetry,
 } from "@/lib/background-song.functions";
 import { isQuietHours } from "@/lib/quiet-hours";
+import { setIntensity as setEngineIntensity, setSensitivity as setEngineSensitivity } from "@/lib/audio-reactive";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -352,7 +353,7 @@ function BackgroundSongPage() {
             hint="Overall glow / brightness multiplier applied to reactive layers."
             value={intensity}
             display={`${intensity.toFixed(2)}×`}
-            onChange={setIntensity}
+            onChange={(v) => { setIntensity(v); setEngineIntensity(v); }}
             onCommit={(v) => intensityMut.mutate(v)}
             saving={intensityMut.isPending}
           />
@@ -362,7 +363,7 @@ function BackgroundSongPage() {
             hint="How strongly the analyser reacts to bass and volume peaks."
             value={sensitivity}
             display={`${sensitivity.toFixed(2)}×`}
-            onChange={setSensitivity}
+            onChange={(v) => { setSensitivity(v); setEngineSensitivity(v); }}
             onCommit={(v) => sensitivityMut.mutate(v)}
             saving={sensitivityMut.isPending}
           />
