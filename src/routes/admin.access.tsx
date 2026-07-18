@@ -325,86 +325,8 @@ function AccessAdminPage() {
       )}
 
 
-      {/* CAPTCHA CONFIG */}
-      {c?.captchaRequired && (
-        <Section title="Captcha configuration" tone="amber" icon={<ShieldAlert className="w-4 h-4" />}>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <Label className="label-caps mb-2 block">Provider</Label>
-              <Select
-                value={c.captchaProvider}
-                onValueChange={(v) =>
-                  saveSettings({ data: { captchaProvider: v as any } }).then(() => {
-                    toast.success(`Provider set to ${v}`);
-                    qc.invalidateQueries({ queryKey: ["gate-config"] });
-                  })
-                }
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="turnstile">Cloudflare Turnstile</SelectItem>
-                  <SelectItem value="hcaptcha">hCaptcha</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="md:col-span-2">
-              <Label className="label-caps mb-2 block">Site key (public)</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={siteKeyDraft ?? savedSiteKey}
-                  placeholder="0x4AAAA… or hCaptcha UUID"
-                  onChange={(e) => setSiteKeyDraft(e.target.value)}
-                />
-                <Button
-                  variant={siteKeyDirty ? "default" : "outline"}
-                  disabled={!siteKeyDirty}
-                  onClick={() => {
-                    const v = (siteKeyDraft ?? "").trim();
-                    saveSettings({ data: { captchaSiteKey: v } }).then(() => {
-                      toast.success("Site key saved");
-                      setSiteKeyDraft(null);
-                      qc.invalidateQueries({ queryKey: ["gate-config"] });
-                    });
-                  }}
-                >
-                  <Save className="w-4 h-4 mr-1.5" /> Save
-                </Button>
-              </div>
-              <p className="text-[11px] text-white/40 mt-2 leading-relaxed">
-                Secret is stored in <code className="text-white/70">HCAPTCHA_SECRET</code> / <code className="text-white/70">TURNSTILE_SECRET</code> and is never exposed to the browser.
-              </p>
-            </div>
-          </div>
-          {providerMismatch && (
-            <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-[12px] text-red-100 flex items-start gap-2">
-              <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-300" />
-              <div>
-                <div className="font-medium">Provider / site-key mismatch</div>
-                <div className="text-red-200/80 mt-1">
-                  This site key looks like a <b>{providerMismatch}</b> key but the selected provider is <b>{c.captchaProvider}</b>. Activations will fail until they match.
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* Live test */}
-          <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-3 flex flex-wrap items-center gap-3">
-            <Activity className="w-4 h-4 text-[#ff8a90]" />
-            <div className="text-[11px] font-mono uppercase tracking-widest text-white/60">Live handshake test</div>
-            <Button size="sm" variant="secondary" disabled={testMut.isPending} onClick={() => testMut.mutate()}>
-              {testMut.isPending
-                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing…</>
-                : <><Play className="w-3.5 h-3.5 mr-1.5" /> Test now</>}
-            </Button>
-            {testResult && (
-              <div className={`text-[11px] flex items-center gap-1.5 ${testResult.ok ? "text-emerald-300" : "text-red-300"}`}>
-                {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                <span>{testResult.summary}</span>
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
+
 
       {/* STATS STRIP */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
