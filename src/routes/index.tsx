@@ -6,7 +6,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
-import { submitActivation } from "@/lib/activate.functions";
+import { submitActivation, getSuccessActivationCount } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
 import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,6 +115,16 @@ function HomePage() {
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
+  const fetchSuccessCount = useServerFn(getSuccessActivationCount);
+
+  // Live successful-activation counter — polled every 2s. Counts ONLY result='success'.
+  const successCount = useQuery({
+    queryKey: ["public-activation-success-count"],
+    queryFn: () => fetchSuccessCount(),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: false,
+    staleTime: 1_000,
+  });
 
 
   // Realtime push on app_settings — banner flips within ~200ms.
@@ -328,6 +338,8 @@ function HomePage() {
           redirectUrl: result.redirectUrl,
           account: result.account,
         });
+        // Instant bump of the live counter — no waiting for the 2s poll.
+        qc.invalidateQueries({ queryKey: ["public-activation-success-count"] });
       } else if (result.error === "invalid_code") {
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
       } else if (result.error === "maintenance") {
@@ -795,7 +807,17 @@ function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
             <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Reviews</div>
-            <h2 className="font-display text-4xl md:text-6xl">4.9 / 5 · <span className="text-live">82,000+</span> activations</h2>
+            <h2 className="font-display text-4xl md:text-6xl">
+              4.9 / 5 ·{" "}
+              <span className="text-live tabular-nums inline-flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
+                </span>
+                {(successCount.data?.count ?? 0).toLocaleString()}
+              </span>{" "}
+              successful activations
+            </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
