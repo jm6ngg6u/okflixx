@@ -41,41 +41,26 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
 
   const [now, setNow] = useState(() => Date.now());
 
-  // Session identity + staff bypass check
+  // Session identity
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       const u = data?.user;
       if (!mounted) return;
-      if (!u) { setUser(null); setIsStaff(false); return; }
+      if (!u) { setUser(null); return; }
       const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
       setUser({
         email: u.email ?? null,
         avatar: (meta.avatar_url as string) ?? (meta.picture as string) ?? null,
         name: (meta.full_name as string) ?? (meta.name as string) ?? null,
       });
-      // RLS allows a user to read their own roles; failure = not staff.
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.id);
-      const staff = !!roles?.some((r: any) => r.role === "admin" || r.role === "moderator");
-      if (mounted) setIsStaff(staff);
-    })();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      // Re-run identity check on any auth transition
-      supabase.auth.getUser().then(({ data }) => {
-        const u = data?.user ?? null;
-        if (!mounted) return;
-        if (!u) { setUser(null); setIsStaff(false); return; }
-        const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
-        setUser({
-          email: u.email ?? null,
-          avatar: (meta.avatar_url as string) ?? (meta.picture as string) ?? null,
-          name: (meta.full_name as string) ?? (meta.name as string) ?? null,
-        });
-      });
-    });
+    };
+    loadUser();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => { loadUser(); });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
+
 
   // Countdown ticker (only relevant when an end time is set)
   useEffect(() => {
