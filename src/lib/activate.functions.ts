@@ -127,8 +127,15 @@ export const submitActivation = createServerFn({ method: "POST" })
       "@/lib/worker.server"
     );
 
-    // 3. Maintenance banner.
-    if ((await getSetting(supabaseAdmin, "maintenance_enabled", "0")) === "1") {
+    // 3. Maintenance banner — manual switch OR scheduled window.
+    const manualMaint = (await getSetting(supabaseAdmin, "maintenance_enabled", "0")) === "1";
+    const startsRaw = await getSetting(supabaseAdmin, "maintenance_starts_at", "");
+    const endsRaw = await getSetting(supabaseAdmin, "maintenance_ends_at", "");
+    const startsAt = startsRaw ? Date.parse(startsRaw) : NaN;
+    const endsAt = endsRaw ? Date.parse(endsRaw) : NaN;
+    const nowMs = Date.now();
+    const scheduledMaint = !isNaN(startsAt) && !isNaN(endsAt) && nowMs >= startsAt && nowMs < endsAt;
+    if (manualMaint || scheduledMaint) {
       const message = await getSetting(
         supabaseAdmin,
         "maintenance_message",
@@ -144,6 +151,7 @@ export const submitActivation = createServerFn({ method: "POST" })
       });
       return { ok: false, error: "maintenance", message };
     }
+
 
     // 3b. Access-gate checks (admin-toggleable: login / access key).
     const loginRequired = (await getSetting(supabaseAdmin, "login_required", "0")) === "1";
