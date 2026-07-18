@@ -180,31 +180,34 @@ function LoginPage() {
         </section>
 
         {/* RIGHT — Sign-in card */}
-        <section className="flex items-center justify-center">
+        <section id="signin-card" className="flex items-center justify-center" aria-labelledby="signin-heading">
           <div className="relative w-full max-w-md">
             {/* Ember ring behind card */}
-            <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-[#ff2a3a]/40 via-white/5 to-transparent opacity-70 blur-[1px]" />
-            <div className="relative rounded-2xl border border-white/10 bg-[#0b0b0d]/85 p-8 backdrop-blur-xl shadow-[0_40px_120px_-30px_rgba(255,42,58,0.35)]">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-[#ff2a3a]/80 font-semibold">
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-[#ff2a3a]/40 via-white/5 to-transparent opacity-70 blur-[1px]" aria-hidden="true" />
+            <div className="relative rounded-2xl border border-white/10 bg-[#0b0b0d]/90 p-6 sm:p-8 backdrop-blur-xl shadow-[0_40px_120px_-30px_rgba(255,42,58,0.35)]">
+              <div className="text-[11px] uppercase tracking-[0.28em] text-[#ff5a68] font-semibold">
                 Wield the trident
               </div>
               <h2
-                className="mt-3 text-3xl font-bold tracking-tight text-white"
+                id="signin-heading"
+                className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-white"
                 style={{ fontFamily: "var(--brand-font-display, Sora), sans-serif" }}
               >
                 Sign in to continue
               </h2>
-              <p className="mt-2 text-sm text-white/55">
+              <p className="mt-2 text-sm text-white/70">
                 One click with Google. No password, no forms — just fire.
               </p>
 
               <button
                 onClick={handleGoogle}
                 disabled={busy}
-                className="group relative mt-8 flex h-13 w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-white px-5 py-3.5 font-medium text-[#0b0b0d] transition-all hover:shadow-[0_0_40px_-4px_rgba(255,255,255,0.35)] disabled:opacity-60 disabled:cursor-not-allowed"
+                aria-busy={busy}
+                aria-label={busy ? "Opening Google sign-in" : "Continue with Google"}
+                className="group relative mt-7 sm:mt-8 flex min-h-11 w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-white px-5 py-3.5 font-medium text-[#0b0b0d] transition-all hover:shadow-[0_0_40px_-4px_rgba(255,255,255,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0b0d] disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#ff2a3a]/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                <svg className="relative h-5 w-5" viewBox="0 0 24 24">
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#ff2a3a]/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" aria-hidden="true" />
+                <svg className="relative h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -213,8 +216,9 @@ function LoginPage() {
                 <span className="relative text-[15px] font-semibold tracking-tight">
                   {busy ? "Opening Google…" : "Continue with Google"}
                 </span>
-                <ArrowUpRight className="relative h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <ArrowUpRight className="relative h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
               </button>
+
 
               {/* Divider */}
               <div className="my-7 flex items-center gap-3">
