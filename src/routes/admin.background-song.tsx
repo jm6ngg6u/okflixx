@@ -813,6 +813,8 @@ function SliderRow({
 // Live diagnostics — self-contained analyser on an admin-only preview element
 // so admins can verify the reactive engine responds to the current track.
 // -----------------------------------------------------------------------------
+type DiagState = "idle" | "warming" | "receiving" | "silent" | "hidden" | "error";
+
 function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensity: number; sensitivity: number }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -821,19 +823,41 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
   const dataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const framesRef = useRef({ frames: 0, sampleAt: 0 });
+  const silenceStartRef = useRef(0);
+  const attachedUrlRef = useRef<string | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [levels, setLevels] = useState({ bass: 0, mid: 0, treble: 0, level: 0 });
-  const [fps, setFps] = useState(60);
-  const [silent, setSilent] = useState<null | boolean>(null);
+  const [fps, setFps] = useState(0);
+  const [state, setState] = useState<DiagState>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [muted, setMuted] = useState(true);
+  const [volume, setVolume] = useState(0.6);
+  const [time, setTime] = useState({ cur: 0, dur: 0 });
+
+  const stop = (nextState: DiagState = "idle") => {
+    const el = audioRef.current;
+    try { if (el && !el.paused) el.pause(); } catch { /* noop */ }
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    framesRef.current = { frames: 0, sampleAt: 0 };
+    silenceStartRef.current = 0;
+    setPlaying(false);
+    setLevels({ bass: 0, mid: 0, treble: 0, level: 0 });
+    setFps(0);
+    setState(nextState);
+  };
 
   const start = async () => {
     const el = audioRef.current;
     if (!el) return;
+    setErrorMsg(null);
+    setState("warming");
     try {
       const AC = window.AudioContext || (window as any).webkitAudioContext;
       if (!ctxRef.current) ctxRef.current = new AC();
       if (ctxRef.current.state === "suspended") await ctxRef.current.resume();
+
       if (!sourceRef.current) {
         sourceRef.current = ctxRef.current.createMediaElementSource(el);
         analyserRef.current = ctxRef.current.createAnalyser();
@@ -842,14 +866,16 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
         dataRef.current = new Uint8Array(new ArrayBuffer(analyserRef.current.frequencyBinCount));
         sourceRef.current.connect(analyserRef.current);
         analyserRef.current.connect(ctxRef.current.destination);
+        attachedUrlRef.current = url;
       }
 
-      // Ensure the media is loaded before play() so the browser doesn't abort
-      // the play request with "interrupted by a new load request".
+      el.muted = muted;
+      el.volume = volume;
+
       if (el.readyState < 2) {
         await new Promise<void>((resolve, reject) => {
           const onReady = () => { cleanup(); resolve(); };
-          const onError = () => { cleanup(); reject(new Error("Failed to load track")); };
+          const onError = () => { cleanup(); reject(new Error("Failed to load track (check upload / CORS)")); };
           const cleanup = () => {
             el.removeEventListener("loadeddata", onReady);
             el.removeEventListener("canplay", onReady);
@@ -865,14 +891,18 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
       try {
         await el.play();
       } catch (err: any) {
-        // Swallow benign AbortError caused by rapid load/play cycling.
         if (err?.name !== "AbortError") throw err;
       }
       setPlaying(true);
-      let silenceStart = 0;
+
       const loop = () => {
-        const analyser = analyserRef.current, data = dataRef.current;
-        if (!analyser || !data) return;
+        const analyser = analyserRef.current, data = dataRef.current, elm = audioRef.current;
+        if (!analyser || !data || !elm) return;
+        if (document.hidden) {
+          setState("hidden");
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
         analyser.getByteFrequencyData(data);
         const bins = data.length;
         const bEnd = Math.max(1, Math.floor(bins * 0.08));
@@ -887,44 +917,85 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
         const treble = Math.min(1, (t / ((bins - mEnd) * 255)) * s);
         const level = Math.min(1, bass * 0.55 + mid * 0.3 + treble * 0.15);
         setLevels({ bass, mid, treble, level });
+        setTime({ cur: elm.currentTime || 0, dur: isFinite(elm.duration) ? elm.duration : 0 });
 
         const now = performance.now();
         const fst = framesRef.current;
         if (!fst.sampleAt) fst.sampleAt = now;
         fst.frames++;
-        if (now - fst.sampleAt >= 1000) {
+        if (now - fst.sampleAt >= 500) {
           setFps((fst.frames * 1000) / (now - fst.sampleAt));
           fst.frames = 0; fst.sampleAt = now;
         }
 
-        const playing2 = !el.paused && !el.muted && el.volume > 0;
-        if (playing2 && level < 0.002 && bass < 0.002) {
-          if (!silenceStart) silenceStart = now;
-          else if (now - silenceStart > 3000) setSilent(true);
-        } else if (level > 0.01 || bass > 0.01) {
-          silenceStart = 0; setSilent(false);
+        const audible = !elm.paused && !elm.muted && elm.volume > 0;
+        // Bass/mid alone can be near-zero on quiet passages; consider any spectral energy.
+        const anyEnergy = level > 0.008 || bass > 0.008 || treble > 0.008;
+        if (audible && !anyEnergy) {
+          if (!silenceStartRef.current) silenceStartRef.current = now;
+          else if (now - silenceStartRef.current > 2500) setState("silent");
+        } else if (anyEnergy) {
+          silenceStartRef.current = 0;
+          setState("receiving");
         }
         rafRef.current = requestAnimationFrame(loop);
       };
       rafRef.current = requestAnimationFrame(loop);
     } catch (e: any) {
-      toast.error("Couldn't start diagnostics", { description: e?.message ?? "AudioContext blocked" });
+      const msg = e?.message ?? "AudioContext blocked";
+      setErrorMsg(msg);
+      setState("error");
+      toast.error("Couldn't start diagnostics", { description: msg });
+      stop("error");
     }
   };
 
+  // Stop cleanly if the underlying track URL changes.
+  useEffect(() => {
+    if (attachedUrlRef.current && attachedUrlRef.current !== url && playing) {
+      stop("idle");
+      toast.message("Track changed — restart diagnostics to re-analyse.");
+    }
+    attachedUrlRef.current = url;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
-  const stop = () => {
-    const el = audioRef.current;
-    if (el && !el.paused) el.pause();
-    setPlaying(false);
-    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-  };
+  // Live-sync mute/volume onto the element.
+  useEffect(() => { const el = audioRef.current; if (el) { el.muted = muted; el.volume = volume; } }, [muted, volume]);
 
+  // Recover from tab-hidden state as soon as the tab is visible again.
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden && playing) setState((s) => (s === "hidden" ? "warming" : s)); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [playing]);
+
+  // Full teardown on unmount — cancel rAF, pause element, close context.
   useEffect(() => () => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     try { audioRef.current?.pause(); } catch { /* noop */ }
+    try { sourceRef.current?.disconnect(); } catch { /* noop */ }
+    try { analyserRef.current?.disconnect(); } catch { /* noop */ }
+    try { ctxRef.current?.close(); } catch { /* noop */ }
+    sourceRef.current = null; analyserRef.current = null; ctxRef.current = null;
   }, []);
+
+  const stateChip = (() => {
+    switch (state) {
+      case "receiving": return { label: "RECEIVING AUDIO", tone: "text-emerald-300 border-emerald-400/30 bg-emerald-500/10" };
+      case "silent":    return { label: "SILENT · CHECK CORS", tone: "text-amber-300 border-amber-400/30 bg-amber-500/10" };
+      case "warming":   return { label: "WARMING UP…", tone: "text-white/70 border-white/15 bg-white/5" };
+      case "hidden":    return { label: "TAB HIDDEN · PAUSED", tone: "text-white/60 border-white/10 bg-white/5" };
+      case "error":     return { label: "ERROR", tone: "text-[#ff2a3a] border-[#ff2a3a]/40 bg-[#ff2a3a]/10" };
+      default:          return { label: "IDLE", tone: "text-white/60 border-white/10 bg-white/[0.03]" };
+    }
+  })();
+
+  const fmt = (sec: number) => {
+    if (!isFinite(sec) || sec <= 0) return "0:00";
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   return (
     <div className="glass p-5">
@@ -932,16 +1003,29 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
         <div className="flex items-start gap-3">
           <Sliders className="w-4 h-4 text-[#ff2a3a] mt-1" />
           <div>
-            <div className="font-display text-lg leading-tight">Live diagnostics</div>
+            <div className="font-display text-lg leading-tight uppercase tracking-wide">Live diagnostics</div>
             <div className="text-xs text-white/50 mt-1 max-w-xl">
               Runs a private analyser on your admin session so you can verify the current track drives real bass/mid/level data.
-              Volume is muted to your device by default — unmute the preview element to hear it locally.
+              Muted to your device by default — toggle Unmute to hear it locally.
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="border-white/15 bg-white/5" onClick={playing ? stop : start}>
+          <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-1 rounded-md border ${stateChip.tone}`}>
+            {stateChip.label}
+          </span>
+          <Button size="sm" variant="outline" className="border-white/15 bg-white/5" onClick={playing ? () => stop("idle") : start}>
             {playing ? <><Pause className="w-3.5 h-3.5 mr-1.5" /> Stop</> : <><Play className="w-3.5 h-3.5 mr-1.5" /> Start</>}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/15 bg-white/5"
+            onClick={() => setMuted((m) => !m)}
+            disabled={!playing}
+            title={muted ? "Unmute local preview" : "Mute local preview"}
+          >
+            {muted ? "Unmute" : "Mute"}
           </Button>
         </div>
       </div>
@@ -958,7 +1042,13 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
       <div className="mt-4 grid sm:grid-cols-3 gap-3 text-xs">
         <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
           <div className="font-mono uppercase tracking-widest text-white/40">Reactive FPS</div>
-          <div className="font-display text-2xl mt-1">{fps.toFixed(0)}<span className="text-white/40 text-sm"> / 60</span></div>
+          <div className="font-display text-2xl mt-1">
+            {playing ? fps.toFixed(0) : "—"}
+            <span className="text-white/40 text-sm"> / 60</span>
+            {playing && fps > 0 && fps < 40 && (
+              <span className="ml-2 text-[10px] font-mono uppercase tracking-widest text-amber-300">low</span>
+            )}
+          </div>
         </div>
         <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
           <div className="font-mono uppercase tracking-widest text-white/40">Intensity applied</div>
@@ -966,11 +1056,48 @@ function LiveDiagnostics({ url, intensity, sensitivity }: { url: string; intensi
         </div>
         <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
           <div className="font-mono uppercase tracking-widest text-white/40">Analyser state</div>
-          <div className={`font-display text-lg mt-1 ${silent ? "text-amber-300" : silent === false ? "text-emerald-300" : "text-white/60"}`}>
-            {silent === null ? (playing ? "Warming up…" : "Idle") : silent ? "Silent (CORS?)" : "Receiving audio"}
+          <div
+            className={`font-display text-lg mt-1 uppercase tracking-wide ${
+              state === "receiving" ? "text-emerald-300"
+              : state === "silent" ? "text-amber-300"
+              : state === "error" ? "text-[#ff2a3a]"
+              : "text-white/70"
+            }`}
+          >
+            {stateChip.label.replace(" · CHECK CORS", "").replace(" · PAUSED", "")}
           </div>
+          {errorMsg && state === "error" && (
+            <div className="mt-1 text-[10px] font-mono text-[#ff2a3a]/80 break-words">{errorMsg}</div>
+          )}
         </div>
       </div>
+
+      {playing && (
+        <div className="mt-4 rounded-md border border-white/10 bg-white/[0.02] p-3">
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-white/40">
+            <span>Local preview</span>
+            <span>{fmt(time.cur)} / {fmt(time.dur)}</span>
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div
+              className="h-full bg-[#ff2a3a]/70 transition-[width] duration-150"
+              style={{ width: `${time.dur > 0 ? Math.min(100, (time.cur / time.dur) * 100) : 0}%` }}
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-white/40 w-14">Volume</span>
+            <Slider
+              value={[Math.round(volume * 100)]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={(vs) => setVolume(Math.max(0, Math.min(1, vs[0] / 100)))}
+              className="flex-1"
+            />
+            <span className="text-[10px] font-mono text-white/50 w-10 text-right">{Math.round(volume * 100)}%</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
