@@ -6,7 +6,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
-import { submitActivation, getSuccessActivationCount } from "@/lib/activate.functions";
+import { submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
 import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
