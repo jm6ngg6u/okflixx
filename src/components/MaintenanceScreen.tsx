@@ -39,6 +39,7 @@ export function MaintenanceView({
   b,
   message,
   remainingLabel,
+  endsAt,
   channels,
   user,
   signingOut,
@@ -48,6 +49,7 @@ export function MaintenanceView({
   b: BrandingMap;
   message: string;
   remainingLabel: string | null;
+  endsAt?: string | null;
   channels: Contact[];
   user: UserChip | null;
   signingOut?: boolean;
@@ -60,8 +62,33 @@ export function MaintenanceView({
   const flash = b.maint_flash === "1";
   const shine = b.maint_shine === "1";
   const wordmarkGlow = b.maint_wordmark_glow === "1";
+  const perScale = (k: keyof BrandingMap, fallback = "100") =>
+    Math.max(60, Math.min(160, parseInt((b as any)[k] ?? fallback, 10) || 100)) / 100;
+  const sz = {
+    status: perScale("maint_size_status" as keyof BrandingMap),
+    wordmark: perScale("maint_size_wordmark" as keyof BrandingMap),
+    headline: perScale("maint_size_headline" as keyof BrandingMap),
+    message: perScale("maint_size_message" as keyof BrandingMap),
+    countdown: perScale("maint_size_countdown" as keyof BrandingMap),
+    contacts: perScale("maint_size_contacts" as keyof BrandingMap),
+    footer: perScale("maint_size_footer" as keyof BrandingMap),
+  };
 
-  const fx = (px: number) => `${px * scale}px`;
+  const fx = (px: number, elem: keyof typeof sz = "message") => `${px * scale * sz[elem]}px`;
+
+  // Formatted ends-at line (timezone aware).
+  let endsFormatted: string | null = null;
+  if (endsAt) {
+    try {
+      const tz = (b as any).maint_timezone || "UTC";
+      const hour12 = ((b as any).maint_time_format || "24h") === "12h";
+      endsFormatted = new Intl.DateTimeFormat(undefined, {
+        timeZone: tz, hour12,
+        weekday: "short", month: "short", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+      }).format(new Date(endsAt));
+    } catch { endsFormatted = null; }
+  }
 
   const rootStyle: CSSProperties = {
     // Consumed by keyframes in styles.css.
@@ -111,7 +138,7 @@ export function MaintenanceView({
         {/* Status pill */}
         <div
           className="inline-flex items-center gap-2 rounded-full border border-[color:var(--brand-accent)]/40 bg-[color:var(--brand-accent)]/10 px-3 py-1.5 font-mono uppercase tracking-[0.25em] text-[color:var(--brand-accent)]"
-          style={{ fontSize: fx(10.5) }}
+          style={{ fontSize: fx(10.5, "status") }}
         >
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[color:var(--brand-accent)] opacity-75" />
@@ -148,7 +175,7 @@ export function MaintenanceView({
           style={{
             letterSpacing: "var(--brand-letter-spacing)",
             marginTop: fx(20),
-            fontSize: fx(compact ? 32 : 56),
+            fontSize: fx(compact ? 32 : 56, "wordmark"),
           }}
         >
           {b.name_prefix}
@@ -158,7 +185,7 @@ export function MaintenanceView({
         {/* Headline */}
         <h2
           className="font-[family:var(--brand-font-display)] font-semibold text-white/95"
-          style={{ marginTop: fx(24), fontSize: fx(compact ? 18 : 26) }}
+          style={{ marginTop: fx(24), fontSize: fx(compact ? 18 : 26, "headline") }}
         >
           {b.maint_headline}
         </h2>
@@ -166,33 +193,42 @@ export function MaintenanceView({
         {/* Admin message */}
         <p
           className="max-w-xl leading-relaxed text-white/70"
-          style={{ marginTop: fx(14), fontSize: fx(compact ? 12 : 15) }}
+          style={{ marginTop: fx(14), fontSize: fx(compact ? 12 : 15, "message") }}
         >
           {(message || b.maint_message).trim()}
         </p>
 
-        {/* Countdown */}
-        {remainingLabel && (
+        {/* Countdown + formatted return time */}
+        {(remainingLabel || endsFormatted) && (
           <div
-            className="inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
+            className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
             style={{ marginTop: fx(28), padding: `${fx(10)} ${fx(18)}` }}
           >
-            <span className="font-mono uppercase tracking-[0.25em] text-white/50" style={{ fontSize: fx(10.5) }}>
-              {b.maint_countdown_label}
-            </span>
-            <span
-              className="font-[family:var(--brand-font-display)] font-bold text-white tabular-nums"
-              style={{ fontSize: fx(compact ? 14 : 18) }}
-            >
-              {remainingLabel}
-            </span>
+            {remainingLabel && (
+              <div className="flex items-center gap-3">
+                <span className="font-mono uppercase tracking-[0.25em] text-white/50" style={{ fontSize: fx(10.5, "countdown") }}>
+                  {b.maint_countdown_label}
+                </span>
+                <span
+                  className="font-[family:var(--brand-font-display)] font-bold text-white tabular-nums"
+                  style={{ fontSize: fx(compact ? 14 : 18, "countdown") }}
+                >
+                  {remainingLabel}
+                </span>
+              </div>
+            )}
+            {endsFormatted && (
+              <span className="font-mono text-white/40 tabular-nums" style={{ fontSize: fx(10, "countdown") }}>
+                {endsFormatted}
+              </span>
+            )}
           </div>
         )}
 
         {/* Contact channels */}
         {channels.length > 0 && (
           <div className="w-full max-w-xl" style={{ marginTop: fx(compact ? 20 : 36) }}>
-            <div className="font-mono uppercase tracking-[0.25em] text-white/40" style={{ fontSize: fx(10.5) }}>
+            <div className="font-mono uppercase tracking-[0.25em] text-white/40" style={{ fontSize: fx(10.5, "contacts") }}>
               {b.maint_contacts_label}
             </div>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -207,7 +243,7 @@ export function MaintenanceView({
                     className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-white/75 hover:text-white hover:border-[color:var(--brand-accent)]/50 hover:bg-[color:var(--brand-accent)]/[0.08] transition"
                   >
                     <Icon className="h-3.5 w-3.5" strokeWidth={2} />
-                    <span className="font-mono uppercase tracking-widest" style={{ fontSize: fx(11) }}>
+                    <span className="font-mono uppercase tracking-widest" style={{ fontSize: fx(11, "contacts") }}>
                       {c.name || c.kind}
                     </span>
                   </a>
@@ -219,7 +255,7 @@ export function MaintenanceView({
 
         <div
           className="font-mono uppercase tracking-[0.25em] text-white/30"
-          style={{ marginTop: fx(compact ? 24 : 48), fontSize: fx(10) }}
+          style={{ marginTop: fx(compact ? 24 : 48), fontSize: fx(10, "footer") }}
         >
           {b.footer_legal || "© Emberlord"}
         </div>
@@ -294,6 +330,7 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
         b={b}
         message={message}
         remainingLabel={remainingLabel}
+        endsAt={endsAt}
         channels={channels}
         user={user}
         signingOut={signingOut}

@@ -82,7 +82,18 @@ export const BRANDING_DEFAULTS = {
   maint_shine: "1",         // "1" on / "0" off — logo glow/shine loop
   maint_wordmark_glow: "1", // "1" on / "0" off — wordmark auto glow
   maint_intensity: "70",    // 0..100 — animation strength multiplier
-  maint_font_scale: "100",  // 60..140 — font size scale (%)
+  maint_font_scale: "100",  // 60..140 — global font size scale (%)
+  // Timezone + clock formatting for the countdown / ends-at line.
+  maint_timezone: "UTC",     // IANA
+  maint_time_format: "24h",  // "24h" | "12h"
+  // Per-element size overrides (percent, 60..160). Multiplies with maint_font_scale.
+  maint_size_status: "100",
+  maint_size_wordmark: "100",
+  maint_size_headline: "100",
+  maint_size_message: "100",
+  maint_size_countdown: "100",
+  maint_size_contacts: "100",
+  maint_size_footer: "100",
 };
 
 
@@ -131,6 +142,21 @@ function sanitize(key: BrandingKey, raw: string): string {
   if (key === "maint_font_scale") {
     const n = Math.max(60, Math.min(140, parseInt(v, 10)));
     return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.maint_font_scale;
+  }
+  if (
+    key === "maint_size_status" || key === "maint_size_wordmark" ||
+    key === "maint_size_headline" || key === "maint_size_message" ||
+    key === "maint_size_countdown" || key === "maint_size_contacts" ||
+    key === "maint_size_footer"
+  ) {
+    const n = Math.max(60, Math.min(160, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : "100";
+  }
+  if (key === "maint_time_format") return v === "12h" ? "12h" : "24h";
+  if (key === "maint_timezone") {
+    const s = (v || "").trim();
+    if (!s) return BRANDING_DEFAULTS.maint_timezone;
+    try { new Intl.DateTimeFormat("en", { timeZone: s }); return s; } catch { return BRANDING_DEFAULTS.maint_timezone; }
   }
   if (key === "font_display" || key === "font_body" || key === "font_mono") {
     return (FONT_WHITELIST as readonly string[]).includes(v) ? v : BRANDING_DEFAULTS[key];

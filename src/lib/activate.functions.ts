@@ -141,6 +141,12 @@ export const submitActivation = createServerFn({ method: "POST" })
         "maintenance_message",
         "The service is temporarily unavailable.",
       );
+      const { setResponseStatus, setResponseHeader } = await import("@tanstack/react-start/server");
+      // 503 + no-store so browsers, CDNs and SW caches never persist a
+      // maintenance response and can't flash stale success on refresh.
+      setResponseStatus(503);
+      setResponseHeader("cache-control", "no-store, no-cache, must-revalidate, max-age=0");
+      setResponseHeader("retry-after", "60");
       await supabaseAdmin.from("activation_attempts").insert({
         code,
         result: "maintenance",
