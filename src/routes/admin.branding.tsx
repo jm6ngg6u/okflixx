@@ -644,9 +644,11 @@ function PreviewFrame({
       <div className="p-6 md:p-7">{children}</div>
     </div>
   );
+}
 
 /** Maintenance preview with device (mobile/desktop) + identity (guest/user)
  *  toggles so admins can inspect both breakpoints and both audience states. */
+
 function MaintenancePreviewFrame({ values }: { values: Record<string, string> }) {
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [asUser, setAsUser] = useState(false);
