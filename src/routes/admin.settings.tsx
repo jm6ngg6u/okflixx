@@ -57,7 +57,7 @@ function SettingsPage() {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   // Free-text filter across all setting labels.
   const [filter, setFilter] = useState("");
-  const testWebhookFn = useServerFn(testPoolAlertWebhook);
+  
 
   const fetchRuns = useServerFn(listRecentJobRuns);
 
