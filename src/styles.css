@@ -429,7 +429,6 @@ html, body {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
   border: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-radius: 20px;
 }
 .glass-hover { transition: border-color 0.35s, transform 0.35s, background 0.35s, box-shadow 0.35s; }
@@ -482,11 +481,58 @@ html, body {
 .btn-ghost:active { transform: scale(0.98); }
 
 /* ==== CODE INPUT BOXES ==== */
+.activation-panel {
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018)),
+    rgba(5,5,5,0.18);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(24px) saturate(150%);
+  box-shadow:
+    0 28px 90px -46px rgba(0,0,0,0.95),
+    0 18px 60px -44px rgba(var(--brand-accent-rgb),0.9),
+    inset 0 1px 0 rgba(255,255,255,0.09);
+}
+.activation-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.24), rgba(var(--brand-accent-rgb),0.26), rgba(255,255,255,0.06));
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+.activation-panel > * { position: relative; z-index: 2; }
+.activation-panel-ambient {
+  position: absolute;
+  inset: -35%;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(var(--brand-accent-rgb),0.20), transparent 28%),
+    radial-gradient(circle at 86% 80%, rgba(255,255,255,0.08), transparent 30%);
+  filter: blur(20px);
+  opacity: 0.78;
+}
+.activation-panel-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at 50% 38%, black, transparent 74%);
+}
 .code-frame {
   position: relative;
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(0,0,0,0.55);
+  padding: clamp(10px, 3vw, 16px);
+  border-radius: 20px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
 }
 @property --ring-angle {
   syntax: "<angle>";
@@ -498,7 +544,7 @@ html, body {
   position: absolute; inset: 0;
   border-radius: inherit;
   padding: 1.5px;
-  background: conic-gradient(from var(--ring-angle), #ff2a3a, #ffffff44, #e50914, #7a0410, #ff2a3a);
+  background: conic-gradient(from var(--ring-angle), rgba(var(--brand-accent-rgb),0.85), rgba(255,255,255,0.12), rgba(var(--brand-accent-rgb),0.42), transparent, rgba(var(--brand-accent-rgb),0.85));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
@@ -512,18 +558,18 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: clamp(5px, 1.5vw, 8px);
   flex-wrap: wrap;
 }
 .code-box {
-  width: clamp(32px, 8vw, 46px);
-  height: clamp(44px, 10vw, 58px);
-  background: rgba(255,255,255,0.03);
+  width: clamp(31px, 8vw, 46px);
+  height: clamp(43px, 10vw, 58px);
+  background: rgba(255,255,255,0.045);
   border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 10px;
+  border-radius: 12px;
   color: #fff;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 1.4rem;
+  font-family: var(--brand-font-mono, "JetBrains Mono"), monospace;
+  font-size: clamp(1.05rem, 5vw, 1.4rem);
   font-weight: 600;
   text-align: center;
   outline: none;
@@ -531,20 +577,27 @@ html, body {
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 .code-box.filled {
-  border-color: rgba(229,9,20,0.7);
-  background: rgba(229,9,20,0.08);
-  box-shadow: 0 0 20px rgba(229,9,20,0.35), inset 0 0 12px rgba(229,9,20,0.15);
+  border-color: rgba(var(--brand-accent-rgb),0.7);
+  background: rgba(var(--brand-accent-rgb),0.10);
+  box-shadow: 0 0 20px rgba(var(--brand-accent-rgb),0.30), inset 0 0 12px rgba(var(--brand-accent-rgb),0.13);
 }
 .code-box:focus {
-  border-color: #ff2a3a;
-  background: rgba(229,9,20,0.12);
-  box-shadow: 0 0 0 3px rgba(229,9,20,0.25), 0 0 30px rgba(229,9,20,0.35);
+  border-color: var(--brand-accent);
+  background: rgba(var(--brand-accent-rgb),0.14);
+  box-shadow: 0 0 0 3px rgba(var(--brand-accent-rgb),0.22), 0 0 30px rgba(var(--brand-accent-rgb),0.28);
   transform: translateY(-2px);
 }
 .code-sep {
   color: rgba(255,255,255,0.35);
-  font-family: "JetBrains Mono", monospace;
-  padding: 0 4px;
+  font-family: var(--brand-font-mono, "JetBrains Mono"), monospace;
+  padding: 0 clamp(1px, 1vw, 4px);
+}
+
+@media (max-width: 380px) {
+  .code-frame { padding: 8px; }
+  .code-box { width: 29px; height: 42px; border-radius: 10px; }
+  .code-boxes { gap: 4px; }
+  .code-sep { width: 100%; line-height: 0; opacity: 0; }
 }
 
 /* Animated glowing border ring around a card */

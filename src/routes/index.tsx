@@ -6,7 +6,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
-import { submitActivation } from "@/lib/activate.functions";
+import { getSuccessActivationCount, submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
 import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,16 +118,20 @@ function HomePage() {
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
-  // Note: the "Live TV activations" number in the Reviews section is now fully
-  // admin-editable from the Branding Studio (reviews_count) and is NOT a live
-  // counter. The realtime broadcast + server-side counter are intentionally
-  // removed from the public UI to keep the display stable and admin-controlled.
+  const fetchSuccessCount = useServerFn(getSuccessActivationCount);
+  const qc = useQueryClient();
+  const successCount = useQuery({
+    queryKey: ["success-activation-count"],
+    queryFn: () => fetchSuccessCount(),
+    refetchInterval: 2000,
+    refetchIntervalInBackground: true,
+    staleTime: 1000,
+  });
 
 
 
   // Realtime push on app_settings — banner flips within ~200ms.
   // A 30s poll is retained purely as a safety net for missed events.
-  const qc = useQueryClient();
   const gate = useQuery({
     queryKey: ["public-gate"],
     queryFn: () => fetchGate(),
@@ -159,8 +163,20 @@ function HomePage() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
-  // (Removed) Realtime broadcast for "live activation counter" — the number in
-  // the Reviews section is now static/admin-editable via Branding Studio.
+  // Live activation counter: system-owned, driven only by successful activation records.
+  useEffect(() => {
+    const ch = supabase
+      .channel("activation-success-live")
+      .on("broadcast", { event: "tick" }, () => {
+        qc.setQueryData(["success-activation-count"], (old: any) => {
+          if (!old || typeof old.count !== "number") return old;
+          return { ...old, ok: true, count: old.count + 1 };
+        });
+        qc.invalidateQueries({ queryKey: ["success-activation-count"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
 
   // Auto-tick every 30s so a scheduled window flips on/off in-place without user action.
   useEffect(() => {
@@ -339,7 +355,7 @@ function HomePage() {
           redirectUrl: result.redirectUrl,
           account: result.account,
         });
-        // Live counter removed — the Reviews number is admin-editable, not derived from activations.
+        qc.invalidateQueries({ queryKey: ["success-activation-count"] });
 
       } else if (result.error === "invalid_code") {
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
@@ -505,33 +521,18 @@ function HomePage() {
 
           {/* CODE PANEL — CENTER (system-owned copy, not editable via Branding Studio) */}
           <div id="code-panel" className="reveal mt-8 sm:mt-10 w-full max-w-xl">
-            <div className="relative glass glow-ring-anim p-5 sm:p-8 md:p-10 overflow-hidden rounded-2xl">
-
-              {/* Refined background — layered radial + fine grid, no harsh scanlines */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 rounded-2xl"
-                style={{
-                  background:
-                    "radial-gradient(120% 80% at 0% 0%, rgba(255,42,58,0.10) 0%, transparent 55%), radial-gradient(90% 70% at 100% 100%, rgba(255,138,144,0.06) 0%, transparent 60%), linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.25) 100%)",
-                }}
-              />
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.04] [background-image:linear-gradient(rgba(255,255,255,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:28px_28px]"
-              />
-              <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 h-56 w-56 rounded-full bg-[#ff2a3a]/15 blur-3xl" />
-              <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 h-56 w-56 rounded-full bg-[#ff2a3a]/10 blur-3xl" />
-              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#ff2a3a]/50 to-transparent" />
+            <div className="relative activation-panel p-4 sm:p-6 md:p-8 overflow-hidden">
+              <div aria-hidden className="activation-panel-ambient" />
+              <div aria-hidden className="activation-panel-grid" />
 
               {/* Stage rail — SYSTEM stages, live-driven by input + pipeline state */}
-              <div className="relative flex items-center justify-between mb-6">
-                <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/60">
-                  <span className="text-[#ff8a90]">STEP 01</span>
+              <div className="relative mb-5 sm:mb-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-3 sm:px-4">
+                <div className="min-w-0 text-left font-mono text-[10px] uppercase tracking-[0.24em] text-white/58">
+                  <span className="text-brand-accent">STEP 01</span>
                   <span className="text-white/25 mx-2">/</span>
-                  <span>{codeLen === 0 ? "ACTIVATE" : codeLen < 8 ? `ENTERING · ${codeLen}/8` : submitting ? "LINKING" : "READY"}</span>
+                  <span className="truncate align-baseline">{codeLen === 0 ? "ENTER CODE" : codeLen < 8 ? `TYPING · ${codeLen}/8` : submitting ? "LINKING" : "READY"}</span>
                 </div>
-                <div className="flex items-center gap-1.5" aria-label="Activation stages">
+                <div className="flex shrink-0 items-center gap-1.5" aria-label="Activation stages">
                   {["ENTER", "VERIFY", "LINK"].map((s, i) => {
                     // Deterministic, instant progression:
                     //  ENTER  active as soon as any digit typed
@@ -545,20 +546,28 @@ function HomePage() {
                       <span
                         key={s}
                         title={s}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${active ? "w-6 bg-[#ff2a3a] shadow-[0_0_10px_rgba(255,42,58,0.6)]" : "w-2 bg-white/15"}`}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${active ? "w-7 bg-brand-accent shadow-[0_0_14px_rgba(var(--brand-accent-rgb),0.6)]" : "w-2 bg-white/15"}`}
                       />
                     );
                   })}
                 </div>
               </div>
 
-              <div className="relative">
-                <h3 className="font-display brand-card-title mb-1 tracking-tight">
-                  Enter your <span className="text-shine">TV code</span>
-                </h3>
-                <p className="text-white/50 text-sm mb-6">
-                  Grab the 8-character code shown on your Netflix TV screen. Case doesn't matter.
-                </p>
+              <div className="relative text-left">
+                <div className="mb-5 flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                  <div className="min-w-0">
+                    <h3 className="font-display brand-card-title tracking-tight leading-tight">
+                      Enter your <span className="text-shine">TV code</span>
+                    </h3>
+                    <p className="mt-2 text-white/58 text-sm leading-relaxed">
+                      Type the 8-character code from your TV screen. It updates instantly as you enter each character.
+                    </p>
+                  </div>
+                  <div className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-accent animate-pulse" />
+                    8 characters
+                  </div>
+                </div>
 
                 <CodeInput ref={codeRef} onChange={(filled) => setCodeLen(filled)} />
 
@@ -577,20 +586,20 @@ function HomePage() {
 
               {/* ---- ACCESS GATES ---- only visible for gates admin enabled */}
               {anyGate && (
-                <div className="mt-6">
+                <div className="mt-5 sm:mt-6">
                   {/* Header strip removed per request */}
 
 
-                  <div className="rounded-b-lg border border-white/10 border-t-0 bg-black/20 p-3 space-y-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 sm:p-4 space-y-3 backdrop-blur-md">
 
                   {/* Login gate */}
                   {gate.data?.loginRequired && (
-                    <div className={`rounded-lg border p-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : loginError ? "border-red-500/40 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
-                      <div className="flex items-center gap-3">
+                    <div className={`rounded-xl border p-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : loginError ? "border-red-500/40 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                         <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
-                        <div className="flex-1 text-xs">
+                        <div className="min-w-0 text-xs text-white/78">
                           {authUserId ? (
-                            <>Signed in as <span className="text-white font-mono">{authEmail}</span></>
+                            <>Signed in as <span className="text-white font-mono break-all">{authEmail}</span></>
                           ) : (
                             <>Sign-in required for activation.</>
                           )}
@@ -616,8 +625,8 @@ function HomePage() {
 
                   {/* Access key gate */}
                   {gate.data?.accessKeyRequired && (
-                    <div className={`rounded-lg border p-3 ${sessionToken ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-white/[0.03]"}`}>
-                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
+                    <div className={`rounded-xl border p-3 ${sessionToken ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-white/[0.03]"}`}>
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)] sm:flex sm:items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
                         <KeyRound className="w-3.5 h-3.5 text-[#ff8a90]" />
                         <span>Access key required</span>
                         {sessionToken && (
@@ -631,20 +640,20 @@ function HomePage() {
                           <p className="text-[11px] text-white/45 leading-snug mb-2">
                             Paste the key you received, then press Verify. Session and one-time keys are supported.
                           </p>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <input
                               type="text"
                               value={accessKey}
                               onChange={(e) => { setAccessKey(e.target.value.toUpperCase()); if (keyError) setKeyError(null); }}
                               placeholder="NFX-XXXX-XXXX-XXXX"
-                              className={`flex-1 bg-black/40 border rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none ${keyError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-[#ff2a3a]/60"}`}
+                              className={`min-w-0 flex-1 bg-black/25 border rounded-md px-3 py-2 font-mono text-sm text-white placeholder:text-white/25 focus:outline-none ${keyError ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-[#ff2a3a]/60"}`}
                               autoComplete="off"
                             />
                             <button
                               type="button"
                               onClick={redeemKey}
                               disabled={redeeming || !accessKey.trim()}
-                              className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
+                              className="w-full sm:w-auto px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 border border-white/10 text-xs uppercase tracking-widest text-white/80 disabled:opacity-50"
                             >
                               {redeeming ? "Checking…" : "Verify"}
                             </button>
@@ -676,12 +685,12 @@ function HomePage() {
               )}
               {/* SYSTEM progress — three stages, always in sync with the pipeline. Not editable. */}
               {submitting && (
-                <div className="mt-6 rounded-xl border border-[#ff2a3a]/30 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4">
+                <div className="mt-6 rounded-2xl border border-brand-accent/30 bg-white/[0.04] backdrop-blur-md p-4">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.28em] text-[#ff8a90] mb-3">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Activating — please keep this tab open
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                     {[
                       { k: "Verifying code", d: "01" },
                       { k: "Linking device", d: "02" },
@@ -773,7 +782,7 @@ function HomePage() {
 
 
 
-              <div className="mt-5 pt-5 border-t border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-widest text-white/40">
+              <div className="mt-5 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-white/40">
                 <span>Encrypted End-to-End</span>
                 <span className="text-[#ff2a3a]">● Online</span>
               </div>
@@ -883,31 +892,32 @@ function HomePage() {
         </div>
       </section>
 
-      {/* REVIEWS — fully admin-editable via Branding Studio. Not a live counter. */}
+      {/* LIVE ACTIVATIONS — system-owned realtime count. Not editable in Branding Studio. */}
       <section id="reviews" className="relative py-20 sm:py-24 md:py-28 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 md:mb-16 reveal">
             <div className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.28em] sm:tracking-[0.3em] text-[#ff2a3a] mb-4 break-words">
-              {b.reviews_kicker}
+              // Live activations
             </div>
             <h2 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight">
-              <span className="whitespace-nowrap">{b.reviews_rating}</span>
-              <span className="text-white/40 mx-2 sm:mx-3">·</span>
               <span className="text-live tabular-nums inline-flex items-center gap-2 align-baseline">
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
                 </span>
-                <span className="break-normal">{b.reviews_count}</span>
+                <span className="break-normal">{(successCount.data?.count ?? 0).toLocaleString()}</span>
               </span>{" "}
-              <span className="block sm:inline text-white/90">{b.reviews_activations_label}</span>
+              <span className="block sm:inline text-white/90">successful TV activations</span>
             </h2>
+            <p className="mt-4 text-sm sm:text-base text-white/55 leading-relaxed max-w-2xl mx-auto">
+              This number is automatic and updates from completed activations only.
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {[
-              { q: b.reviews_q1, n: b.reviews_n1 },
-              { q: b.reviews_q2, n: b.reviews_n2 },
-              { q: b.reviews_q3, n: b.reviews_n3 },
+              { q: "Activated in under 20 seconds. Genuinely smooth.", n: "M. Ortega" },
+              { q: "The code flow just works. No hoops, no spam.", n: "J. Chen" },
+              { q: "Fastest TV setup I've ever done. Support was instant.", n: "S. Nakamura" },
             ].map((t, i) => (
               <div key={`${t.n}-${i}`} className="glass glass-hover p-6 sm:p-8 reveal">
                 <div className="text-[#ff2a3a] text-sm mb-4">★ ★ ★ ★ ★</div>
