@@ -307,7 +307,6 @@ export function BackgroundSong() {
         // Analyser recovered — allow a fresh warning on any future silence
         // and let the play effect re-enable reactive automatically.
         fired.current.silence = false;
-        sendEvent("silence_recovered");
       }
     });
     return off;
