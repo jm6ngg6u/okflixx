@@ -229,6 +229,57 @@ export function resumeAudio() {
   if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
 }
 
+// ---- Silence evaluator (pure, testable) ---------------------------------
+
+/** Amplitude below this (weighted-band RMS proxy) counts as silence. */
+export const SILENCE_FLOOR = 0.0015;
+/** Amplitude above this counts as recovering signal. */
+export const RECOVERY_FLOOR = 0.008;
+/** Sustained frames above RECOVERY_FLOOR before clearing STATIC. ~100ms at 60fps. */
+export const RECOVERY_FRAMES = 6;
+/** Milliseconds of continuous silence before flipping to STATIC. */
+export const SILENCE_HOLD_MS = 3000;
+
+export type SilenceState = {
+  silenceStart: number; // performance.now() when silence began, 0 = none
+  recoveryFrames: number;
+  silent: boolean;
+};
+
+export type SilenceInput = {
+  level: number;   // 0..1 weighted band level for this frame
+  bass: number;    // 0..1 bass band level
+  playing: boolean; // audio actually producing sound (not paused/muted/vol0)
+  now: number;     // performance.now()
+};
+
+/**
+ * Pure state machine for silence detection.
+ * - Requires `playing` before counting any silence at all — quiet intros with
+ *   paused/muted/volume=0 audio never trigger.
+ * - Only recovers after RECOVERY_FRAMES sustained frames above RECOVERY_FLOOR
+ *   to prevent flapping on transients.
+ */
+export function stepSilenceState(prev: SilenceState, input: SilenceInput): SilenceState {
+  const { level, bass, playing, now } = input;
+  let { silenceStart, recoveryFrames, silent } = prev;
+
+  if (playing && level < SILENCE_FLOOR && bass < SILENCE_FLOOR) {
+    recoveryFrames = 0;
+    if (!silenceStart) silenceStart = now;
+    else if (now - silenceStart > SILENCE_HOLD_MS) silent = true;
+  } else if (level > RECOVERY_FLOOR || bass > RECOVERY_FLOOR) {
+    recoveryFrames++;
+    if (recoveryFrames >= RECOVERY_FRAMES) {
+      silenceStart = 0;
+      silent = false;
+    }
+  }
+  // else: in the dead zone between floors — hold state, don't count either way.
+
+  return { silenceStart, recoveryFrames, silent };
+}
+
 // ---- Frame read ----------------------------------------------------------
 
 /** Called every frame by the animation loop. Cheap when disabled. */
@@ -266,27 +317,15 @@ export function getLevels(): Levels {
 
   last = { bass, mid, treble, level, beat: Math.min(1, beatEnv) };
 
-  // Silence detection — only meaningful while audio is *actually* playing.
-  // Guards: not paused, not muted, volume > 0, and playhead advancing.
-  // Threshold is a weighted-band RMS; hysteresis requires ~6 valid frames
-  // (~100ms at 60fps) before clearing STATIC to avoid flapping on transients.
+  // Silence detection — delegated to pure evaluator for testability.
   const playing = !!attachedEl && !attachedEl.paused && !attachedEl.muted && attachedEl.volume > 0;
-  const now = performance.now();
-  const SILENCE_FLOOR = 0.0015;   // below → treat as silence (dither-tolerant)
-  const RECOVERY_FLOOR = 0.008;   // above → count toward recovery
-  const RECOVERY_FRAMES = 6;      // ~100ms sustained signal to flip back to REACTIVE
-
-  if (playing && level < SILENCE_FLOOR && bass < SILENCE_FLOOR) {
-    recoveryFrames = 0;
-    if (!silenceStart) silenceStart = now;
-    else if (now - silenceStart > 3000) setSilent(true);
-  } else if (level > RECOVERY_FLOOR || bass > RECOVERY_FLOOR) {
-    recoveryFrames++;
-    if (recoveryFrames >= RECOVERY_FRAMES) {
-      silenceStart = 0;
-      if (silent) setSilent(false);
-    }
-  }
+  const next = stepSilenceState(
+    { silenceStart, recoveryFrames, silent },
+    { level, bass, playing, now: performance.now() },
+  );
+  silenceStart = next.silenceStart;
+  recoveryFrames = next.recoveryFrames;
+  if (next.silent !== silent) setSilent(next.silent);
 
   return last;
 }
