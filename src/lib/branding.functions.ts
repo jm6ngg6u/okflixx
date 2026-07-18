@@ -163,6 +163,15 @@ function sanitize(key: BrandingKey, raw: string): string {
     const n = Math.max(60, Math.min(160, parseInt(v, 10)));
     return Number.isFinite(n) ? String(n) : "100";
   }
+  if (
+    key === "size_wordmark_nav" || key === "size_hero_kicker" ||
+    key === "size_hero_title" || key === "size_hero_sub" ||
+    key === "size_section_kicker" || key === "size_section_title" ||
+    key === "size_card_title" || key === "size_body"
+  ) {
+    const n = Math.max(60, Math.min(160, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : "100";
+  }
   if (key === "maint_time_format") return v === "12h" ? "12h" : "24h";
   if (key === "maint_timezone") {
     const s = (v || "").trim();
