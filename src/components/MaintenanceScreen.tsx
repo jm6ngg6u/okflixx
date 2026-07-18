@@ -79,19 +79,21 @@ export function MaintenanceView({
 
   const fx = (px: number, elem: keyof typeof sz = "message") => `${px * scale * sz[elem]}px`;
 
-  // Formatted ends-at line (timezone aware).
-  let endsFormatted: string | null = null;
-  if (endsAt) {
+  // Timezone-aware formatting for start/end times.
+  const tz = (b as any).maint_timezone || "UTC";
+  const hour12 = ((b as any).maint_time_format || "24h") === "12h";
+  const fmtDT = (iso?: string | null): string | null => {
+    if (!iso) return null;
     try {
-      const tz = (b as any).maint_timezone || "UTC";
-      const hour12 = ((b as any).maint_time_format || "24h") === "12h";
-      endsFormatted = new Intl.DateTimeFormat(undefined, {
+      return new Intl.DateTimeFormat(undefined, {
         timeZone: tz, hour12,
         weekday: "short", month: "short", day: "2-digit",
         hour: "2-digit", minute: "2-digit", timeZoneName: "short",
-      }).format(new Date(endsAt));
-    } catch { endsFormatted = null; }
-  }
+      }).format(new Date(iso));
+    } catch { return null; }
+  };
+  const startsFormatted = fmtDT(startsAt ?? null);
+  const endsFormatted = fmtDT(endsAt ?? null);
 
   const rootStyle: CSSProperties = {
     // Consumed by keyframes in styles.css.
