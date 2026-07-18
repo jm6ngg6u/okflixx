@@ -448,69 +448,108 @@ function FontPicker({
   );
 }
 
-/** Live mini-preview of the public hero AND login card using current branding.
- *  Toggle switches between "Home hero" and "Login card" so admins can see
- *  every font/color/glow/shine change on the login page BEFORE it goes live —
- *  no round-trip to /login needed. */
+/** Two independent live previews — Home hero on the left, Login card on the right.
+ *  Each has its own header, focus button, and updates instantly from CSS vars. */
 function LivePreview() {
   const b = useBrand();
-  const [view, setView] = useState<"home" | "login">("home");
+  const [focus, setFocus] = useState<null | "home" | "login">(null);
+
+  const showHome = focus !== "login";
+  const showLogin = focus !== "home";
+
   return (
-    <div className="glass p-6 md:p-8 relative overflow-hidden">
-      <div className="absolute top-3 right-3 flex items-center gap-3 text-[10px] uppercase tracking-widest">
-        <span className="flex items-center gap-1.5 text-emerald-300">
-          <CheckCircle2 className="w-3 h-3" /> Live
-        </span>
-      </div>
-
-      <div className="mb-5 inline-flex rounded-lg border border-white/10 bg-black/40 p-1">
-        <button
-          onClick={() => setView("home")}
-          className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-widest transition ${
-            view === "home" ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
-          }`}
+    <div className="grid gap-4 lg:grid-cols-2">
+      {showHome && (
+        <PreviewFrame
+          title="Home hero"
+          subtitle="Landing page — kicker, wordmark, CTA."
+          icon={<Palette className="w-3.5 h-3.5" />}
+          focused={focus === "home"}
+          onToggleFocus={() => setFocus(focus === "home" ? null : "home")}
         >
-          <Palette className="w-3 h-3 inline mr-1.5" />Home hero
-        </button>
-        <button
-          onClick={() => setView("login")}
-          className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-widest transition ${
-            view === "login" ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
-          }`}
+          <HomeHeroPreview b={b} />
+        </PreviewFrame>
+      )}
+      {showLogin && (
+        <PreviewFrame
+          title="Login card"
+          subtitle="Google sign-in surface — mascot, glow, shine."
+          icon={<LogIn className="w-3.5 h-3.5" />}
+          focused={focus === "login"}
+          onToggleFocus={() => setFocus(focus === "login" ? null : "login")}
         >
-          <LogIn className="w-3 h-3 inline mr-1.5" />Login card
-        </button>
-      </div>
+          <LoginPreview b={b} />
+        </PreviewFrame>
+      )}
+    </div>
+  );
+}
 
-      {view === "home" ? (
-        <div className="text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-xs text-white/75 mb-4"
-            style={{ fontFamily: "var(--brand-font-body)" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse" />
-            <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
+function PreviewFrame({
+  title, subtitle, icon, focused, onToggleFocus, children,
+}: {
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  focused: boolean;
+  onToggleFocus: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`glass relative overflow-hidden ${focused ? "lg:col-span-2" : ""}`}>
+      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/10 bg-black/40">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex items-center justify-center w-6 h-6 rounded-md bg-white/[0.06] text-brand-accent">
+            {icon}
+          </span>
+          <div className="min-w-0">
+            <div className="font-display text-sm leading-tight truncate">{title}</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/40 truncate">{subtitle}</div>
           </div>
-          <div className="font-display text-4xl md:text-5xl leading-[0.98] tracking-tight wordmark-pulse"
-            style={{ fontFamily: "var(--brand-font-display)", fontWeight: b.font_display_weight }}>
-            {b.name_prefix}<span className="text-brand-accent">{b.name_suffix}</span>
-          </div>
-          <div className="mt-3 font-display text-xl md:text-2xl text-white/85"
-            style={{ fontFamily: "var(--brand-font-display)" }}>
-            {b.hero_headline_1} <span className="text-brand-accent">{b.hero_headline_2}</span>
-          </div>
-          <p className="mt-3 text-white/60 text-sm max-w-md mx-auto"
-            style={{ fontFamily: "var(--brand-font-body)" }}>{b.hero_sub}</p>
-          <button className="mt-5 px-6 py-2.5 rounded-md text-sm font-medium text-white"
-            style={{
-              background: `linear-gradient(135deg, var(--brand-accent), color-mix(in oklab, var(--brand-accent) 60%, black))`,
-              boxShadow: `0 0 ${20 + parseInt(b.glow) / 2}px color-mix(in oklab, var(--brand-accent) ${b.glow}%, transparent)`,
-              fontFamily: "var(--brand-font-body)",
-            }}>
-            {b.activate_cta}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-300">
+            <CheckCircle2 className="w-3 h-3" /> Live
+          </span>
+          <button
+            onClick={onToggleFocus}
+            className="text-[10px] uppercase tracking-widest text-white/50 hover:text-white transition px-2 py-1 rounded border border-white/10"
+          >
+            {focused ? "Show both" : "Focus"}
           </button>
         </div>
-      ) : (
-        <LoginPreview b={b} />
-      )}
+      </div>
+      <div className="p-6 md:p-7">{children}</div>
+    </div>
+  );
+}
+
+function HomeHeroPreview({ b }: { b: BrandingMap }) {
+  return (
+    <div className="text-center">
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-xs text-white/75 mb-4"
+        style={{ fontFamily: "var(--brand-font-body)" }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse" />
+        <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
+      </div>
+      <div className="font-display text-4xl md:text-5xl leading-[0.98] tracking-tight wordmark-pulse"
+        style={{ fontFamily: "var(--brand-font-display)", fontWeight: b.font_display_weight }}>
+        {b.name_prefix}<span className="text-brand-accent">{b.name_suffix}</span>
+      </div>
+      <div className="mt-3 font-display text-xl md:text-2xl text-white/85"
+        style={{ fontFamily: "var(--brand-font-display)" }}>
+        {b.hero_headline_1} <span className="text-brand-accent">{b.hero_headline_2}</span>
+      </div>
+      <p className="mt-3 text-white/60 text-sm max-w-md mx-auto"
+        style={{ fontFamily: "var(--brand-font-body)" }}>{b.hero_sub}</p>
+      <button className="mt-5 px-6 py-2.5 rounded-md text-sm font-medium text-white"
+        style={{
+          background: `linear-gradient(135deg, var(--brand-accent), color-mix(in oklab, var(--brand-accent) 60%, black))`,
+          boxShadow: `0 0 ${20 + parseInt(b.glow) / 2}px color-mix(in oklab, var(--brand-accent) ${b.glow}%, transparent)`,
+          fontFamily: "var(--brand-font-body)",
+        }}>
+        {b.activate_cta}
+      </button>
     </div>
   );
 }
