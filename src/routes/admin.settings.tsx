@@ -456,6 +456,105 @@ function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   );
 }
 
+function ActivationFlowSection({ local, set, save, busy }: any) {
+  const loginOn = local.login_required === "1";
+  const keyOn = local.access_key_required === "1";
+  const gateOn = loginOn || keyOn;
+  const rlValue = parseInt(local.rate_limit_per_10min ?? "10", 10) || 10;
+  const maxA = parseInt(local.max_activation_attempts ?? "3", 10) || 3;
+
+  const activeLabels: string[] = [];
+  if (loginOn) activeLabels.push("Login");
+  if (keyOn) activeLabels.push("Access Key");
+
+  return (
+    <div className={`glass p-5 ${gateOn ? "border-emerald-500/20" : ""}`}>
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex items-start gap-3">
+          <Timer className="w-4 h-4 text-[#ff2a3a] mt-1" />
+          <div>
+            <div className="font-display text-lg leading-tight">Activation flow</div>
+            <div className="text-xs text-white/50 mt-1 max-w-2xl">
+              Cookie retry budget and abuse throttling for the public activation endpoint. Rate limit auto-yields to the access-gate throttle when a gate is enabled.
+            </div>
+          </div>
+        </div>
+        <Badge
+          variant="outline"
+          className={
+            gateOn
+              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-mono text-[10px]"
+              : "bg-amber-500/15 text-amber-300 border-amber-500/30 font-mono text-[10px]"
+          }
+        >
+          {gateOn ? `GATED · ${activeLabels.join(" + ")}` : "PUBLIC · IP LIMITED"}
+        </Badge>
+      </div>
+
+      {/* Live effective policy banner */}
+      <div className={`mb-4 rounded-md border px-3 py-2.5 text-xs flex items-start gap-2 ${
+        gateOn
+          ? "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-100/90"
+          : "border-amber-500/25 bg-amber-500/[0.06] text-amber-100/90"
+      }`}>
+        {gateOn ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
+        <div className="leading-relaxed">
+          {gateOn ? (
+            <>
+              <span className="font-semibold">{activeLabels.join(" & ")} gate active.</span>{" "}
+              Per-IP rate limit is <span className="font-mono">disabled</span> — gated users are throttled by their per-user daily limit and key quota. Cookie retry cap ({maxA}/activation) still applies.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">No access gate enabled.</span>{" "}
+              Public activation is protected by the IP rate limit ({rlValue}/10 min) and cookie retry cap ({maxA}/activation). Signed-in users bypass the IP limit and use their per-user daily quota instead.
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <NumField
+          k="max_activation_attempts"
+          label="Max cookies tried per activation"
+          hint={`Currently: retry up to ${maxA} cookies before giving up. Applies to every request.`}
+          local={local} set={set} onSave={save} busy={busy} min={1} max={10}
+        />
+        <div className={gateOn ? "opacity-60" : ""}>
+          <NumField
+            k="rate_limit_per_10min"
+            label="Rate limit (per IP, 10 min)"
+            hint={
+              gateOn
+                ? `Idle — ${activeLabels.join(" + ")} gate is enforcing throttling. Turn gates off in Access to reactivate.`
+                : `Currently: allow ${rlValue} attempts per IP every 10 min for anonymous callers.`
+            }
+            local={local} set={set} onSave={save} busy={busy} min={1} max={200}
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 grid sm:grid-cols-3 gap-2 text-[11px]">
+        <PolicyChip label="Anonymous" value={gateOn ? "Blocked by gate" : `${rlValue} / 10 min per IP`} ok={!gateOn} />
+        <PolicyChip label="Signed-in" value="Per-user daily limit" ok />
+        <PolicyChip label="Cookie retries" value={`${maxA} per activation`} ok />
+      </div>
+    </div>
+  );
+}
+
+function PolicyChip({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+  return (
+    <div className={`rounded-md border px-3 py-2 flex items-center justify-between ${
+      ok ? "border-white/10 bg-white/[0.03]" : "border-rose-500/25 bg-rose-500/[0.05]"
+    }`}>
+      <span className="font-mono uppercase tracking-widest text-[9px] text-white/50">{label}</span>
+      <span className="font-mono text-white/85 text-[11px]">{value}</span>
+    </div>
+  );
+}
+
+
 function NumField({ k, label, hint, local, set, onSave, busy, min, max }: any) {
   const raw = local[k] ?? "";
   const n = raw === "" ? NaN : Number(raw);
