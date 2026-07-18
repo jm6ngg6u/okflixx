@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LogOut, Send, Instagram, Phone, ShieldCheck, Loader2 } from "lucide-react";
+import { LogOut, Send, Instagram, Phone, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrand } from "@/lib/branding-context";
 import { getPublicContacts } from "@/lib/settings.functions";
