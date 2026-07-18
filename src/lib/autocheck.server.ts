@@ -61,6 +61,27 @@ async function restoreProxySnapshots(supabaseAdmin: any, snapshots: ProxySnapsho
   }
 }
 
+function watchJobControl(
+  jobId: string | null,
+  onSignal: (signal: "stop" | "cancel") => void,
+  intervalMs = 1000,
+) {
+  if (!jobId) return () => {};
+  let closed = false;
+  const timer = setInterval(async () => {
+    if (closed) return;
+    const signal = await readJobControl(jobId);
+    if (!signal) return;
+    onSignal(signal);
+    closed = true;
+    clearInterval(timer);
+  }, intervalMs);
+  return () => {
+    closed = true;
+    clearInterval(timer);
+  };
+}
+
 function bucketReason(msg: string | null | undefined): string {
   const s = String(msg ?? "").toLowerCase().trim();
   if (!s) return "unknown";
@@ -124,6 +145,11 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     const reasons: Record<string, number> = {};
     let control: "stop" | "cancel" | null = null;
     const snapshots: CookieSnapshot[] = [];
+    const abortCurrentCheck = new AbortController();
+    const stopWatchingControl = watchJobControl(jobId, (signal) => {
+      control = signal;
+      abortCurrentCheck.abort(signal);
+    });
 
     for (const r of rows ?? []) {
       control = await readJobControl(jobId);
@@ -174,6 +200,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
         }
       }
       const out = await checkCookieViaWorker({ cookies: r.cookies_json as any[], proxy: proxyPayload });
+      if (control) break;
       if (proxyId) {
         await supabaseAdmin.rpc("release_proxy", {
           _id: proxyId,
@@ -211,6 +238,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       control = await readJobControl(jobId);
       if (control) break;
     }
+    stopWatchingControl();
     if (control === "cancel") {
       const summary = { checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons, cancelled: true };
       await recordJobProgress(jobId, { ...summary, phase: "rolling_back", total: rows?.length ?? 0 });
@@ -329,6 +357,11 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
     const reasons: Record<string, number> = {};
     let control: "stop" | "cancel" | null = null;
     const snapshots: ProxySnapshot[] = [];
+    const abortCurrentCheck = new AbortController();
+    const stopWatchingControl = watchJobControl(jobId, (signal) => {
+      control = signal;
+      abortCurrentCheck.abort(signal);
+    });
     for (const p of rows ?? []) {
       control = await readJobControl(jobId);
       if (control) break;
@@ -344,7 +377,9 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
 
       const res = await checkProxyViaWorker({
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
+        signal: abortCurrentCheck.signal,
       });
+      if (control) break;
       await supabaseAdmin.from("proxy_pool").update({
         is_valid: res.ok,
         last_error: res.error ?? null,
@@ -363,6 +398,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       control = await readJobControl(jobId);
       if (control) break;
     }
+    stopWatchingControl();
     if (control === "cancel") {
       const summary = { checked: ok + dead, ok_count: ok, dead, reasons, cancelled: true };
       await recordJobProgress(jobId, { ...summary, phase: "rolling_back", total: rows?.length ?? 0 });
