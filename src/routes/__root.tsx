@@ -107,7 +107,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
+  // Prefetch the gate on SSR so the maintenance takeover renders on the very
+  // first paint — no flash of the activation UI before the client swap.
+  loader: async ({ context }) => {
+    try {
+      await context.queryClient.ensureQueryData({
+        queryKey: ["public-gate"],
+        queryFn: () => getGateConfig(),
+        staleTime: 2000,
+      });
+    } catch {
+      /* non-fatal — MaintenanceGate falls through to <Outlet /> if fetch fails */
+    }
+  },
 });
+
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
