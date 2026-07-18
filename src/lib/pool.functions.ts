@@ -44,6 +44,17 @@ async function checkNetflixCookie(pairs: CookiePair[], supabaseAdmin: any): Prom
     if (p) {
       proxyPayload = { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password };
       proxyId = p.id;
+    } else {
+      // STRICT proxy mode: refuse to fall back to direct so the toggle is
+      // honoured end-to-end. Admin gets a clear reason in `last_error`.
+      return {
+        status: "unknown",
+        is_valid: false,
+        transient: true,
+        proxy_mode: true,
+        proxy_used: false,
+        last_error: "Proxy mode is ON but no proxies are available. Add proxies or run a proxy recheck.",
+      };
     }
   }
   const out = await checkCookieViaWorker({ cookies: pairs, proxy: proxyPayload });
@@ -71,6 +82,7 @@ async function checkNetflixCookie(pairs: CookiePair[], supabaseAdmin: any): Prom
     last_error: out.error ?? null,
   };
 }
+
 
 
 // -------------------- Cookie server functions --------------------
