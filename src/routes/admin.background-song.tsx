@@ -171,8 +171,18 @@ function BackgroundSongPage() {
   const [uploadName, setUploadName] = useState("");
   const [uploadSize, setUploadSize] = useState(0);
   const [uploadError, setUploadError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const successTimerRef = useRef<number | null>(null);
+
+  const isUploadBusy = uploadStatus === "uploading" || uploadStatus === "reading";
 
   const handleUpload = async (file: File) => {
+    if (isUploadBusy) {
+      toast.error("An upload is already in progress", { description: "Cancel it first to start a new one." });
+      return;
+    }
+    if (successTimerRef.current) { window.clearTimeout(successTimerRef.current); successTimerRef.current = null; }
     setUploadError("");
     setUploadName(file.name);
     setUploadSize(file.size);
@@ -180,9 +190,14 @@ function BackgroundSongPage() {
     setUploadStatus("reading");
     setUploadMsg("Preparing file…");
 
-    if (!file.type.startsWith("audio/") && !/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name)) {
+    const audioExt = /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name);
+    if (!file.type.startsWith("audio/") && !audioExt) {
       setUploadStatus("error"); setUploadError("File must be audio (mp3, wav, ogg, m4a, aac, flac).");
       toast.error("Not an audio file"); return;
+    }
+    if (file.size <= 0) {
+      setUploadStatus("error"); setUploadError("File is empty (0 bytes).");
+      toast.error("Empty file"); return;
     }
     if (file.size > 15 * 1024 * 1024) {
       setUploadStatus("error"); setUploadError("File is larger than 15 MB.");
@@ -197,14 +212,25 @@ function BackgroundSongPage() {
     form.append("file", file);
     await new Promise<void>((resolve) => {
       const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
       xhr.open("POST", "/api/admin/upload-background-song");
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.timeout = 120_000; // 2 min hard ceiling
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
           setUploadPct(pct); setUploadStatus("uploading");
           setUploadMsg(pct >= 100 ? "Finalizing on server…" : `Uploading… ${pct}%`);
         }
+      };
+      xhr.ontimeout = () => {
+        setUploadStatus("error");
+        setUploadError("Upload timed out after 2 minutes. Try a smaller file or a faster network.");
+        toast.error("Upload timed out"); resolve();
+      };
+      xhr.onabort = () => {
+        setUploadStatus("error"); setUploadError("Upload cancelled.");
+        setUploadPct(0); resolve();
       };
       xhr.onerror = () => { setUploadStatus("error"); setUploadError("Network error during upload."); toast.error("Upload failed"); resolve(); };
       xhr.onload = () => {
@@ -215,9 +241,15 @@ function BackgroundSongPage() {
             setUploadMsg("Upload complete · New track live on the public site.");
             toast.success("New background song uploaded", { description: `${res.name} · ${fmtSize(res.size)}` });
             invalidateAll();
+            // Auto-clear the success card after 8s so the panel returns to a clean state.
+            successTimerRef.current = window.setTimeout(() => {
+              setUploadStatus("idle"); setUploadPct(0); setUploadMsg(""); setUploadName(""); setUploadSize(0);
+              successTimerRef.current = null;
+            }, 8000);
           } else {
             setUploadStatus("error");
             const label = res.error === "file_too_large" ? "File too large (max 15 MB)"
+              : res.error === "empty_file" ? "File is empty (0 bytes)"
               : res.error === "not_audio" ? "File is not audio"
               : res.error === "forbidden" ? "You are not authorized"
               : res.error === "unauthorized" ? "Session expired"
@@ -229,12 +261,33 @@ function BackgroundSongPage() {
       };
       xhr.send(form);
     });
+    xhrRef.current = null;
   };
+
+  const cancelUpload = () => {
+    if (xhrRef.current) {
+      try { xhrRef.current.abort(); } catch { /* noop */ }
+      xhrRef.current = null;
+    }
+  };
+
+  // Clean up any pending success-clear timer on unmount.
+  useEffect(() => () => {
+    if (successTimerRef.current) window.clearTimeout(successTimerRef.current);
+    if (xhrRef.current) { try { xhrRef.current.abort(); } catch { /* noop */ } }
+  }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) handleUpload(f);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false);
+    if (isUploadBusy) return;
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleUpload(f);
   };
 
   const togglePreview = () => {
