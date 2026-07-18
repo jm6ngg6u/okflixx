@@ -581,6 +581,67 @@ function LoginPage() {
               </span>
               {loginStatus}
             </div>
+
+            {/* ================== Diagnostics ================== */}
+            <div className="mt-3 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setDiagOpen((v) => !v)}
+                className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/40 underline underline-offset-4 hover:text-white/70"
+                aria-expanded={diagOpen}
+                aria-controls="login-diagnostics"
+                style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+              >
+                {diagOpen ? "Hide diagnostics" : "Show diagnostics"}
+              </button>
+            </div>
+            {diagOpen && (
+              <div
+                id="login-diagnostics"
+                className="mt-3 rounded-xl border border-white/10 bg-black/50 p-3 backdrop-blur-xl"
+                style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+              >
+                <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.24em] text-white/50">
+                  <span>Login diagnostics</span>
+                  <span className="text-white/30">{diag.length} events</span>
+                </div>
+                <ul className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                  {diag.length === 0 && (
+                    <li className="text-[11px] text-white/40">No events yet.</li>
+                  )}
+                  {diag.map((d, i) => {
+                    const color =
+                      d.status === "ok" ? "text-emerald-300" :
+                      d.status === "warn" ? "text-amber-300" :
+                      d.status === "fail" ? "text-[#ff5a68]" :
+                      "text-white/60";
+                    const t = new Date(d.ts);
+                    const stamp = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:${String(t.getSeconds()).padStart(2, "0")}.${String(t.getMilliseconds()).padStart(3, "0")}`;
+                    return (
+                      <li key={i} className="grid grid-cols-[auto_auto_1fr] items-start gap-2 text-[11px] leading-snug">
+                        <span className="font-mono text-white/35">{stamp}</span>
+                        <span className={`font-semibold uppercase tracking-[0.12em] ${color}`}>
+                          {d.status}
+                        </span>
+                        <span className="text-white/80">
+                          {d.label}
+                          {d.detail && <span className="ml-1 text-white/45 font-mono">— {d.detail}</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="mt-2 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { diagRef.current = []; setDiag([]); }}
+                    className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40 hover:text-white/70"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </main>
