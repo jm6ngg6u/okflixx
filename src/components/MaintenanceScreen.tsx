@@ -198,21 +198,30 @@ export function MaintenanceView({
           {(message || b.maint_message).trim()}
         </p>
 
-        {/* Countdown */}
-        {remainingLabel && (
+        {/* Countdown + formatted return time */}
+        {(remainingLabel || endsFormatted) && (
           <div
-            className="inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
+            className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
             style={{ marginTop: fx(28), padding: `${fx(10)} ${fx(18)}` }}
           >
-            <span className="font-mono uppercase tracking-[0.25em] text-white/50" style={{ fontSize: fx(10.5) }}>
-              {b.maint_countdown_label}
-            </span>
-            <span
-              className="font-[family:var(--brand-font-display)] font-bold text-white tabular-nums"
-              style={{ fontSize: fx(compact ? 14 : 18) }}
-            >
-              {remainingLabel}
-            </span>
+            {remainingLabel && (
+              <div className="flex items-center gap-3">
+                <span className="font-mono uppercase tracking-[0.25em] text-white/50" style={{ fontSize: fx(10.5, "countdown") }}>
+                  {b.maint_countdown_label}
+                </span>
+                <span
+                  className="font-[family:var(--brand-font-display)] font-bold text-white tabular-nums"
+                  style={{ fontSize: fx(compact ? 14 : 18, "countdown") }}
+                >
+                  {remainingLabel}
+                </span>
+              </div>
+            )}
+            {endsFormatted && (
+              <span className="font-mono text-white/40 tabular-nums" style={{ fontSize: fx(10, "countdown") }}>
+                {endsFormatted}
+              </span>
+            )}
           </div>
         )}
 
