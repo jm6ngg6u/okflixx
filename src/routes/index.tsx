@@ -338,6 +338,8 @@ function HomePage() {
           redirectUrl: result.redirectUrl,
           account: result.account,
         });
+        // Instant bump of the live counter — no waiting for the 2s poll.
+        qc.invalidateQueries({ queryKey: ["public-activation-success-count"] });
       } else if (result.error === "invalid_code") {
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
       } else if (result.error === "maintenance") {
