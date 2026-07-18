@@ -167,24 +167,32 @@ function LoginPage() {
           className="flex flex-col items-center text-center lg:items-start lg:text-left"
           aria-labelledby="tagline-heading"
         >
-          {/* Mascot with periodic shine sweep */}
+          {/* Mascot with shine clipped to the transparent logo shape */}
           <div className="relative inline-block">
-            <div className="relative inline-block overflow-hidden">
+            <div className="relative inline-block">
               <img
                 src={heroLogo}
                 alt=""
                 className="h-40 w-40 select-none object-contain drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:h-56 sm:w-56 lg:h-72 lg:w-72"
                 draggable={false}
               />
-              {/* Shine flash (Florzin-style logo shine every few seconds) */}
+              {/* Shine flash is masked by the logo alpha, so no square box can appear. */}
               <span
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 motion-safe:animate-[logo-shine_5.5s_ease-in-out_infinite]"
                 style={{
                   background:
-                    "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.65) 48%, rgba(255,170,110,0.9) 50%, rgba(255,255,255,0.65) 52%, transparent 70%)",
+                    "linear-gradient(115deg, transparent 34%, rgba(255,255,255,0.72) 48%, rgba(255,170,110,0.9) 50%, rgba(255,255,255,0.68) 52%, transparent 66%)",
                   mixBlendMode: "screen",
                   transform: "translateX(-120%)",
+                  WebkitMaskImage: `url(${heroLogo})`,
+                  maskImage: `url(${heroLogo})`,
+                  WebkitMaskRepeat: "no-repeat",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskPosition: "center",
+                  maskPosition: "center",
+                  WebkitMaskSize: "contain",
+                  maskSize: "contain",
                 }}
               />
             </div>
