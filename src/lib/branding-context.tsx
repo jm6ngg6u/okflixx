@@ -55,6 +55,20 @@ function applyCss(b: BrandingMap) {
   r.setProperty("--brand-font-mono", `"${b.font_mono}"`);
   r.setProperty("--brand-font-display-weight", b.font_display_weight);
   r.setProperty("--brand-font-body-weight", b.font_body_weight);
+  // Global per-element size multipliers (unitless, 0.6..1.6). Consumed by
+  // .brand-* utility classes in styles.css so every branded surface scales.
+  const pct = (v: string) => {
+    const n = Math.max(60, Math.min(160, parseInt(v, 10) || 100));
+    return (n / 100).toString();
+  };
+  r.setProperty("--brand-size-wordmark-nav",  pct((b as any).size_wordmark_nav  ?? "100"));
+  r.setProperty("--brand-size-hero-kicker",   pct((b as any).size_hero_kicker   ?? "100"));
+  r.setProperty("--brand-size-hero-title",    pct((b as any).size_hero_title    ?? "100"));
+  r.setProperty("--brand-size-hero-sub",      pct((b as any).size_hero_sub      ?? "100"));
+  r.setProperty("--brand-size-section-kicker",pct((b as any).size_section_kicker?? "100"));
+  r.setProperty("--brand-size-section-title", pct((b as any).size_section_title ?? "100"));
+  r.setProperty("--brand-size-card-title",    pct((b as any).size_card_title    ?? "100"));
+  r.setProperty("--brand-size-body",          pct((b as any).size_body          ?? "100"));
 }
 
 const FONT_LINK_ID = "branding-fonts-link";
