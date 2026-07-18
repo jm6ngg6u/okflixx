@@ -468,9 +468,10 @@ export const restoreBackgroundSong = createServerFn({ method: "POST" })
       .eq("id", data.id).maybeSingle();
     if (error || !row) throw new Error("Version not found");
 
-    // Verify storage object still exists.
-    const { data: list } = await supabaseAdmin.storage.from(BUCKET).list("", { limit: 200 });
-    if (!list?.find((o) => o.name === row.path)) throw new Error("File missing from storage");
+    // Verify storage object still exists (targeted lookup, not paginated list).
+    const { data: signed } = await supabaseAdmin.storage
+      .from(BUCKET).createSignedUrl(row.path as string, 30);
+    if (!signed?.signedUrl) throw new Error("File missing from storage");
 
     await supabaseAdmin.from("background_song_history").update({ is_current: false }).eq("is_current", true);
     await supabaseAdmin.from("background_song_history").update({ is_current: true }).eq("id", row.id);
