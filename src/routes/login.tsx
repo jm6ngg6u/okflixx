@@ -66,6 +66,22 @@ function LoginPage() {
     });
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Origin diagnostics fires whenever the expected origin resolves from
+    // branding — includes a warn line when the two disagree.
+    if (typeof window === "undefined") return;
+    const expected = (brand?.login_expected_origin || "").trim().replace(/\/$/, "");
+    const here = window.location.origin;
+    if (!expected) return;
+    if (expected === here) {
+      logDiag("Origin check", "ok", `matches configured (${expected})`);
+    } else {
+      logDiag("Origin check", "warn", `expected ${expected}, got ${here}`);
+    }
+  }, [brand?.login_expected_origin]);
+
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) return;
