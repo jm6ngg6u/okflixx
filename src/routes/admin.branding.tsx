@@ -471,55 +471,16 @@ function FontPicker({
   );
 }
 
-/** Two independent live previews — Home hero on the left, Login card on the right.
- *  Each has its own header, focus button, and updates instantly from CSS vars. */
-function LivePreview() {
-  const b = useBrand();
-  const [focus, setFocus] = useState<null | "home" | "login">(null);
-
-  const showHome = focus !== "login";
-  const showLogin = focus !== "home";
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {showHome && (
-        <PreviewFrame
-          title="Home hero"
-          subtitle="Landing page — kicker, wordmark, CTA."
-          icon={<Palette className="w-3.5 h-3.5" />}
-          focused={focus === "home"}
-          onToggleFocus={() => setFocus(focus === "home" ? null : "home")}
-        >
-          <HomeHeroPreview b={b} />
-        </PreviewFrame>
-      )}
-      {showLogin && (
-        <PreviewFrame
-          title="Login card"
-          subtitle="Google sign-in surface — mascot, glow, shine."
-          icon={<LogIn className="w-3.5 h-3.5" />}
-          focused={focus === "login"}
-          onToggleFocus={() => setFocus(focus === "login" ? null : "login")}
-        >
-          <LoginPreview b={b} />
-        </PreviewFrame>
-      )}
-    </div>
-  );
-}
-
 function PreviewFrame({
-  title, subtitle, icon, focused, onToggleFocus, children,
+  title, subtitle, icon, children,
 }: {
   title: string;
   subtitle: string;
   icon: ReactNode;
-  focused: boolean;
-  onToggleFocus: () => void;
   children: ReactNode;
 }) {
   return (
-    <div className={`glass relative overflow-hidden ${focused ? "lg:col-span-2" : ""}`}>
+    <div className="glass relative overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/10 bg-black/40">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex items-center justify-center w-6 h-6 rounded-md bg-white/[0.06] text-brand-accent">
@@ -530,17 +491,9 @@ function PreviewFrame({
             <div className="text-[10px] uppercase tracking-widest text-white/40 truncate">{subtitle}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-300">
-            <CheckCircle2 className="w-3 h-3" /> Live
-          </span>
-          <button
-            onClick={onToggleFocus}
-            className="text-[10px] uppercase tracking-widest text-white/50 hover:text-white transition px-2 py-1 rounded border border-white/10"
-          >
-            {focused ? "Show both" : "Focus"}
-          </button>
-        </div>
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-300 shrink-0">
+          <CheckCircle2 className="w-3 h-3" /> Live · updates every 2s
+        </span>
       </div>
       <div className="p-6 md:p-7">{children}</div>
     </div>
