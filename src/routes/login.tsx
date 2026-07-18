@@ -94,6 +94,7 @@ function LoginPage() {
     setBusy(true);
     setErrorMessage(null);
     stashRedirect(search.redirect ?? null);
+    logDiag(opts?.forceRedirect ? "Sign-in start · redirect mode" : "Sign-in start · popup mode", "info");
 
     // Pre-flight popup probe. MUST run synchronously in the click handler so
     // the browser attributes the resulting popup to the user gesture.
@@ -107,17 +108,25 @@ function LoginPage() {
     }
     const popupBlocked = !opts?.forceRedirect && (!probe || probe.closed);
     if (probe && !probe.closed) probe.close();
+    if (!opts?.forceRedirect) {
+      logDiag("Popup capability", popupBlocked ? "warn" : "ok", popupBlocked ? "blocked — switching to full-page redirect" : "allowed");
+    }
 
     // Safety: never leave the button stuck.
-    const stuck = window.setTimeout(() => setBusy(false), 45_000);
+    const stuck = window.setTimeout(() => {
+      logDiag("Safety timeout", "warn", "45s elapsed with no response — resetting button");
+      setBusy(false);
+    }, 45_000);
 
     try {
       if (popupBlocked || opts?.forceRedirect) {
+        logDiag("Calling supabase.auth.signInWithOAuth", "info", "full-page redirect");
         await redirectFallback();
         // Browser will navigate; keep busy state so button reads "Opening Google…"
         return;
       }
 
+      logDiag("Calling lovable.auth.signInWithOAuth", "info", "popup");
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
         extraParams: { prompt: "select_account" },
@@ -125,6 +134,7 @@ function LoginPage() {
       if (result.error) {
         window.clearTimeout(stuck);
         const msg = result.error.message ?? "Google sign-in failed.";
+        logDiag("OAuth error", "fail", msg);
         setErrorMessage(msg);
         toast.error(msg);
         setBusy(false);
@@ -132,14 +142,17 @@ function LoginPage() {
       }
       if (result.redirected) {
         window.clearTimeout(stuck);
+        logDiag("Redirected to Google", "ok");
         return;
       }
       window.clearTimeout(stuck);
+      logDiag("Token received", "ok", "session set — navigating");
       const target = consumeRedirect() ?? sanitizeRedirect(search.redirect) ?? "/";
       navigate({ to: target, replace: true });
     } catch (err: any) {
       window.clearTimeout(stuck);
       const msg = err?.message ?? "Google sign-in failed.";
+      logDiag("Exception", "fail", msg);
       setErrorMessage(msg);
       toast.error(msg);
       setBusy(false);
