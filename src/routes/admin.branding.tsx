@@ -258,6 +258,7 @@ function BrandingStudio() {
           <TabsTrigger value="assets"><ImageIcon className="w-3.5 h-3.5 mr-2" />Assets</TabsTrigger>
           <TabsTrigger value="typography"><Type className="w-3.5 h-3.5 mr-2" />Typography</TabsTrigger>
           <TabsTrigger value="effects"><Sparkles className="w-3.5 h-3.5 mr-2" />Effects</TabsTrigger>
+          <TabsTrigger value="maintenance"><Wrench className="w-3.5 h-3.5 mr-2" />Maintenance</TabsTrigger>
           <TabsTrigger value="presets"><Wand2 className="w-3.5 h-3.5 mr-2" />Presets</TabsTrigger>
         </TabsList>
 
