@@ -40,6 +40,7 @@ export function MaintenanceView({
   b,
   message,
   remainingLabel,
+  startsAt,
   endsAt,
   channels,
   user,
@@ -50,6 +51,7 @@ export function MaintenanceView({
   b: BrandingMap;
   message: string;
   remainingLabel: string | null;
+  startsAt?: string | null;
   endsAt?: string | null;
   channels: Contact[];
   user: UserChip | null;
