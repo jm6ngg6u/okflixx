@@ -27,6 +27,7 @@ import { Route as AdminRotationRouteImport } from './routes/admin.rotation'
 import { Route as AdminProxiesRouteImport } from './routes/admin.proxies'
 import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminContactRouteImport } from './routes/admin.contact'
+import { Route as AdminBrandingRouteImport } from './routes/admin.branding'
 import { Route as AdminBackgroundSongRouteImport } from './routes/admin.background-song'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
@@ -128,6 +129,11 @@ const AdminContactRoute = AdminContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBrandingRoute = AdminBrandingRouteImport.update({
+  id: '/branding',
+  path: '/branding',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBackgroundSongRoute = AdminBackgroundSongRouteImport.update({
   id: '/background-song',
   path: '/background-song',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
+  '/admin/branding': typeof AdminBrandingRoute
   '/admin/contact': typeof AdminContactRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
+  '/admin/branding': typeof AdminBrandingRoute
   '/admin/contact': typeof AdminContactRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
+  '/admin/branding': typeof AdminBrandingRoute
   '/admin/contact': typeof AdminContactRoute
   '/admin/cookies': typeof AdminCookiesRoute
   '/admin/proxies': typeof AdminProxiesRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/attempts'
     | '/admin/audit'
     | '/admin/background-song'
+    | '/admin/branding'
     | '/admin/contact'
     | '/admin/cookies'
     | '/admin/proxies'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/admin/attempts'
     | '/admin/audit'
     | '/admin/background-song'
+    | '/admin/branding'
     | '/admin/contact'
     | '/admin/cookies'
     | '/admin/proxies'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/admin/attempts'
     | '/admin/audit'
     | '/admin/background-song'
+    | '/admin/branding'
     | '/admin/contact'
     | '/admin/cookies'
     | '/admin/proxies'
@@ -512,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminContactRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/branding': {
+      id: '/admin/branding'
+      path: '/branding'
+      fullPath: '/admin/branding'
+      preLoaderRoute: typeof AdminBrandingRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/background-song': {
       id: '/admin/background-song'
       path: '/background-song'
@@ -590,6 +609,7 @@ interface AdminRouteChildren {
   AdminAttemptsRoute: typeof AdminAttemptsRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminBackgroundSongRoute: typeof AdminBackgroundSongRoute
+  AdminBrandingRoute: typeof AdminBrandingRoute
   AdminContactRoute: typeof AdminContactRoute
   AdminCookiesRoute: typeof AdminCookiesRoute
   AdminProxiesRoute: typeof AdminProxiesRoute
@@ -605,6 +625,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAttemptsRoute: AdminAttemptsRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminBackgroundSongRoute: AdminBackgroundSongRoute,
+  AdminBrandingRoute: AdminBrandingRoute,
   AdminContactRoute: AdminContactRoute,
   AdminCookiesRoute: AdminCookiesRoute,
   AdminProxiesRoute: AdminProxiesRoute,
