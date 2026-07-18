@@ -772,8 +772,8 @@ function HomePage() {
       <section id="devices" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_devices_kicker}</div>
-            <h2 className="font-display text-4xl md:text-6xl">{b.section_devices_title_1} <span className="text-shine">{b.section_devices_title_2}</span></h2>
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_devices_kicker}</div>
+            <h2 className="font-display brand-section-title">{b.section_devices_title_1} <span className="text-shine">{b.section_devices_title_2}</span></h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {["Smart TV", "Apple TV", "Roku", "Fire TV", "Chromecast", "PS5 / PS4", "Xbox", "Nvidia Shield"].map((d) => (
