@@ -435,8 +435,27 @@ function LoginPage() {
                 {loginSubtitle}
               </p>
 
-              {/* Inline error — shows the exact Google/OAuth failure so users
-                  can act on it instead of a disappearing toast. */}
+              {/* Origin / env mismatch — surfaced BEFORE OAuth attempt. */}
+              {originMismatch && (
+                <div
+                  role="alert"
+                  className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-400/40 bg-amber-400/[0.08] px-3.5 py-3 text-sm text-amber-100"
+                  style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" aria-hidden="true" />
+                  <div className="flex-1 space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+                      Wrong environment
+                    </p>
+                    <p className="leading-snug text-amber-50/95">
+                      This page is on <span className="font-mono">{currentOrigin}</span>, but sign-in is configured for{" "}
+                      <span className="font-mono">{expectedOrigin}</span>. Sign-in may be rejected by Google.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Inline error — shows the exact Google/OAuth failure. */}
               {errorMessage && (
                 <div
                   role="alert"
@@ -445,15 +464,36 @@ function LoginPage() {
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ff5a68]" aria-hidden="true" />
                   <div className="flex-1 space-y-2">
-                    <p className="leading-snug text-red-50/95">{errorMessage}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleGoogle({ forceRedirect: true })}
-                      disabled={busy}
-                      className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
-                    >
-                      Try full-page sign-in instead
-                    </button>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff8894]">
+                      {loginErrorTitle}
+                    </p>
+                    <p className="leading-snug text-red-50/95 font-mono text-[12.5px] break-words">
+                      {errorMessage}
+                    </p>
+                    {loginErrorHint && (
+                      <p className="leading-snug text-red-50/70 text-[12.5px]">{loginErrorHint}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleGoogle({ forceRedirect: true })}
+                        disabled={busy}
+                        className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
+                      >
+                        Try full-page sign-in instead
+                      </button>
+                      {loginHelpUrl && (
+                        <a
+                          href={loginHelpUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70 underline underline-offset-4 hover:text-white"
+                        >
+                          {loginHelpLabel}
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
