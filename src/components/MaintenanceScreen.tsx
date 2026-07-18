@@ -175,7 +175,7 @@ export function MaintenanceView({
           style={{
             letterSpacing: "var(--brand-letter-spacing)",
             marginTop: fx(20),
-            fontSize: fx(compact ? 32 : 56),
+            fontSize: fx(compact ? 32 : 56, "wordmark"),
           }}
         >
           {b.name_prefix}
