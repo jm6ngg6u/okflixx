@@ -9,79 +9,16 @@ import { z } from "zod";
 
 const CODE_REGEX = /^[A-Z0-9]{8}$/;
 
-function humanCaptchaReason(reason?: string, codes?: string[]): string {
-  const c = new Set(codes ?? []);
-  if (c.has("invalid-input-secret")) return "server secret was rejected — rotate it in project secrets";
-  if (c.has("missing-input-secret")) return "server secret is not configured";
-  if (c.has("invalid-input-response")) return "the widget token is invalid or already used";
-  if (c.has("missing-input-response")) return "no widget token was submitted";
-  if (c.has("timeout-or-duplicate")) return "the widget token expired — solve the captcha again";
-  if (c.has("bad-request")) return "the request was malformed";
-  if (c.has("sitekey-secret-mismatch")) return "site key and secret belong to different projects";
-  if (c.has("hostname-mismatch")) return "this domain isn't allowed on the site key";
-  if (!reason) return "unknown provider error";
-  if (reason.startsWith("captcha_network")) return "couldn't reach the captcha provider";
-  if (reason === "captcha_secret_missing") return "server secret is not configured";
-  if (reason === "empty_token") return "no widget token was submitted";
-  return reason.replace(/_/g, " ");
-}
-
 const InputSchema = z.object({
   code: z.string().length(8),
   website: z.string().max(0).optional().default(""),
   elapsedMs: z.number().int().min(0).max(24 * 60 * 60 * 1000),
   accessKey: z.string().max(64).optional().nullable(),
   accessSessionToken: z.string().max(128).optional().nullable(),
-  captchaToken: z.string().max(4096).optional().nullable(),
-  captchaWidgetProvider: z.enum(["turnstile", "hcaptcha"]).optional().nullable(),
-  captchaPassToken: z.string().max(512).optional().nullable(),
   fingerprint: z.string().max(256).optional().nullable(),
   authUserId: z.string().uuid().optional().nullable(),
 });
 
-// ---- captcha_pass: short-lived HMAC-signed token proving a captcha was
-// solved recently. Binds to ipHash+fpHash+expiry so it cannot be replayed
-// across users, devices, or after expiry. HMAC key = service role secret
-// (server-only, stable, rotating it invalidates all outstanding passes).
-const CAPTCHA_PASS_TTL_MS = 10 * 60 * 1000; // 10 minutes
-function passSecret(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_PROJECT_ID ?? "emberlord";
-}
-function b64url(bytes: Uint8Array): string {
-  let s = ""; for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-async function hmac(payload: string): Promise<string> {
-  const key = await globalThis.crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(passSecret()),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-  );
-  const sig = await globalThis.crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-  return b64url(new Uint8Array(sig));
-}
-export async function signCaptchaPass(ipHash: string, fpHash: string): Promise<{ token: string; exp: number }> {
-  const exp = Date.now() + CAPTCHA_PASS_TTL_MS;
-  const payload = `${ipHash.slice(0, 32)}.${fpHash.slice(0, 32)}.${exp}`;
-  const sig = await hmac(payload);
-  return { token: `cp1.${payload}.${sig}`, exp };
-}
-export async function verifyCaptchaPass(
-  token: string | null | undefined, ipHash: string, fpHash: string,
-): Promise<boolean> {
-  if (!token || !token.startsWith("cp1.")) return false;
-  const parts = token.slice(4).split(".");
-  if (parts.length !== 4) return false;
-  const [ipP, fpP, expStr, sig] = parts;
-  const exp = Number(expStr);
-  if (!Number.isFinite(exp) || exp < Date.now()) return false;
-  if (ipP !== ipHash.slice(0, 32)) return false;
-  if (fpP !== fpHash.slice(0, 32)) return false;
-  const expected = await hmac(`${ipP}.${fpP}.${exp}`);
-  if (expected.length !== sig.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
-  return diff === 0;
-}
 
 type ActivateResult =
   | {
