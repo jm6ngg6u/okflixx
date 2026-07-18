@@ -388,6 +388,29 @@ function SettingsPage() {
           <NumField k="pool_alert_threshold" label="Alert threshold (usable cookies)" local={local} set={set} onSave={save} busy={busy} min={0} max={10000} />
           <TextField k="pool_alert_webhook" label="Webhook URL" placeholder="https://…" local={local} set={set} onSave={save} busy={busy} />
         </div>
+        <div className="flex items-center justify-end mt-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/15 bg-white/[0.03] hover:bg-white/[0.06]"
+            disabled={!!busy["__test_webhook"] || !(local.pool_alert_webhook ?? "").trim()}
+            onClick={async () => {
+              setBusy((b) => ({ ...b, __test_webhook: true }));
+              try {
+                const r: any = await testWebhookFn();
+                if (r.ok) toast.success(`Webhook OK · ${r.status} in ${r.duration_ms}ms`);
+                else toast.error(`Webhook failed${r.status ? ` · ${r.status}` : ""}`, { description: r.error ?? r.snippet ?? "" });
+              } catch (e: any) {
+                toast.error("Test failed", { description: e?.message ?? "" });
+              } finally {
+                setBusy((b) => { const n = { ...b }; delete n.__test_webhook; return n; });
+              }
+            }}
+          >
+            {busy["__test_webhook"] ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1.5" />}
+            Send test payload
+          </Button>
+        </div>
       </Section>
 
     </div>
