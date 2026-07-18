@@ -869,6 +869,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_cron_schedules: {
+        Args: never
+        Returns: {
+          active: boolean
+          jobname: string
+          schedule: string
+        }[]
+      }
       log_admin_access_attempt: {
         Args: { _allowed: boolean; _path?: string }
         Returns: undefined
