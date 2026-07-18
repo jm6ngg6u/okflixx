@@ -115,8 +115,6 @@ function HomePage() {
 
   const [accessKey, setAccessKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<
     | { kind: "no_cookie" | "exhausted"; message: string; attempts?: number; code: string; at: number }
@@ -125,24 +123,6 @@ function HomePage() {
   const [retryCountdown, setRetryCountdown] = useState(0);
   const [autoRetry, setAutoRetry] = useState(true);
 
-  // Short-lived (10 min) HMAC pass minted after a successful captcha verify.
-  // Sent on subsequent activations so the user doesn't have to re-solve for
-  // every retry / new code within the window. Server enforces expiry + binding.
-  const CAPTCHA_PASS_KEY = "cp1";
-  const [captchaPassToken, setCaptchaPassToken] = useState<string | null>(
-    typeof window !== "undefined" ? (() => {
-      const raw = sessionStorage.getItem(CAPTCHA_PASS_KEY);
-      if (!raw) return null;
-      try {
-        const { token, exp } = JSON.parse(raw) as { token: string; exp: number };
-        return exp > Date.now() ? token : null;
-      } catch { return null; }
-    })() : null,
-  );
-  // Which provider the widget on this page was actually rendered for —
-  // sent to the server so a mismatched admin toggle produces a clear
-  // error instead of "captcha failed".
-  const captchaWidgetProviderRef = useRef<"turnstile" | "hcaptcha" | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("");
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
@@ -161,7 +141,6 @@ function HomePage() {
       setRetryCountdown((n) => {
         const next = Math.max(0, n - 1);
         if (next === 0 && autoRetry && serviceError) {
-          // Fire on next tick so state settles.
           window.setTimeout(() => handleActivateRef.current?.(), 0);
         }
         return next;
@@ -183,68 +162,16 @@ function HomePage() {
     return () => { sub.subscription.unsubscribe(); };
   }, []);
 
-  // Load Turnstile / hCaptcha script when captcha gate is on, then explicitly render the widget.
-  const captchaWidgetRef = useRef<HTMLDivElement>(null);
-  const captchaRenderedRef = useRef(false);
-  useEffect(() => {
-    if (!gate.data?.captchaRequired || !gate.data.captchaSiteKey) return;
-    const provider = gate.data.captchaProvider;
-    const src = provider === "hcaptcha"
-      ? "https://js.hcaptcha.com/1/api.js?render=explicit"
-      : "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-    const ensureScript = () => new Promise<void>((resolve) => {
-      const existing = document.querySelector(`script[src="${src}"]`);
-      if (existing) { resolve(); return; }
-      const s = document.createElement("script");
-      s.src = src; s.async = true; s.defer = true;
-      s.onload = () => resolve();
-      document.head.appendChild(s);
-    });
-    let cancelled = false;
-    (async () => {
-      await ensureScript();
-      const start = Date.now();
-      while (!cancelled) {
-        const api: any = provider === "hcaptcha" ? (window as any).hcaptcha : (window as any).turnstile;
-        if (api && captchaWidgetRef.current && !captchaRenderedRef.current) {
-          try {
-            api.render(captchaWidgetRef.current, {
-              sitekey: gate.data!.captchaSiteKey,
-              theme: "dark",
-              callback: (token: string) => {
-                setCaptchaToken(token);
-                setCaptchaError(null);
-                captchaWidgetProviderRef.current = provider;
-              },
-              "expired-callback": () => setCaptchaToken(""),
-              "error-callback": (err?: string) => {
-                setCaptchaToken("");
-                setCaptchaError(err ? `Widget error: ${err}` : "Widget error — refresh and try again.");
-              },
-            });
-            captchaRenderedRef.current = true;
-            captchaWidgetProviderRef.current = provider;
-          } catch { /* already rendered */ }
-          return;
-        }
-        if (Date.now() - start > 8000) return;
-        await new Promise((r) => setTimeout(r, 150));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [gate.data?.captchaRequired, gate.data?.captchaSiteKey, gate.data?.captchaProvider]);
-
   const gateBlocks = useMemo(() => {
     const g = gate.data;
-    if (!g) return { needsLogin: false, needsCaptcha: false, needsKey: false, hasSession: false };
+    if (!g) return { needsLogin: false, needsKey: false, hasSession: false };
     return {
       needsLogin: g.loginRequired && !authUserId,
-      // Captcha is satisfied by either a fresh widget token OR a live pass token.
-      needsCaptcha: g.captchaRequired && !captchaToken && !captchaPassToken,
       needsKey: g.accessKeyRequired && !accessKey && !sessionToken,
       hasSession: !!sessionToken,
     };
-  }, [gate.data, authUserId, captchaToken, captchaPassToken, accessKey, sessionToken]);
+  }, [gate.data, authUserId, accessKey, sessionToken]);
+
 
   // --- Redeem key ---
   const [redeeming, setRedeeming] = useState(false);
