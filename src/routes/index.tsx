@@ -747,7 +747,7 @@ function HomePage() {
 
           <div className="glass glow-ring-anim p-10 md:p-12 reveal text-center">
             <div className="font-mono text-[10px] uppercase tracking-widest text-[#ff2a3a] mb-4">◆ Premium UHD · Global</div>
-            <div className="font-display text-2xl mb-2">Emberlord Premium</div>
+            <div className="font-display brand-card-title mb-2">Emberlord Premium</div>
             <div className="flex items-baseline justify-center gap-2 mb-8">
               <span className="font-display text-7xl text-shine">$0</span>
               <span className="text-white/40 text-sm">/ forever</span>
