@@ -627,14 +627,14 @@ function AccessOpsPanels() {
 
   const [pvEmail, setPvEmail] = useState("");
   const [pvHasKey, setPvHasKey] = useState(false);
-  const [pvHasCaptcha, setPvHasCaptcha] = useState(false);
   const preview = useMutation({
     mutationFn: () => runPreview({ data: {
       email: pvEmail.trim() || null,
       hasAccessKey: pvHasKey,
-      hasCaptchaPass: pvHasCaptcha,
+      hasCaptchaPass: false,
     } }),
   });
+
 
   const l = lastUpdated.data?.latest;
   const rel = l ? relTime(l.updated_at) : null;
