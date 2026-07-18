@@ -376,17 +376,28 @@ export const setBackgroundSongSensitivity = createServerFn({ method: "POST" })
     return { ok: true, sensitivity: data.sensitivity };
   });
 
+/** Strip ASCII control chars + zero-width, collapse whitespace, trim, cap at 120. */
+function normalizeTrackTitle(raw: string): string {
+  return raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
 export const setBackgroundSongTrackTitle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ title: z.string().max(120) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ title: z.string().max(240) }).parse(d))
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
+    const clean = normalizeTrackTitle(data.title);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("app_settings").upsert({
-      key: "background_song_track_title", value: data.title,
+      key: "background_song_track_title", value: clean,
       updated_at: nowIso(), updated_by: userId,
     });
-    return { ok: true, title: data.title };
+    return { ok: true, title: clean };
   });
 
 // ============================================================================

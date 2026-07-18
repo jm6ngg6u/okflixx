@@ -250,7 +250,22 @@ function BackgroundSongPage() {
     d.scheduleStart !== scheduleStart ||
     d.scheduleEnd !== scheduleEnd
   );
-  const titleDirty = !!d && d.trackTitle !== trackTitleDraft;
+  // Match server normalization: strip control/zero-width, collapse whitespace, trim, cap.
+  const normalizeTitle = (raw: string) => raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  const normalizedTitleDraft = normalizeTitle(trackTitleDraft);
+  const titleDirty = !!d && d.trackTitle !== normalizedTitleDraft;
+  const titleCharCount = normalizedTitleDraft.length;
+  const fileFallback = d?.name?.replace(/\.[a-z0-9]+$/i, "") || "Background";
+  const titlePreview = normalizedTitleDraft || fileFallback;
+  const saveTitle = () => {
+    if (!titleDirty || titleMut.isPending) return;
+    titleMut.mutate(normalizedTitleDraft);
+  };
 
   // ---- Schedule validation + live-status helpers ------------------------
   const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -520,21 +535,64 @@ function BackgroundSongPage() {
       <div className="glass p-5">
         <div className="flex items-start gap-3 mb-4">
           <Type className="w-4 h-4 text-[#ff2a3a] mt-1" />
-          <div>
-            <div className="font-display text-lg leading-tight">Public track name</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="font-display text-lg leading-tight">Public track name</div>
+              <Badge variant="outline" className={normalizedTitleDraft
+                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-mono text-[10px] uppercase tracking-widest"
+                : "bg-white/10 text-white/60 border-white/15 font-mono text-[10px] uppercase tracking-widest"}>
+                {normalizedTitleDraft ? "CUSTOM" : "USING FILE NAME"}
+              </Badge>
+            </div>
             <div className="text-xs text-white/50 mt-1 max-w-xl">
               Shown in the floating chip on the public site so visitors can read what's playing. Leave blank to fall back to the file name.
             </div>
           </div>
         </div>
+
         <div className="flex flex-wrap gap-2">
-          <Input value={trackTitleDraft} onChange={(e) => setTrackTitleDraft(e.target.value)}
-            placeholder="e.g. Emberlord Theme — Extended Cut"
-            className="flex-1 min-w-[220px] bg-white/5 border-white/10" maxLength={120} />
-          <Button className="btn-red" disabled={!titleDirty || titleMut.isPending}
-            onClick={() => titleMut.mutate(trackTitleDraft.trim())}>
+          <Input
+            value={trackTitleDraft}
+            onChange={(e) => setTrackTitleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveTitle(); }
+              if (e.key === "Escape" && d) { setTrackTitleDraft(d.trackTitle); }
+            }}
+            placeholder={`e.g. ${fileFallback}`}
+            aria-label="Public track name"
+            className="flex-1 min-w-[220px] bg-white/5 border-white/10"
+            maxLength={120}
+          />
+          <Button
+            variant="outline"
+            className="border-white/10 bg-white/5 hover:bg-white/10"
+            disabled={!trackTitleDraft || titleMut.isPending}
+            onClick={() => setTrackTitleDraft("")}
+            title="Clear to use the file name"
+          >
+            Clear
+          </Button>
+          <Button className="btn-red" disabled={!titleDirty || titleMut.isPending} onClick={saveTitle}>
             {titleMut.isPending ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving…</> : "Save name"}
           </Button>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-white/40">
+          <span>Enter to save · Esc to revert · control chars stripped, whitespace collapsed.</span>
+          <span className={titleCharCount >= 110 ? "text-[#ff2a3a]" : ""}>{titleCharCount}/120</span>
+        </div>
+
+        {/* Live chip preview — mirrors the public floating chip */}
+        <div className="mt-4">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40 mb-2">// Live preview</div>
+          <div className="rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent p-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#ff2a3a]/30 bg-black/60 backdrop-blur px-3 py-1.5 shadow-[0_0_24px_rgba(255,42,58,0.15)]">
+              <Music4 className="w-3.5 h-3.5 text-[#ff2a3a]" />
+              <span className="font-mono text-[11px] tracking-wide text-white/90 truncate max-w-[280px]">
+                {titlePreview}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
