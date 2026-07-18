@@ -82,7 +82,18 @@ export const BRANDING_DEFAULTS = {
   maint_shine: "1",         // "1" on / "0" off — logo glow/shine loop
   maint_wordmark_glow: "1", // "1" on / "0" off — wordmark auto glow
   maint_intensity: "70",    // 0..100 — animation strength multiplier
-  maint_font_scale: "100",  // 60..140 — font size scale (%)
+  maint_font_scale: "100",  // 60..140 — global font size scale (%)
+  // Timezone + clock formatting for the countdown / ends-at line.
+  maint_timezone: "UTC",     // IANA
+  maint_time_format: "24h",  // "24h" | "12h"
+  // Per-element size overrides (percent, 60..160). Multiplies with maint_font_scale.
+  maint_size_status: "100",
+  maint_size_wordmark: "100",
+  maint_size_headline: "100",
+  maint_size_message: "100",
+  maint_size_countdown: "100",
+  maint_size_contacts: "100",
+  maint_size_footer: "100",
 };
 
 
