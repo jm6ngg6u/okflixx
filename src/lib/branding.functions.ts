@@ -13,8 +13,8 @@ export const BRANDING_DEFAULTS = {
   name_suffix: "LORD",
   tagline: "Command Netflix on any TV",
   browser_title: "Emberlord — Activate Netflix on any TV",
-  logo_url: "",
-  favicon_url: "",
+  logo_url: "/__l5e/assets-v1/48705337-395f-45fa-bb9b-b75a91db0e04/emberlord-logo.png",
+  favicon_url: "/favicon.png",
   meta_description:
     "Enter your 8-digit code and stream Netflix instantly on any Smart TV, Apple TV, Roku, PS5 or Xbox. Encrypted, always-on, 2026-ready.",
   footer_legal: "© 2026 · Encrypted · Everywhere",
