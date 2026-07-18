@@ -171,7 +171,8 @@ function sanitize(key: BrandingKey, raw: string): string {
     key === "size_wordmark_nav" || key === "size_hero_kicker" ||
     key === "size_hero_title" || key === "size_hero_sub" ||
     key === "size_section_kicker" || key === "size_section_title" ||
-    key === "size_card_title" || key === "size_body"
+    key === "size_card_title" || key === "size_body" ||
+    key === "home_scale" || key === "login_scale"
   ) {
     const n = Math.max(60, Math.min(160, parseInt(v, 10)));
     return Number.isFinite(n) ? String(n) : "100";
