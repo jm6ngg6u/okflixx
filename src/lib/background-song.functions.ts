@@ -323,13 +323,16 @@ export const setBackgroundSongReactive = createServerFn({ method: "POST" })
     return { ok: true, reactive: data.reactive };
   });
 
-const HHMM = z.string().regex(/^\d{2}:\d{2}$/);
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Must be HH:MM (00:00–23:59)");
 export const setBackgroundSongSchedule = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     enabled: z.boolean(),
     start: HHMM,
     end: HHMM,
+  }).refine((v) => !v.enabled || v.start !== v.end, {
+    message: "Start and end cannot be identical while the schedule is enabled.",
+    path: ["end"],
   }).parse(d))
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);

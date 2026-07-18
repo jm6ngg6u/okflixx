@@ -252,6 +252,54 @@ function BackgroundSongPage() {
   );
   const titleDirty = !!d && d.trackTitle !== trackTitleDraft;
 
+  // ---- Schedule validation + live-status helpers ------------------------
+  const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const startValid = HHMM_RE.test(scheduleStart);
+  const endValid = HHMM_RE.test(scheduleEnd);
+  const sameTimeError = scheduleEnabled && scheduleStart === scheduleEnd;
+  const scheduleError = !startValid || !endValid
+    ? "Times must be HH:MM (00:00–23:59)."
+    : sameTimeError
+      ? "Start and end cannot be identical while the schedule is on."
+      : "";
+
+  const [scheduleTick, setScheduleTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setScheduleTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const scheduleLive = useMemo(() => {
+    void scheduleTick;
+    if (!scheduleEnabled || !startValid || !endValid || sameTimeError) {
+      return { inWindow: true, nextLabel: "24/7", nextMinutes: 0 };
+    }
+    const parse = (v: string) => {
+      const [h, m] = v.split(":").map(Number);
+      return h * 60 + m;
+    };
+    const s = parse(scheduleStart);
+    const e = parse(scheduleEnd);
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const inW = s < e
+      ? cur >= s && cur <= e
+      : cur >= s || cur <= e;
+    // Minutes until next transition (start when out, end+1 when in).
+    const target = inW ? (e + 1) % 1440 : s;
+    let delta = target - cur;
+    if (delta <= 0) delta += 1440;
+    const hrs = Math.floor(delta / 60);
+    const mins = delta % 60;
+    const label = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+    return { inWindow: inW, nextLabel: label, nextMinutes: delta };
+  }, [scheduleTick, scheduleEnabled, scheduleStart, scheduleEnd, startValid, endValid, sameTimeError]);
+
+  const applyPreset = (start: string, end: string) => {
+    setScheduleEnabled(true);
+    setScheduleStart(start);
+    setScheduleEnd(end);
+  };
+
   return (
     <div className="space-y-6 pb-16">
       {/* Header */}
@@ -384,38 +432,88 @@ function BackgroundSongPage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {scheduleEnabled && !scheduleError && (
+              <Badge variant="outline" className={scheduleLive.inWindow
+                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-mono text-[10px] uppercase tracking-widest"
+                : "bg-white/5 text-white/50 border-white/15 font-mono text-[10px] uppercase tracking-widest"}>
+                {scheduleLive.inWindow ? "IN WINDOW" : "SLEEPING"}
+              </Badge>
+            )}
             <Badge variant="outline" className={scheduleEnabled
-              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-              : "bg-white/10 text-white/60 border-white/15"}>
+              ? "bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30 font-mono text-[10px] uppercase tracking-widest"
+              : "bg-white/10 text-white/60 border-white/15 font-mono text-[10px] uppercase tracking-widest"}>
               {scheduleEnabled ? "ACTIVE" : "24/7"}
             </Badge>
             <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
           </div>
         </div>
 
+        {/* Presets */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { label: "24/7", start: "00:00", end: "23:59", off: true },
+            { label: "Daytime 09–17", start: "09:00", end: "17:00" },
+            { label: "Evening 18–22", start: "18:00", end: "22:00" },
+            { label: "Night 22–06", start: "22:00", end: "06:00" },
+          ].map((p) => {
+            const active = p.off
+              ? !scheduleEnabled
+              : scheduleEnabled && scheduleStart === p.start && scheduleEnd === p.end;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => {
+                  if (p.off) { setScheduleEnabled(false); return; }
+                  applyPreset(p.start, p.end);
+                }}
+                className={`px-2.5 py-1 rounded-md border font-mono text-[10px] uppercase tracking-widest transition ${
+                  active
+                    ? "bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/40"
+                    : "bg-white/[0.03] text-white/60 border-white/10 hover:bg-white/[0.06] hover:text-white/80"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="mt-5 grid sm:grid-cols-3 gap-3 items-end">
           <div>
             <Label htmlFor="bg-start" className="text-[10px] font-mono uppercase tracking-widest text-white/40">Start</Label>
             <Input id="bg-start" type="time" value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)}
-              disabled={!scheduleEnabled} className="mt-1 bg-white/5 border-white/10" />
+              disabled={!scheduleEnabled}
+              className={`mt-1 bg-white/5 border-white/10 ${!startValid ? "border-[#ff2a3a]/50" : ""}`} />
           </div>
           <div>
             <Label htmlFor="bg-end" className="text-[10px] font-mono uppercase tracking-widest text-white/40">End</Label>
             <Input id="bg-end" type="time" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)}
-              disabled={!scheduleEnabled} className="mt-1 bg-white/5 border-white/10" />
+              disabled={!scheduleEnabled}
+              className={`mt-1 bg-white/5 border-white/10 ${!endValid || sameTimeError ? "border-[#ff2a3a]/50" : ""}`} />
           </div>
           <Button
             className="btn-red"
-            disabled={!scheduleDirty || scheduleMut.isPending}
+            disabled={!scheduleDirty || scheduleMut.isPending || !!scheduleError}
             onClick={() => scheduleMut.mutate({ enabled: scheduleEnabled, start: scheduleStart, end: scheduleEnd })}
           >
             {scheduleMut.isPending ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving…</> : "Save schedule"}
           </Button>
         </div>
-        <div className="mt-3 text-[11px] font-mono text-white/40">
-          Wraps midnight when end is earlier than start (e.g. 22:00 → 06:00).
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+          <span className="text-white/40">Wraps midnight when end is earlier than start (e.g. 22:00 → 06:00).</span>
+          {scheduleEnabled && !scheduleError && (
+            <span className="text-white/60">
+              {scheduleLive.inWindow ? "Ends in " : "Starts in "}
+              <span className="text-[#ff2a3a]">{scheduleLive.nextLabel}</span>
+            </span>
+          )}
         </div>
+        {scheduleError && (
+          <div className="mt-2 text-[11px] font-mono text-[#ff2a3a]">{scheduleError}</div>
+        )}
       </div>
 
       {/* Track title / preview mode */}

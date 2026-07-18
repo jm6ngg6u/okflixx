@@ -52,9 +52,11 @@ function isInWindow(start: string, end: string) {
   const s = parseHHMM(start);
   const e = parseHHMM(end);
   const cur = currentMinuteOfDay();
-  if (s === e) return true;
-  if (s < e) return cur >= s && cur < e;
-  return cur >= s || cur < e; // wraps midnight
+  if (s === e) return true; // "24/7 mirror" — no window means always play
+  // End-inclusive by the minute so 00:00–23:59 covers the full day and
+  // "22:00–06:00" plays through the 06:00 minute (matches admin expectation).
+  if (s < e) return cur >= s && cur <= e;
+  return cur >= s || cur <= e; // wraps midnight
 }
 function ensureSessionHash() {
   if (typeof window === "undefined") return "";
@@ -337,11 +339,15 @@ export function BackgroundSong() {
     sendEvent("impression");
   }, [q.data?.enabled, q.data?.url]);
 
-  // Fire an out_of_schedule event once when the schedule blocks playback.
+  // Fire out_of_schedule when the window closes; reset when it reopens so
+  // repeat closures are still logged for analytics.
   useEffect(() => {
-    if (q.data?.enabled && q.data.url && q.data.scheduleEnabled && !inWindow && !fired.current.oos) {
+    if (!q.data?.enabled || !q.data.url || !q.data.scheduleEnabled) return;
+    if (!inWindow && !fired.current.oos) {
       fired.current.oos = true;
       sendEvent("out_of_schedule");
+    } else if (inWindow && fired.current.oos) {
+      fired.current.oos = false;
     }
   }, [q.data?.enabled, q.data?.url, q.data?.scheduleEnabled, inWindow]);
 
