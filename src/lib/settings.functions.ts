@@ -270,14 +270,21 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
     if (!isAdmin && !isMod) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const staleCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const controlCutoffMs = Date.now() - 2 * 60 * 1000;
     const { data: staleRows } = await supabaseAdmin
       .from("job_runs")
-      .select("id, control, progress")
+      .select("id, control, progress, started_at")
       .is("finished_at", null)
-      .lt("started_at", staleCutoff);
+      .or(`started_at.lt.${staleCutoff},control.not.is.null`);
     for (const row of staleRows ?? []) {
-      const action = row.control === "stop" || row.control === "cancel" ? row.control : "timeout";
       const previous = row.progress && typeof row.progress === "object" ? row.progress : {};
+      const requestedAt = typeof previous.control_requested_at === "string"
+        ? new Date(previous.control_requested_at).getTime()
+        : new Date(row.started_at).getTime();
+      const isStaleRuntime = new Date(row.started_at).toISOString() < staleCutoff;
+      const isStaleControl = !!row.control && requestedAt < controlCutoffMs;
+      if (!isStaleRuntime && !isStaleControl) continue;
+      const action = row.control === "stop" || row.control === "cancel" ? row.control : "timeout";
       await supabaseAdmin
         .from("job_runs")
         .update({
@@ -389,10 +396,19 @@ export const requestJobControl = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row } = await supabaseAdmin
-      .from("job_runs").select("id, job, finished_at").eq("id", data.id).maybeSingle();
+      .from("job_runs").select("id, job, finished_at, progress").eq("id", data.id).maybeSingle();
     if (!row) throw new Error("Job not found");
     if (row.finished_at) throw new Error("Job already finished");
-    await supabaseAdmin.from("job_runs").update({ control: data.action }).eq("id", data.id);
+    const previousProgress = row.progress && typeof row.progress === "object" ? row.progress : {};
+    await supabaseAdmin.from("job_runs").update({
+      control: data.action,
+      progress: {
+        ...previousProgress,
+        control_action: data.action,
+        control_requested_at: new Date().toISOString(),
+        phase: data.action === "stop" ? "stopping" : "cancelling",
+      },
+    }).eq("id", data.id);
     await supabaseAdmin.from("admin_activity_log").insert({
       admin_id: userId,
       action: data.action === "stop" ? "job.stop_requested" : "job.cancel_requested",
