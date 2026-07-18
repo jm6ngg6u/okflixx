@@ -13,6 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download, Search, Send, RotateCcw, CheckCircle2, AlertTriangle, Calendar, X } from "lucide-react";
 import brandLogo from "@/assets/brand-logo.png";
+import { MaintenanceView } from "@/components/MaintenanceScreen";
+import { useBrand } from "@/lib/branding-context";
+
 
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
