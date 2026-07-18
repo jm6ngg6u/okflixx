@@ -1,17 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
-  runCookiesAutocheckNow, runProxiesAutocheckNow,
+  runCookiesAutocheckNow, runProxiesAutocheckNow, testPoolAlertWebhook,
 } from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download } from "lucide-react";
+import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download, Search, Send, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
 
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
@@ -33,8 +33,21 @@ function SettingsPage() {
   const doRunCookies = useServerFn(runCookiesAutocheckNow);
   const doRunProxies = useServerFn(runProxiesAutocheckNow);
 
-  const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
+  // Live poll every 2s so job "next-run" ticks down and remote edits appear.
+  const q = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => fetchSettings(),
+    refetchInterval: 2000,
+    refetchIntervalInBackground: false,
+  });
   const [local, setLocal] = useState<Record<string, string>>({});
+  // Track which keys the admin is editing so the 2s poll doesn't wipe them.
+  const dirtyRef = useRef<Set<string>>(new Set());
+  // Per-key busy flag → Save button spinner, disabled state.
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  // Free-text filter across all setting labels.
+  const [filter, setFilter] = useState("");
+  const testWebhookFn = useServerFn(testPoolAlertWebhook);
 
   const fetchRuns = useServerFn(listRecentJobRuns);
 
@@ -139,21 +152,47 @@ function SettingsPage() {
     }
   };
 
+  // Merge-preserving sync: never overwrite fields the admin is actively editing.
   useEffect(() => {
-    if (q.data?.settings) setLocal(q.data.settings);
+    const remote = q.data?.settings;
+    if (!remote) return;
+    setLocal((prev) => {
+      const next: Record<string, string> = { ...remote };
+      for (const k of dirtyRef.current) {
+        if (prev[k] !== undefined) next[k] = prev[k];
+      }
+      return next;
+    });
   }, [q.data]);
 
-  const set = (k: string, v: string) => setLocal((s) => ({ ...s, [k]: v }));
+  const set = (k: string, v: string) => {
+    dirtyRef.current.add(k);
+    setLocal((s) => ({ ...s, [k]: v }));
+  };
+
+  // Optimistic save with rollback. Pass an explicit value to bypass stale-closure
+  // bugs from toggles that fire immediately after setState.
   const save = async (k: string, valueOverride?: string) => {
+    if (busy[k]) return;
+    const value = valueOverride ?? local[k] ?? "";
+    const prev = q.data?.settings?.[k];
+    setLocal((s) => ({ ...s, [k]: value }));
+    setBusy((b) => ({ ...b, [k]: true }));
     try {
-      const value = valueOverride ?? local[k] ?? "";
-      if (valueOverride !== undefined) setLocal((s) => ({ ...s, [k]: value }));
       await doSet({ data: { key: k, value } });
+      dirtyRef.current.delete(k);
       toast.success(`Saved ${k.replace(/_/g, " ")}`);
       qc.invalidateQueries({ queryKey: ["admin-settings"] });
       qc.invalidateQueries({ queryKey: ["public-contacts"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Save failed");
+      // Rollback local optimistic value.
+      setLocal((s) => ({ ...s, [k]: prev ?? "" }));
+      dirtyRef.current.delete(k);
+      toast.error(`Couldn't save ${k.replace(/_/g, " ")}`, {
+        description: e?.message ?? "Reverted to previous value.",
+      });
+    } finally {
+      setBusy((b) => { const n = { ...b }; delete n[k]; return n; });
     }
   };
 
@@ -183,13 +222,17 @@ function SettingsPage() {
           : "bg-white/10 text-white/60 border-white/15"}>{proxyOn ? "PROXIED" : "DIRECT"}</Badge>}
       >
         <div className="flex items-center gap-4">
-          <Switch checked={proxyOn} onCheckedChange={async () => {
+          <Switch checked={proxyOn} disabled={!!busy["proxy_mode"]} onCheckedChange={async () => {
+            setBusy((b) => ({ ...b, proxy_mode: true }));
             try {
               const r = await doToggle();
-              set("proxy_mode", r.proxy_mode ? "1" : "0");
+              const nv = r.proxy_mode ? "1" : "0";
+              setLocal((s) => ({ ...s, proxy_mode: nv }));
+              dirtyRef.current.delete("proxy_mode");
               toast.success(`Proxy mode ${r.proxy_mode ? "enabled" : "disabled"}`);
               qc.invalidateQueries({ queryKey: ["admin-settings"] });
             } catch (e: any) { toast.error(e?.message ?? "Toggle failed"); }
+            finally { setBusy((b) => { const n = { ...b }; delete n.proxy_mode; return n; }); }
           }} />
           <span className="text-sm text-white/60">{proxyOn ? "Traffic routed via proxy pool" : "Direct edge connections"}</span>
         </div>
@@ -207,13 +250,16 @@ function SettingsPage() {
       >
         <div className="space-y-3">
           <div className="flex items-center gap-4">
-            <Switch checked={maintOn} onCheckedChange={async (v) => {
+            <Switch checked={maintOn} disabled={!!busy["maintenance_enabled"]} onCheckedChange={async (v) => {
+              setBusy((b) => ({ ...b, maintenance_enabled: true }));
               try {
                 await doMaint({ data: { enabled: v, message: local.maintenance_message ?? "" } });
-                set("maintenance_enabled", v ? "1" : "0");
+                setLocal((s) => ({ ...s, maintenance_enabled: v ? "1" : "0" }));
+                dirtyRef.current.delete("maintenance_enabled");
                 toast.success(`Maintenance ${v ? "enabled" : "disabled"}`);
                 qc.invalidateQueries({ queryKey: ["admin-settings"] });
               } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+              finally { setBusy((b) => { const n = { ...b }; delete n.maintenance_enabled; return n; }); }
             }} />
             <span className="text-sm text-white/60">{maintOn ? "Public site is in maintenance" : "Public site is live"}</span>
           </div>
@@ -243,8 +289,8 @@ function SettingsPage() {
         subtitle="Attempt limits and rate limiting for the public activation endpoint."
       >
         <div className="grid sm:grid-cols-2 gap-4">
-          <NumField k="max_activation_attempts" label="Max cookies tried per activation" hint="How many cookies to try before giving up" local={local} set={set} onSave={save} min={1} max={10} />
-          <NumField k="rate_limit_per_10min" label="Rate limit (per IP, 10 min)" hint="Attempts allowed per IP within 10 minutes" local={local} set={set} onSave={save} min={1} max={200} />
+          <NumField k="max_activation_attempts" label="Max cookies tried per activation" hint="How many cookies to try before giving up" local={local} set={set} onSave={save} busy={busy} min={1} max={10} />
+          <NumField k="rate_limit_per_10min" label="Rate limit (per IP, 10 min)" hint="Attempts allowed per IP within 10 minutes" local={local} set={set} onSave={save} busy={busy} min={1} max={200} />
         </div>
       </Section>
 
@@ -283,8 +329,8 @@ function SettingsPage() {
             onRun={() => runProxiesMut.mutate()}
             running={runProxiesMut.isPending}
           />
-          <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} />
-          <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} min={1} max={365} />
+          <ToggleField k="auto_cleanup_enabled" label="Nightly cleanup" hint="Prunes stale rows and old logs" local={local} set={set} onSave={save} busy={busy} />
+          <NumField k="auto_cleanup_days" label="Delete rows older than (days)" local={local} set={set} onSave={save} busy={busy} min={1} max={365} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2 pt-4 border-t border-white/10">
           <Button size="sm" variant="outline" onClick={exportRunsCSV} className="border-white/15 bg-white/5">
@@ -306,9 +352,9 @@ function SettingsPage() {
         subtitle="Toast notifications when scheduled or manual jobs finish. Quiet hours mute toasts within a time window (24h HH:MM, local time)."
       >
         <div className="grid sm:grid-cols-2 gap-3">
-          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} defaultOn />
-          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} defaultOn />
-          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} defaultOn />
+          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
+          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
+          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
           <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
             <div className="text-sm font-medium mb-2">Quiet hours</div>
             <div className="grid grid-cols-2 gap-2">
@@ -339,8 +385,31 @@ function SettingsPage() {
         subtitle="POST a JSON payload to a webhook when usable cookies fall below the threshold."
       >
         <div className="grid sm:grid-cols-2 gap-4">
-          <NumField k="pool_alert_threshold" label="Alert threshold (usable cookies)" local={local} set={set} onSave={save} min={0} max={10000} />
-          <TextField k="pool_alert_webhook" label="Webhook URL" placeholder="https://…" local={local} set={set} onSave={save} />
+          <NumField k="pool_alert_threshold" label="Alert threshold (usable cookies)" local={local} set={set} onSave={save} busy={busy} min={0} max={10000} />
+          <TextField k="pool_alert_webhook" label="Webhook URL" placeholder="https://…" local={local} set={set} onSave={save} busy={busy} />
+        </div>
+        <div className="flex items-center justify-end mt-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/15 bg-white/[0.03] hover:bg-white/[0.06]"
+            disabled={!!busy["__test_webhook"] || !(local.pool_alert_webhook ?? "").trim()}
+            onClick={async () => {
+              setBusy((b) => ({ ...b, __test_webhook: true }));
+              try {
+                const r: any = await testWebhookFn();
+                if (r.ok) toast.success(`Webhook OK · ${r.status} in ${r.duration_ms}ms`);
+                else toast.error(`Webhook failed${r.status ? ` · ${r.status}` : ""}`, { description: r.error ?? r.snippet ?? "" });
+              } catch (e: any) {
+                toast.error("Test failed", { description: e?.message ?? "" });
+              } finally {
+                setBusy((b) => { const n = { ...b }; delete n.__test_webhook; return n; });
+              }
+            }}
+          >
+            {busy["__test_webhook"] ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-1.5" />}
+            Send test payload
+          </Button>
         </div>
       </Section>
 
@@ -374,15 +443,27 @@ function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   );
 }
 
-function NumField({ k, label, hint, local, set, onSave, min, max }: any) {
+function NumField({ k, label, hint, local, set, onSave, busy, min, max }: any) {
+  const raw = local[k] ?? "";
+  const n = raw === "" ? NaN : Number(raw);
+  const outOfRange = raw !== "" && (Number.isNaN(n) || (min != null && n < min) || (max != null && n > max));
+  const isBusy = !!busy?.[k];
   return (
     <div className="space-y-1">
       <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</label>
       <div className="flex gap-2">
-        <Input type="number" min={min} max={max} value={local[k] ?? ""} onChange={(e) => set(k, e.target.value)} className="bg-white/5 border-white/10 font-mono" />
-        <Button size="sm" onClick={() => onSave(k)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+        <Input
+          type="number" min={min} max={max} value={raw}
+          onChange={(e) => set(k, e.target.value)}
+          className={`bg-white/5 font-mono ${outOfRange ? "border-red-500/50" : "border-white/10"}`}
+        />
+        <Button size="sm" disabled={isBusy || outOfRange || raw === ""} onClick={() => onSave(k)} className="btn-red shrink-0">
+          {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        </Button>
       </div>
-      {hint && <div className="text-[11px] text-white/40">{hint}</div>}
+      {outOfRange
+        ? <div className="text-[11px] text-red-300">Value must be between {min} and {max}.</div>
+        : hint && <div className="text-[11px] text-white/40">{hint}</div>}
     </div>
   );
 }
@@ -391,30 +472,38 @@ function NumField({ k, label, hint, local, set, onSave, min, max }: any) {
 
 
 
-function TextField({ k, label, placeholder, local, set, onSave }: any) {
+function TextField({ k, label, placeholder, local, set, onSave, busy }: any) {
+  const isBusy = !!busy?.[k];
   return (
     <div className="space-y-1">
       <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</label>
       <div className="flex gap-2">
         <Input placeholder={placeholder} value={local[k] ?? ""} onChange={(e) => set(k, e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-        <Button size="sm" onClick={() => onSave(k)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+        <Button size="sm" disabled={isBusy} onClick={() => onSave(k)} className="btn-red shrink-0">
+          {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        </Button>
       </div>
     </div>
   );
 }
-function ToggleField({ k, label, hint, local, set, onSave, defaultOn }: any) {
+function ToggleField({ k, label, hint, local, set, onSave, busy, defaultOn }: any) {
   const raw = local[k];
   const on = raw === "1" || (raw === undefined && !!defaultOn);
+  const isBusy = !!busy?.[k];
   return (
     <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-3">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         <div className="text-[11px] text-white/40">{hint ?? (on ? "Enabled" : "Disabled")}</div>
       </div>
-      <Switch checked={on} onCheckedChange={(v) => {
-        set(k, v ? "1" : "0");
-        setTimeout(() => onSave(k), 0);
-      }} />
+      <div className="flex items-center gap-2">
+        {isBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/50" />}
+        <Switch checked={on} disabled={isBusy} onCheckedChange={(v) => {
+          const nv = v ? "1" : "0";
+          set(k, nv);
+          onSave(k, nv);          // pass explicit value → no stale-closure bug
+        }} />
+      </div>
     </div>
   );
 }
@@ -445,7 +534,7 @@ function JobScheduleCard({
   defaultInterval: number;
   local: Record<string, string>;
   set: (k: string, v: string) => void;
-  onSave: (k: string) => void;
+  onSave: (k: string, valueOverride?: string) => void;
   onRun: () => void;
   running: boolean;
 }) {
@@ -473,7 +562,7 @@ function JobScheduleCard({
           <Badge variant="outline" className={enabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-white/10 text-white/60 border-white/15"}>
             {enabled ? "ON" : "OFF"}
           </Badge>
-          <Switch checked={enabled} onCheckedChange={(v) => { set(enabledKey, v ? "1" : "0"); setTimeout(() => onSave(enabledKey), 0); }} />
+          <Switch checked={enabled} onCheckedChange={(v) => { const nv = v ? "1" : "0"; set(enabledKey, nv); onSave(enabledKey, nv); }} />
         </div>
       </div>
 
@@ -513,7 +602,7 @@ function JobScheduleCard({
         <div className="min-w-0 pr-3">
           <div className="text-xs">{cleanupLabel}</div>
         </div>
-        <Switch checked={cleanupOn} onCheckedChange={(v) => { set(cleanupKey, v ? "1" : "0"); setTimeout(() => onSave(cleanupKey), 0); }} />
+        <Switch checked={cleanupOn} onCheckedChange={(v) => { const nv = v ? "1" : "0"; set(cleanupKey, nv); onSave(cleanupKey, nv); }} />
       </div>
 
       <div className="flex flex-wrap gap-2">
