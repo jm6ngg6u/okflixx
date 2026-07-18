@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download, Search, Send, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download, Search, Send, RotateCcw, CheckCircle2, AlertTriangle, Calendar, X } from "lucide-react";
+import brandLogo from "@/assets/brand-logo.png";
 
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
