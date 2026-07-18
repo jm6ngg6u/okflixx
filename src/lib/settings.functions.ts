@@ -246,6 +246,33 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
     return { rows: data ?? [] };
   });
 
+/**
+ * Live proxy-mode health summary. Exposes whether strict proxy mode has any
+ * usable proxies right now so the settings toggle can show real state.
+ */
+export const getProxyModeStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: a }, { data: m }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!a && !m) throw new Error("Forbidden");
+    const { data: setting } = await supabase.from("app_settings").select("value").eq("key", "proxy_mode").maybeSingle();
+    const proxy_mode = setting?.value === "1";
+    const { data: stats } = await supabase.rpc("get_proxy_stats");
+    const s: any = stats ?? {};
+    return {
+      proxy_mode,
+      usable: (s.valid ?? 0) as number,
+      total: (s.total ?? 0) as number,
+      quarantined: (s.quarantined ?? 0) as number,
+      stuck_locked: (s.stuck_locked ?? 0) as number,
+      avg_latency_ms: (s.avg_latency_ms ?? 0) as number,
+    };
+  });
+
 /** Admin: kick off cookie auto-check immediately (ignores enabled flag). */
 export const runCookiesAutocheckNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
