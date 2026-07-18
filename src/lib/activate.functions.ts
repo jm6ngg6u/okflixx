@@ -244,10 +244,9 @@ export const submitActivation = createServerFn({ method: "POST" })
         };
       }
     }
-    // Per-IP rate limit — a bot/scraper safety net. A user who solved the
-    // captcha or is signed in has already proved they're human, so we skip
-    // the IP cap for them (removes false positives on shared / NAT'd IPs).
-    if (!captchaPassed && !verifiedUserId) {
+    // Per-IP rate limit — a bot/scraper safety net. Signed-in users skip it.
+    if (!verifiedUserId) {
+
       const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
       const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
         _ip_hash: ipHash,
