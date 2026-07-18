@@ -281,11 +281,7 @@ function BackgroundSongPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className={d?.enabled
-              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-              : "bg-white/10 text-white/60 border-white/15"}>
-              {d?.enabled ? "PLAYING" : "OFF"}
-            </Badge>
+            <LiveHealthPill enabled={!!d?.enabled} t={telemetry.data} />
             <Switch checked={!!d?.enabled} disabled={toggleMut.isPending || !d?.path} onCheckedChange={(v) => toggleMut.mutate(v)} />
           </div>
         </div>
@@ -295,6 +291,16 @@ function BackgroundSongPage() {
           <StatBlock label="File size" value={fmtSize(d?.sizeBytes ?? 0)} />
           <StatBlock label="Last updated" value={fmtDate(d?.updatedAt ?? "")} />
         </div>
+
+        <LivePlaybackTelemetry
+          t={telemetry.data}
+          loading={telemetry.isLoading}
+          fetching={telemetry.isFetching}
+          generatedAt={telemetry.data?.generatedAt ?? null}
+          scheduleEnabled={!!d?.scheduleEnabled}
+          quietStart={d?.scheduleStart ?? ""}
+          quietEnd={d?.scheduleEnd ?? ""}
+        />
 
         {d?.previewUrl && (
           <div className="mt-4 flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
