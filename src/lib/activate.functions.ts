@@ -524,3 +524,19 @@ export const submitActivation = createServerFn({ method: "POST" })
       message: "We couldn't activate this code after several attempts — please try again shortly.",
     };
   });
+
+// Public live counter of ONLY successful TV activations.
+// No auth, no PII returned — just a scalar count. Polled every 2s from the homepage.
+export const getSuccessActivationCount = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count, error } = await supabaseAdmin
+      .from("activation_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("result", "success");
+    if (error) return { count: 0, ok: false as const };
+    return { count: count ?? 0, ok: true as const };
+  } catch {
+    return { count: 0, ok: false as const };
+  }
+});
