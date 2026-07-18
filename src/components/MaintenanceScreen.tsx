@@ -156,21 +156,30 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
           Maintenance in progress
         </div>
 
-        {/* Logo */}
-        <img
-          src={b.logo_url}
-          alt={brandName}
-          className="mt-8 h-24 w-24 object-contain drop-shadow-[0_0_36px_rgba(var(--brand-accent-rgb),0.55)] animate-pulse"
-        />
+        {/* Logo — flashing halo + sweeping shine */}
+        <div className="relative mt-8 h-28 w-28">
+          <span
+            aria-hidden
+            className="absolute inset-[-14%] rounded-full blur-2xl maintenance-flash"
+            style={{ background: "radial-gradient(closest-side, rgba(var(--brand-accent-rgb),0.75), transparent 70%)" }}
+          />
+          <img
+            src={b.logo_url}
+            alt={brandName}
+            className="relative h-28 w-28 object-contain maintenance-logo-shine"
+            style={{ filter: "drop-shadow(0 0 28px rgba(var(--brand-accent-rgb),0.65))" }}
+          />
+        </div>
 
-        {/* Wordmark */}
+        {/* Wordmark — auto glow pulse */}
         <h1
-          className="mt-6 font-[family:var(--brand-font-display)] text-4xl sm:text-6xl font-extrabold tracking-tight text-white"
+          className="mt-6 font-[family:var(--brand-font-display)] text-4xl sm:text-6xl font-extrabold tracking-tight text-white maintenance-wordmark-glow"
           style={{ letterSpacing: "var(--brand-letter-spacing)" }}
         >
           {b.name_prefix}
           <span className="text-[color:var(--brand-accent)]">{b.name_suffix}</span>
         </h1>
+
 
         {/* Headline */}
         <h2 className="mt-6 font-[family:var(--brand-font-display)] text-2xl sm:text-3xl font-semibold text-white/95">
