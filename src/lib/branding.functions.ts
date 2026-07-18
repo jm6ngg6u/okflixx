@@ -54,6 +54,12 @@ export const BRANDING_DEFAULTS = {
   login_footer_prompt: "Already have security clearance?",
   login_footer_cta: "Login",
   login_status: "Gateway online",
+  login_error_title: "Sign-in failed",
+  login_error_hint:
+    "Popups can be blocked in-browser. Try the full-page sign-in link or open this page in a new tab.",
+  login_help_url: "",
+  login_help_label: "Need help?",
+  login_expected_origin: "",
   // Typography (whitelisted below)
   font_display: "Sora",
   font_body: "Inter",
