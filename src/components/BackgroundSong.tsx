@@ -16,6 +16,9 @@ import {
   updateBgsHealth,
   recordBgsError,
   bumpBgsRetries,
+  resetBgsRetries,
+  bgsRetryBackoffMs,
+  bgsRetriesExhausted,
   type BgsStatus,
 } from "@/lib/background-song-health";
 import { BackgroundSongHealthPanel } from "@/components/BackgroundSongHealthPanel";
@@ -112,8 +115,15 @@ export function BackgroundSong() {
   // to avoid tight loops; retries within 30s share the same cooldown.
   const attemptRecovery = (reason: string) => {
     if (retryingRef.current) return;
+    // Exhausted → park in error until visibility change / config refresh.
+    if (bgsRetriesExhausted()) {
+      setStatus("error");
+      recordBgsError(`Retry budget exhausted (${reason})`);
+      return;
+    }
     const now = performance.now();
-    if (now - retryCooldownRef.current < 4000) return;
+    const cooldown = bgsRetryBackoffMs();
+    if (now - retryCooldownRef.current < cooldown) return;
     retryCooldownRef.current = now;
     retryingRef.current = true;
     retryCountRef.current += 1;
@@ -130,6 +140,7 @@ export function BackgroundSong() {
       el.play()
         .then(() => {
           setStatus("playing");
+          resetBgsRetries();
           retryingRef.current = false;
         })
         .catch((err) => {
@@ -148,6 +159,58 @@ export function BackgroundSong() {
     try { el.load(); } catch (err) { recordBgsError(err); }
     window.setTimeout(() => { retryingRef.current = false; }, 6000);
   };
+
+  // Reset retry budget when the tab becomes visible again (user came back).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const h = () => { if (document.visibilityState === "visible") resetBgsRetries(); };
+    document.addEventListener("visibilitychange", h);
+    return () => document.removeEventListener("visibilitychange", h);
+  }, []);
+
+  // Heartbeat beacon: post the current playback snapshot to the admin
+  // telemetry endpoint. Throttled + deduped so a stable state stays quiet.
+  const lastBeaconRef = useRef<{ payload: string; at: number }>({ payload: "", at: 0 });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tick = () => {
+      const h = {
+        status: statusRef.current,
+        muted,
+        needsGesture,
+        silent: analyserSilent,
+        retries: retryCountRef.current,
+        lastError: null as string | null,
+        sessionHash: ensureSessionHash(),
+      };
+      const body = JSON.stringify(h);
+      const now = performance.now();
+      // Skip if identical to last beacon and sent <30s ago.
+      if (body === lastBeaconRef.current.payload && now - lastBeaconRef.current.at < 30_000) return;
+      lastBeaconRef.current = { payload: body, at: now };
+      try {
+        const blob = new Blob([body], { type: "application/json" });
+        if (navigator.sendBeacon?.("/api/public/hooks/bgs-heartbeat", blob)) return;
+      } catch { /* ignore */ }
+      void fetch("/api/public/hooks/bgs-heartbeat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    };
+    // First beat quickly, then every 15s.
+    const first = window.setTimeout(tick, 1500);
+    const id = window.setInterval(tick, 15_000);
+    const onHide = () => { if (document.visibilityState === "hidden") tick(); };
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [muted, needsGesture]);
 
   const switchSeamlessLoop = () => {
     if (loopSwitchingRef.current || needsGesture) return;

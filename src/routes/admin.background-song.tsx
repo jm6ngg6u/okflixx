@@ -16,7 +16,9 @@ import {
   restoreBackgroundSong,
   deleteBackgroundSongVersion,
   getBackgroundSongAnalytics,
+  getPlaybackTelemetry,
 } from "@/lib/background-song.functions";
+import { isQuietHours } from "@/lib/quiet-hours";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +55,7 @@ function BackgroundSongPage() {
   const fetchInfo = useServerFn(getBackgroundSongAdmin);
   const fetchHistory = useServerFn(listBackgroundSongHistory);
   const fetchAnalytics = useServerFn(getBackgroundSongAnalytics);
+  const fetchTelemetry = useServerFn(getPlaybackTelemetry);
   const doToggle = useServerFn(setBackgroundSongEnabled);
   const doRemove = useServerFn(removeBackgroundSong);
   const doReactive = useServerFn(setBackgroundSongReactive);
@@ -67,6 +70,12 @@ function BackgroundSongPage() {
   const info = useQuery({ queryKey: ["bg-song-admin"], queryFn: () => fetchInfo(), refetchInterval: 15_000 });
   const history = useQuery({ queryKey: ["bg-song-history"], queryFn: () => fetchHistory() });
   const analytics = useQuery({ queryKey: ["bg-song-analytics"], queryFn: () => fetchAnalytics(), refetchInterval: 30_000 });
+  const telemetry = useQuery({
+    queryKey: ["bg-song-telemetry"],
+    queryFn: () => fetchTelemetry(),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: false,
+  });
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["bg-song-admin"] });
@@ -272,11 +281,7 @@ function BackgroundSongPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className={d?.enabled
-              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-              : "bg-white/10 text-white/60 border-white/15"}>
-              {d?.enabled ? "PLAYING" : "OFF"}
-            </Badge>
+            <LiveHealthPill enabled={!!d?.enabled} t={telemetry.data} />
             <Switch checked={!!d?.enabled} disabled={toggleMut.isPending || !d?.path} onCheckedChange={(v) => toggleMut.mutate(v)} />
           </div>
         </div>
@@ -286,6 +291,16 @@ function BackgroundSongPage() {
           <StatBlock label="File size" value={fmtSize(d?.sizeBytes ?? 0)} />
           <StatBlock label="Last updated" value={fmtDate(d?.updatedAt ?? "")} />
         </div>
+
+        <LivePlaybackTelemetry
+          t={telemetry.data}
+          loading={telemetry.isLoading}
+          fetching={telemetry.isFetching}
+          generatedAt={telemetry.data?.generatedAt ?? null}
+          scheduleEnabled={!!d?.scheduleEnabled}
+          quietStart={d?.scheduleStart ?? ""}
+          quietEnd={d?.scheduleEnd ?? ""}
+        />
 
         {d?.previewUrl && (
           <div className="mt-4 flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
@@ -817,6 +832,131 @@ function MeterCard({ label, value, tone, strong }: { label: string; value: numbe
           style={{ width: `${pct}%`, background: tone, boxShadow: strong ? `0 0 12px ${tone}` : "none" }}
         />
       </div>
+    </div>
+  );
+}
+
+// ---------- Live playback health -----------------------------------------
+
+type Telemetry = {
+  active: number;
+  audible: number;
+  muted: number;
+  gestureWait: number;
+  outOfSchedule: number;
+  errored: number;
+  silent: number;
+  audiblePct: number;
+  gesturePct: number;
+  errorPct: number;
+  totalEvents5m: number;
+  topErrors: { message: string; count: number; lastAt: string }[];
+  generatedAt: string;
+};
+
+function computeMaster(enabled: boolean, t: Telemetry | undefined): {
+  label: string;
+  className: string;
+  dot: string;
+  hint: string;
+} {
+  if (!enabled) {
+    return { label: "OFF", className: "bg-white/10 text-white/60 border-white/15", dot: "bg-white/40", hint: "Playback disabled" };
+  }
+  if (!t || t.active === 0) {
+    return { label: "IDLE", className: "bg-white/10 text-white/60 border-white/15", dot: "bg-white/40", hint: "No live listeners" };
+  }
+  if (t.errorPct >= 30) {
+    return { label: "DEGRADED", className: "bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30", dot: "bg-[#ff2a3a]", hint: `${t.errorPct}% error/stalled` };
+  }
+  if (t.audiblePct >= 50) {
+    return { label: "LIVE · AUDIBLE", className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400", hint: `${t.audiblePct}% audible` };
+  }
+  if (t.audible > 0) {
+    return { label: "LIVE", className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400", hint: `${t.audible}/${t.active} audible` };
+  }
+  if (t.gesturePct >= 50) {
+    return { label: "AWAITING GESTURE", className: "bg-amber-500/15 text-amber-200 border-amber-500/30", dot: "bg-amber-300", hint: `${t.gesturePct}% blocked by autoplay` };
+  }
+  return { label: "MUTED ONLY", className: "bg-sky-500/15 text-sky-200 border-sky-500/30", dot: "bg-sky-300", hint: "Playing muted for most listeners" };
+}
+
+function LiveHealthPill({ enabled, t }: { enabled: boolean; t: Telemetry | undefined }) {
+  const m = computeMaster(enabled, t);
+  return (
+    <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border text-[11px] font-mono uppercase tracking-widest ${m.className}`}
+         title={m.hint}>
+      <span className={`inline-block w-1.5 h-1.5 rounded-full ${m.dot} ${enabled ? "animate-pulse" : ""}`} />
+      {m.label}
+    </div>
+  );
+}
+
+function LivePlaybackTelemetry(props: {
+  t: Telemetry | undefined;
+  loading: boolean;
+  fetching: boolean;
+  generatedAt: string | null;
+  scheduleEnabled: boolean;
+  quietStart: string;
+  quietEnd: string;
+}) {
+  const { t, loading, fetching, generatedAt, scheduleEnabled, quietStart, quietEnd } = props;
+  const inQuiet = scheduleEnabled && !isQuietHours(new Date(), quietStart, quietEnd);
+  // scheduleStart/End is the play window; outside it we render "out of schedule".
+  return (
+    <div className="mt-4 rounded-md border border-white/10 bg-white/[0.02] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Signal className={`w-3.5 h-3.5 ${fetching ? "text-[#ff2a3a]" : "text-white/50"}`} />
+          <div className="font-mono uppercase tracking-widest text-[10px] text-white/50">
+            Live playback health · rolling 5 min
+          </div>
+        </div>
+        <div className="text-[10px] font-mono text-white/40">
+          {loading ? "loading…" : generatedAt ? `updated ${new Date(generatedAt).toLocaleTimeString()}` : "—"}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-6 gap-2">
+        <Tile label="Listeners" value={t?.active ?? 0} tone="text-white" />
+        <Tile label="Audible" value={t?.audible ?? 0} sub={`${t?.audiblePct ?? 0}%`} tone="text-emerald-300" />
+        <Tile label="Muted" value={t?.muted ?? 0} tone="text-sky-300" />
+        <Tile label="Awaiting tap" value={t?.gestureWait ?? 0} sub={`${t?.gesturePct ?? 0}%`} tone="text-amber-300" />
+        <Tile label="Errored" value={t?.errored ?? 0} sub={`${t?.errorPct ?? 0}%`} tone="text-[#ff2a3a]" />
+        <Tile label="Out of schedule" value={t?.outOfSchedule ?? 0} tone="text-white/50" />
+      </div>
+
+      {inQuiet && (
+        <div className="mt-3 text-[11px] font-mono text-amber-200/80">
+          Play window active — visitors outside {quietStart}–{quietEnd} are correctly silenced.
+        </div>
+      )}
+
+      {t?.topErrors?.length ? (
+        <div className="mt-4">
+          <div className="font-mono uppercase tracking-widest text-[10px] text-white/40 mb-1.5">Top errors</div>
+          <div className="space-y-1">
+            {t.topErrors.map((e) => (
+              <div key={e.message} className="flex items-start gap-2 text-[11px] font-mono">
+                <AlertCircle className="w-3 h-3 mt-[3px] text-[#ff2a3a] shrink-0" />
+                <div className="min-w-0 flex-1 break-words text-white/70 leading-snug">{e.message}</div>
+                <div className="text-white/40 tabular-nums shrink-0">×{e.count}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Tile({ label, value, sub, tone }: { label: string; value: number; sub?: string; tone: string }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-black/30 p-2.5">
+      <div className="font-mono uppercase tracking-widest text-[9px] text-white/40">{label}</div>
+      <div className={`font-display text-xl leading-tight mt-0.5 tabular-nums ${tone}`}>{value}</div>
+      {sub ? <div className="font-mono text-[10px] text-white/40 mt-0.5">{sub}</div> : null}
     </div>
   );
 }

@@ -375,21 +375,39 @@ export type Database = {
       background_song_events: {
         Row: {
           created_at: string
+          error: string | null
           event_type: string
           id: number
+          ip_hash: string | null
+          muted: boolean | null
+          needs_gesture: boolean | null
           session_hash: string | null
+          silent: boolean | null
+          status: string | null
         }
         Insert: {
           created_at?: string
+          error?: string | null
           event_type: string
           id?: never
+          ip_hash?: string | null
+          muted?: boolean | null
+          needs_gesture?: boolean | null
           session_hash?: string | null
+          silent?: boolean | null
+          status?: string | null
         }
         Update: {
           created_at?: string
+          error?: string | null
           event_type?: string
           id?: never
+          ip_hash?: string | null
+          muted?: boolean | null
+          needs_gesture?: boolean | null
           session_hash?: string | null
+          silent?: boolean | null
+          status?: string | null
         }
         Relationships: []
       }

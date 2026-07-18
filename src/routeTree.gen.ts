@@ -36,6 +36,7 @@ import { Route as ApiPublicBackgroundSongAudioRouteImport } from './routes/api/p
 import { Route as ApiAdminUploadBackgroundSongRouteImport } from './routes/api/admin/upload-background-song'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
+import { Route as ApiPublicHooksBgsHeartbeatRouteImport } from './routes/api/public/hooks/bgs-heartbeat'
 import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
 const LoginRoute = LoginRouteImport.update({
@@ -177,6 +178,12 @@ const ApiPublicHooksCookiesAutocheckRoute =
     path: '/api/public/hooks/cookies-autocheck',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksBgsHeartbeatRoute =
+  ApiPublicHooksBgsHeartbeatRouteImport.update({
+    id: '/api/public/hooks/bgs-heartbeat',
+    path: '/api/public/hooks/bgs-heartbeat',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksAutoCleanupRoute =
   ApiPublicHooksAutoCleanupRouteImport.update({
     id: '/api/public/hooks/auto-cleanup',
@@ -211,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
   '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
+  '/api/public/hooks/bgs-heartbeat': typeof ApiPublicHooksBgsHeartbeatRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -240,6 +248,7 @@ export interface FileRoutesByTo {
   '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
   '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
+  '/api/public/hooks/bgs-heartbeat': typeof ApiPublicHooksBgsHeartbeatRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -271,6 +280,7 @@ export interface FileRoutesById {
   '/api/admin/upload-background-song': typeof ApiAdminUploadBackgroundSongRoute
   '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
+  '/api/public/hooks/bgs-heartbeat': typeof ApiPublicHooksBgsHeartbeatRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/api/admin/upload-background-song'
     | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
+    | '/api/public/hooks/bgs-heartbeat'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/proxies-autocheck'
   fileRoutesByTo: FileRoutesByTo
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/admin/upload-background-song'
     | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
+    | '/api/public/hooks/bgs-heartbeat'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/proxies-autocheck'
   id:
@@ -362,6 +374,7 @@ export interface FileRouteTypes {
     | '/api/admin/upload-background-song'
     | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
+    | '/api/public/hooks/bgs-heartbeat'
     | '/api/public/hooks/cookies-autocheck'
     | '/api/public/hooks/proxies-autocheck'
   fileRoutesById: FileRoutesById
@@ -379,6 +392,7 @@ export interface RootRouteChildren {
   ApiAdminUploadBackgroundSongRoute: typeof ApiAdminUploadBackgroundSongRoute
   ApiPublicBackgroundSongAudioRoute: typeof ApiPublicBackgroundSongAudioRoute
   ApiPublicHooksAutoCleanupRoute: typeof ApiPublicHooksAutoCleanupRoute
+  ApiPublicHooksBgsHeartbeatRoute: typeof ApiPublicHooksBgsHeartbeatRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
   ApiPublicHooksProxiesAutocheckRoute: typeof ApiPublicHooksProxiesAutocheckRoute
 }
@@ -574,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksCookiesAutocheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/bgs-heartbeat': {
+      id: '/api/public/hooks/bgs-heartbeat'
+      path: '/api/public/hooks/bgs-heartbeat'
+      fullPath: '/api/public/hooks/bgs-heartbeat'
+      preLoaderRoute: typeof ApiPublicHooksBgsHeartbeatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/auto-cleanup': {
       id: '/api/public/hooks/auto-cleanup'
       path: '/api/public/hooks/auto-cleanup'
@@ -641,6 +662,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminUploadBackgroundSongRoute: ApiAdminUploadBackgroundSongRoute,
   ApiPublicBackgroundSongAudioRoute: ApiPublicBackgroundSongAudioRoute,
   ApiPublicHooksAutoCleanupRoute: ApiPublicHooksAutoCleanupRoute,
+  ApiPublicHooksBgsHeartbeatRoute: ApiPublicHooksBgsHeartbeatRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
   ApiPublicHooksProxiesAutocheckRoute: ApiPublicHooksProxiesAutocheckRoute,
 }
