@@ -190,6 +190,7 @@ function SettingsPage() {
       toast.success(`Saved ${k.replace(/_/g, " ")}`);
       qc.invalidateQueries({ queryKey: ["admin-settings"] });
       qc.invalidateQueries({ queryKey: ["public-contacts"] });
+      qc.invalidateQueries({ queryKey: ["public-gate"] });
     } catch (e: any) {
       // Rollback local optimistic value.
       setLocal((s) => ({ ...s, [k]: prev ?? "" }));
