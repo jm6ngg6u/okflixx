@@ -592,11 +592,14 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
   );
 }
 
-function PolicyChip({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+function PolicyChip({ label, value, ok, warn }: { label: string; value: string; ok?: boolean; warn?: boolean }) {
+  const border = warn
+    ? "border-sky-500/30 bg-sky-500/[0.06]"
+    : ok
+      ? "border-white/10 bg-white/[0.03]"
+      : "border-rose-500/25 bg-rose-500/[0.05]";
   return (
-    <div className={`rounded-md border px-3 py-2 flex items-center justify-between ${
-      ok ? "border-white/10 bg-white/[0.03]" : "border-rose-500/25 bg-rose-500/[0.05]"
-    }`}>
+    <div className={`rounded-md border px-3 py-2 flex items-center justify-between ${border}`}>
       <span className="font-mono uppercase tracking-widest text-[9px] text-white/50">{label}</span>
       <span className="font-mono text-white/85 text-[11px]">{value}</span>
     </div>
