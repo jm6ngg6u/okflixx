@@ -12,6 +12,7 @@ import type { BrandingMap } from "@/lib/branding-context";
 
 type Props = {
   message: string;
+  startsAt?: string | null;
   endsAt: string | null;
   onCleared: () => void;
 };
