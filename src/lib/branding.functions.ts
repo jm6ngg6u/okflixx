@@ -123,7 +123,15 @@ function sanitize(key: BrandingKey, raw: string): string {
     const n = Math.max(0, Math.min(100, parseInt(v, 10)));
     return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.glow;
   }
-  if (key === "wordmark_pulse") return v === "0" ? "0" : "1";
+  if (key === "wordmark_pulse" || key === "maint_flash" || key === "maint_shine" || key === "maint_wordmark_glow") return v === "0" ? "0" : "1";
+  if (key === "maint_intensity") {
+    const n = Math.max(0, Math.min(100, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.maint_intensity;
+  }
+  if (key === "maint_font_scale") {
+    const n = Math.max(60, Math.min(140, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.maint_font_scale;
+  }
   if (key === "font_display" || key === "font_body" || key === "font_mono") {
     return (FONT_WHITELIST as readonly string[]).includes(v) ? v : BRANDING_DEFAULTS[key];
   }
