@@ -68,7 +68,7 @@ const HOME_MESSAGES: Row[] = [
   { key: "section_cta_title_2", label: "Bottom CTA — line B (accent)" },
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
-  { key: "error_generic", label: "Generic activation error", multiline: true },
+  
 ];
 
 const LOGIN_MESSAGES: Row[] = [
