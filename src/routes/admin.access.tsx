@@ -268,14 +268,8 @@ function AccessAdminPage() {
           onToggle={(v) => gateMut.mutate({ accessKeyRequired: v })}
           loading={gateMut.isPending}
         />
-        <GateCard
-          icon={<ShieldCheck className="w-5 h-5" />}
-          title="Captcha gate"
-          desc="Cloudflare Turnstile or hCaptcha check on every submit. Blocks bots and headless clients."
-          enabled={!!c?.captchaRequired}
-          onToggle={(v) => gateMut.mutate({ captchaRequired: v })}
-          loading={gateMut.isPending}
-        />
+
+
         <GateCard
           icon={<UserCheck className="w-5 h-5" />}
           title="Login gate"
