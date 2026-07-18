@@ -558,9 +558,10 @@ function HomePage() {
                   <div className="min-w-0">
                     <h3 className="font-display brand-card-title leading-tight">
                       <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                        <span>Enter your</span>
-                        <span className="text-shine">TV code</span>
+                        <span>Activate</span>
+                        <span className="text-shine">TV</span>
                       </span>
+
                     </h3>
                     <p className="mt-2 text-white/58 text-sm leading-relaxed">
                       Type the 8-character code from your TV screen. It updates instantly as you enter each character.
