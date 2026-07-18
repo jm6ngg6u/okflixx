@@ -314,7 +314,6 @@ export const submitActivation = createServerFn({ method: "POST" })
           error: "no_cookie",
           attempts: attemptNumber,
           message: "Cookie pool is empty — please try again shortly.",
-          captchaPass: mintedPass,
         };
       }
 
@@ -460,7 +459,6 @@ export const submitActivation = createServerFn({ method: "POST" })
             payment_method: meta?.payment_method ?? null,
             name: meta?.name ?? null,
           },
-          captchaPass: mintedPass,
         };
       }
 
@@ -470,7 +468,6 @@ export const submitActivation = createServerFn({ method: "POST" })
           error: "invalid_code",
           attempts: attemptNumber,
           message: "That code is invalid or has expired. Check your TV screen and try again.",
-          captchaPass: mintedPass,
         };
       }
       // otherwise: transient → loop with a fresh cookie
@@ -481,6 +478,5 @@ export const submitActivation = createServerFn({ method: "POST" })
       error: "exhausted",
       attempts: maxAttempts,
       message: "We couldn't activate this code after several attempts — please try again shortly.",
-      captchaPass: mintedPass,
     };
   });
