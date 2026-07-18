@@ -6,7 +6,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
-import { submitActivation } from "@/lib/activate.functions";
+import { submitActivation, getSuccessActivationCount } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
 import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,6 +115,16 @@ function HomePage() {
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
+  const fetchSuccessCount = useServerFn(getSuccessActivationCount);
+
+  // Live successful-activation counter — polled every 2s. Counts ONLY result='success'.
+  const successCount = useQuery({
+    queryKey: ["public-activation-success-count"],
+    queryFn: () => fetchSuccessCount(),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: false,
+    staleTime: 1_000,
+  });
 
 
   // Realtime push on app_settings — banner flips within ~200ms.
