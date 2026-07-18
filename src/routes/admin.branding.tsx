@@ -80,6 +80,11 @@ const MESSAGES: Row[] = [
   { key: "login_footer_prompt", label: "Login — footer prompt" },
   { key: "login_footer_cta", label: "Login — footer CTA" },
   { key: "login_status", label: "Login — status pill" },
+  { key: "login_error_title", label: "Login — error title" },
+  { key: "login_error_hint", label: "Login — error hint / help copy", multiline: true },
+  { key: "login_help_url", label: "Login — help link URL", placeholder: "https://…" },
+  { key: "login_help_label", label: "Login — help link label" },
+  { key: "login_expected_origin", label: "Login — expected origin (env check)", placeholder: "https://your-site.lovable.app" },
 ];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];

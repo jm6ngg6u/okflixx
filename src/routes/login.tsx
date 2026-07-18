@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Zap, ShieldCheck, Radio, Crown, AlertTriangle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Zap, ShieldCheck, Radio, Crown, AlertTriangle, Activity, ChevronDown, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
@@ -25,16 +25,62 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+type DiagLine = { ts: number; label: string; status: "ok" | "warn" | "fail" | "info"; detail?: string };
+
 function LoginPage() {
   const navigate = useNavigate();
   const brand = useBrand();
   const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [diagOpen, setDiagOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).has("diag");
+  });
+  const [diag, setDiag] = useState<DiagLine[]>([]);
+  const diagRef = useRef<DiagLine[]>([]);
+
+  function logDiag(label: string, status: DiagLine["status"], detail?: string) {
+    const line: DiagLine = { ts: Date.now(), label, status, detail };
+    diagRef.current = [...diagRef.current, line].slice(-40);
+    setDiag(diagRef.current);
+  }
 
   useEffect(() => {
     if (search.redirect) stashRedirect(search.redirect);
   }, [search.redirect]);
+
+  // Initial diagnostics snapshot — origin, browser hints, session probe.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    logDiag("Loaded /login", "info", window.location.origin);
+    // Session callback check: if we already have a session, this is a callback.
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        logDiag("Session probe", "fail", error.message);
+      } else if (data.session) {
+        logDiag("Session callback detected", "ok", data.session.user.email ?? "signed in");
+      } else {
+        logDiag("Session probe", "ok", "no active session");
+      }
+    });
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Origin diagnostics fires whenever the expected origin resolves from
+    // branding — includes a warn line when the two disagree.
+    if (typeof window === "undefined") return;
+    const expected = (brand?.login_expected_origin || "").trim().replace(/\/$/, "");
+    const here = window.location.origin;
+    if (!expected) return;
+    if (expected === here) {
+      logDiag("Origin check", "ok", `matches configured (${expected})`);
+    } else {
+      logDiag("Origin check", "warn", `expected ${expected}, got ${here}`);
+    }
+  }, [brand?.login_expected_origin]);
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -64,6 +110,7 @@ function LoginPage() {
     setBusy(true);
     setErrorMessage(null);
     stashRedirect(search.redirect ?? null);
+    logDiag(opts?.forceRedirect ? "Sign-in start · redirect mode" : "Sign-in start · popup mode", "info");
 
     // Pre-flight popup probe. MUST run synchronously in the click handler so
     // the browser attributes the resulting popup to the user gesture.
@@ -77,17 +124,25 @@ function LoginPage() {
     }
     const popupBlocked = !opts?.forceRedirect && (!probe || probe.closed);
     if (probe && !probe.closed) probe.close();
+    if (!opts?.forceRedirect) {
+      logDiag("Popup capability", popupBlocked ? "warn" : "ok", popupBlocked ? "blocked — switching to full-page redirect" : "allowed");
+    }
 
     // Safety: never leave the button stuck.
-    const stuck = window.setTimeout(() => setBusy(false), 45_000);
+    const stuck = window.setTimeout(() => {
+      logDiag("Safety timeout", "warn", "45s elapsed with no response — resetting button");
+      setBusy(false);
+    }, 45_000);
 
     try {
       if (popupBlocked || opts?.forceRedirect) {
+        logDiag("Calling supabase.auth.signInWithOAuth", "info", "full-page redirect");
         await redirectFallback();
         // Browser will navigate; keep busy state so button reads "Opening Google…"
         return;
       }
 
+      logDiag("Calling lovable.auth.signInWithOAuth", "info", "popup");
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
         extraParams: { prompt: "select_account" },
@@ -95,6 +150,7 @@ function LoginPage() {
       if (result.error) {
         window.clearTimeout(stuck);
         const msg = result.error.message ?? "Google sign-in failed.";
+        logDiag("OAuth error", "fail", msg);
         setErrorMessage(msg);
         toast.error(msg);
         setBusy(false);
@@ -102,14 +158,17 @@ function LoginPage() {
       }
       if (result.redirected) {
         window.clearTimeout(stuck);
+        logDiag("Redirected to Google", "ok");
         return;
       }
       window.clearTimeout(stuck);
+      logDiag("Token received", "ok", "session set — navigating");
       const target = consumeRedirect() ?? sanitizeRedirect(search.redirect) ?? "/";
       navigate({ to: target, replace: true });
     } catch (err: any) {
       window.clearTimeout(stuck);
       const msg = err?.message ?? "Google sign-in failed.";
+      logDiag("Exception", "fail", msg);
       setErrorMessage(msg);
       toast.error(msg);
       setBusy(false);
@@ -134,6 +193,19 @@ function LoginPage() {
   const loginFooterPrompt = brand?.login_footer_prompt || "Already have security clearance?";
   const loginFooterCta = brand?.login_footer_cta || "Login";
   const loginStatus = brand?.login_status || "Gateway online";
+  const loginErrorTitle = brand?.login_error_title || "Sign-in failed";
+  const loginErrorHint = brand?.login_error_hint || "";
+  const loginHelpUrl = (brand?.login_help_url || "").trim();
+  const loginHelpLabel = brand?.login_help_label || "Need help?";
+  const expectedOrigin = (brand?.login_expected_origin || "").trim().replace(/\/$/, "");
+
+  // Env / redirect-URI mismatch banner — admin sets the canonical origin;
+  // if the visitor is on a different one (a stale preview, a mistyped domain)
+  // we warn BEFORE the OAuth round-trip so they don't burn a redirect attempt.
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const originMismatch =
+    !!expectedOrigin && !!currentOrigin && expectedOrigin !== currentOrigin;
+
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-[#050505] text-white">
@@ -379,8 +451,27 @@ function LoginPage() {
                 {loginSubtitle}
               </p>
 
-              {/* Inline error — shows the exact Google/OAuth failure so users
-                  can act on it instead of a disappearing toast. */}
+              {/* Origin / env mismatch — surfaced BEFORE OAuth attempt. */}
+              {originMismatch && (
+                <div
+                  role="alert"
+                  className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-400/40 bg-amber-400/[0.08] px-3.5 py-3 text-sm text-amber-100"
+                  style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-300" aria-hidden="true" />
+                  <div className="flex-1 space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+                      Wrong environment
+                    </p>
+                    <p className="leading-snug text-amber-50/95">
+                      This page is on <span className="font-mono">{currentOrigin}</span>, but sign-in is configured for{" "}
+                      <span className="font-mono">{expectedOrigin}</span>. Sign-in may be rejected by Google.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Inline error — shows the exact Google/OAuth failure. */}
               {errorMessage && (
                 <div
                   role="alert"
@@ -389,15 +480,36 @@ function LoginPage() {
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ff5a68]" aria-hidden="true" />
                   <div className="flex-1 space-y-2">
-                    <p className="leading-snug text-red-50/95">{errorMessage}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleGoogle({ forceRedirect: true })}
-                      disabled={busy}
-                      className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
-                    >
-                      Try full-page sign-in instead
-                    </button>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff8894]">
+                      {loginErrorTitle}
+                    </p>
+                    <p className="leading-snug text-red-50/95 font-mono text-[12.5px] break-words">
+                      {errorMessage}
+                    </p>
+                    {loginErrorHint && (
+                      <p className="leading-snug text-red-50/70 text-[12.5px]">{loginErrorHint}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleGoogle({ forceRedirect: true })}
+                        disabled={busy}
+                        className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
+                      >
+                        Try full-page sign-in instead
+                      </button>
+                      {loginHelpUrl && (
+                        <a
+                          href={loginHelpUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70 underline underline-offset-4 hover:text-white"
+                        >
+                          {loginHelpLabel}
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -469,6 +581,67 @@ function LoginPage() {
               </span>
               {loginStatus}
             </div>
+
+            {/* ================== Diagnostics ================== */}
+            <div className="mt-3 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setDiagOpen((v) => !v)}
+                className="text-[10px] font-semibold uppercase tracking-[0.24em] text-white/40 underline underline-offset-4 hover:text-white/70"
+                aria-expanded={diagOpen}
+                aria-controls="login-diagnostics"
+                style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+              >
+                {diagOpen ? "Hide diagnostics" : "Show diagnostics"}
+              </button>
+            </div>
+            {diagOpen && (
+              <div
+                id="login-diagnostics"
+                className="mt-3 rounded-xl border border-white/10 bg-black/50 p-3 backdrop-blur-xl"
+                style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+              >
+                <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.24em] text-white/50">
+                  <span>Login diagnostics</span>
+                  <span className="text-white/30">{diag.length} events</span>
+                </div>
+                <ul className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                  {diag.length === 0 && (
+                    <li className="text-[11px] text-white/40">No events yet.</li>
+                  )}
+                  {diag.map((d, i) => {
+                    const color =
+                      d.status === "ok" ? "text-emerald-300" :
+                      d.status === "warn" ? "text-amber-300" :
+                      d.status === "fail" ? "text-[#ff5a68]" :
+                      "text-white/60";
+                    const t = new Date(d.ts);
+                    const stamp = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:${String(t.getSeconds()).padStart(2, "0")}.${String(t.getMilliseconds()).padStart(3, "0")}`;
+                    return (
+                      <li key={i} className="grid grid-cols-[auto_auto_1fr] items-start gap-2 text-[11px] leading-snug">
+                        <span className="font-mono text-white/35">{stamp}</span>
+                        <span className={`font-semibold uppercase tracking-[0.12em] ${color}`}>
+                          {d.status}
+                        </span>
+                        <span className="text-white/80">
+                          {d.label}
+                          {d.detail && <span className="ml-1 text-white/45 font-mono">— {d.detail}</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="mt-2 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { diagRef.current = []; setDiag([]); }}
+                    className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40 hover:text-white/70"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </main>
