@@ -1,0 +1,2 @@
+SELECT cron.unschedule('emberlord-pool-alert') WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname='emberlord-pool-alert');
+DELETE FROM public.app_settings WHERE key IN ('pool_alert_threshold','pool_alert_webhook');

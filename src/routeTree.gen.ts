@@ -35,7 +35,6 @@ import { Route as AdminAccessRouteImport } from './routes/admin.access'
 import { Route as ApiPublicBackgroundSongAudioRouteImport } from './routes/api/public/background-song-audio'
 import { Route as ApiAdminUploadBackgroundSongRouteImport } from './routes/api/admin/upload-background-song'
 import { Route as ApiPublicHooksProxiesAutocheckRouteImport } from './routes/api/public/hooks/proxies-autocheck'
-import { Route as ApiPublicHooksPoolAlertRouteImport } from './routes/api/public/hooks/pool-alert'
 import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api/public/hooks/cookies-autocheck'
 import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
@@ -172,11 +171,6 @@ const ApiPublicHooksProxiesAutocheckRoute =
     path: '/api/public/hooks/proxies-autocheck',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksPoolAlertRoute = ApiPublicHooksPoolAlertRouteImport.update({
-  id: '/api/public/hooks/pool-alert',
-  path: '/api/public/hooks/pool-alert',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicHooksCookiesAutocheckRoute =
   ApiPublicHooksCookiesAutocheckRouteImport.update({
     id: '/api/public/hooks/cookies-autocheck',
@@ -218,7 +212,6 @@ export interface FileRoutesByFullPath {
   '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
-  '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
 export interface FileRoutesByTo {
@@ -248,7 +241,6 @@ export interface FileRoutesByTo {
   '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
-  '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
 export interface FileRoutesById {
@@ -280,7 +272,6 @@ export interface FileRoutesById {
   '/api/public/background-song-audio': typeof ApiPublicBackgroundSongAudioRoute
   '/api/public/hooks/auto-cleanup': typeof ApiPublicHooksAutoCleanupRoute
   '/api/public/hooks/cookies-autocheck': typeof ApiPublicHooksCookiesAutocheckRoute
-  '/api/public/hooks/pool-alert': typeof ApiPublicHooksPoolAlertRoute
   '/api/public/hooks/proxies-autocheck': typeof ApiPublicHooksProxiesAutocheckRoute
 }
 export interface FileRouteTypes {
@@ -313,7 +304,6 @@ export interface FileRouteTypes {
     | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
-    | '/api/public/hooks/pool-alert'
     | '/api/public/hooks/proxies-autocheck'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -343,7 +333,6 @@ export interface FileRouteTypes {
     | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
-    | '/api/public/hooks/pool-alert'
     | '/api/public/hooks/proxies-autocheck'
   id:
     | '__root__'
@@ -374,7 +363,6 @@ export interface FileRouteTypes {
     | '/api/public/background-song-audio'
     | '/api/public/hooks/auto-cleanup'
     | '/api/public/hooks/cookies-autocheck'
-    | '/api/public/hooks/pool-alert'
     | '/api/public/hooks/proxies-autocheck'
   fileRoutesById: FileRoutesById
 }
@@ -392,7 +380,6 @@ export interface RootRouteChildren {
   ApiPublicBackgroundSongAudioRoute: typeof ApiPublicBackgroundSongAudioRoute
   ApiPublicHooksAutoCleanupRoute: typeof ApiPublicHooksAutoCleanupRoute
   ApiPublicHooksCookiesAutocheckRoute: typeof ApiPublicHooksCookiesAutocheckRoute
-  ApiPublicHooksPoolAlertRoute: typeof ApiPublicHooksPoolAlertRoute
   ApiPublicHooksProxiesAutocheckRoute: typeof ApiPublicHooksProxiesAutocheckRoute
 }
 
@@ -580,13 +567,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksProxiesAutocheckRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/pool-alert': {
-      id: '/api/public/hooks/pool-alert'
-      path: '/api/public/hooks/pool-alert'
-      fullPath: '/api/public/hooks/pool-alert'
-      preLoaderRoute: typeof ApiPublicHooksPoolAlertRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/hooks/cookies-autocheck': {
       id: '/api/public/hooks/cookies-autocheck'
       path: '/api/public/hooks/cookies-autocheck'
@@ -662,7 +642,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBackgroundSongAudioRoute: ApiPublicBackgroundSongAudioRoute,
   ApiPublicHooksAutoCleanupRoute: ApiPublicHooksAutoCleanupRoute,
   ApiPublicHooksCookiesAutocheckRoute: ApiPublicHooksCookiesAutocheckRoute,
-  ApiPublicHooksPoolAlertRoute: ApiPublicHooksPoolAlertRoute,
   ApiPublicHooksProxiesAutocheckRoute: ApiPublicHooksProxiesAutocheckRoute,
 }
 export const routeTree = rootRouteImport
