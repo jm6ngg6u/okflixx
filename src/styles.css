@@ -763,3 +763,41 @@ html, body {
 .brand-section-title  { font-size: calc(clamp(2rem, 5vw, 3.75rem) * var(--brand-size-section-title, 1) * var(--brand-surface-scale, 1)); }
 .brand-card-title     { font-size: calc(1.5rem   * var(--brand-size-card-title, 1)     * var(--brand-surface-scale, 1)); }
 .brand-body           { font-size: calc(1rem     * var(--brand-size-body, 1)           * var(--brand-surface-scale, 1)); }
+
+/* Live activations count — red pulsing border, same accent family as the TV code box */
+.live-count-panel {
+  border-color: rgba(var(--brand-accent-rgb), 0.55);
+  box-shadow:
+    0 28px 90px -48px rgba(0,0,0,0.92),
+    0 0 0 1px rgba(var(--brand-accent-rgb), 0.35),
+    0 0 32px -4px rgba(var(--brand-accent-rgb), 0.55),
+    0 18px 60px -30px rgba(var(--brand-accent-rgb), 0.7),
+    inset 0 1px 0 rgba(255,255,255,0.09);
+  animation: liveBorderPulse 2s ease-in-out infinite;
+}
+.live-count-panel::before {
+  background: linear-gradient(135deg,
+    rgba(var(--brand-accent-rgb),0.85),
+    rgba(255,255,255,0.15),
+    rgba(var(--brand-accent-rgb),0.6),
+    rgba(var(--brand-accent-rgb),0.85));
+}
+@keyframes liveBorderPulse {
+  0%, 100% {
+    box-shadow:
+      0 28px 90px -48px rgba(0,0,0,0.92),
+      0 0 0 1px rgba(var(--brand-accent-rgb), 0.35),
+      0 0 32px -4px rgba(var(--brand-accent-rgb), 0.55),
+      0 18px 60px -30px rgba(var(--brand-accent-rgb), 0.7),
+      inset 0 1px 0 rgba(255,255,255,0.09);
+  }
+  50% {
+    box-shadow:
+      0 28px 90px -48px rgba(0,0,0,0.92),
+      0 0 0 1px rgba(var(--brand-accent-rgb), 0.7),
+      0 0 48px 0 rgba(var(--brand-accent-rgb), 0.8),
+      0 18px 70px -20px rgba(var(--brand-accent-rgb), 0.95),
+      inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+}
+
