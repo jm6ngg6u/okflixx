@@ -54,13 +54,11 @@ async function requireAdmin(ctx: any): Promise<string> {
 // PUBLIC — gate config (safe to expose)
 // ==========================================================================
 export const getGateConfig = createServerFn({ method: "GET" }).handler(async () => {
-  const { setResponseHeaders } = await import("@tanstack/react-start/server");
+  const { setResponseHeader } = await import("@tanstack/react-start/server");
   // Never cache the maintenance gate — a stale response can flash the
   // activation UI on refresh for a fraction of a second.
-  setResponseHeaders({
-    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-    "Pragma": "no-cache",
-  });
+  setResponseHeader("cache-control", "no-store, no-cache, must-revalidate, max-age=0");
+  setResponseHeader("pragma", "no-cache");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
     .from("app_settings")
