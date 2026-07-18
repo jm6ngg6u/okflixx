@@ -89,14 +89,6 @@ export function MaintenanceView({
       }).format(new Date(endsAt));
     } catch { endsFormatted = null; }
   }
-  const brandName = `${b.name_prefix}${b.name_suffix}`;
-  const scale = Math.max(60, Math.min(140, parseInt(b.maint_font_scale, 10) || 100)) / 100;
-  const intensity = Math.max(0, Math.min(100, parseInt(b.maint_intensity, 10) || 0)) / 100;
-  const flash = b.maint_flash === "1";
-  const shine = b.maint_shine === "1";
-  const wordmarkGlow = b.maint_wordmark_glow === "1";
-
-  const fx = (px: number) => `${px * scale}px`;
 
   const rootStyle: CSSProperties = {
     // Consumed by keyframes in styles.css.
