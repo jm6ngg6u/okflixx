@@ -612,6 +612,18 @@ function UndoButton() {
   );
 }
 
+/** File → data URL uploader with strict client-side validation.
+ *  Data URLs are stored directly in branding — the server sanitizer allows
+ *  data:image/* up to 200KB, so no bucket / no CORS / no signed URLs required. */
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result ?? ""));
+    r.onerror = () => reject(r.error ?? new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
 function AssetsPanel({
   values, stage, commit, resetOne,
 }: {
@@ -620,55 +632,153 @@ function AssetsPanel({
   commit: (k: BrandingKey, v: string) => void;
   resetOne: (k: BrandingKey) => void;
 }) {
-  const fields: { key: BrandingKey; label: string; help: string }[] = [
-    { key: "logo_url", label: "Main logo URL", help: "Shown in the header, footer, and login screen. Recommended: transparent PNG, 512×512." },
-    { key: "favicon_url", label: "Favicon URL", help: "Browser tab icon. If empty, the main logo is used. Recommended: 96×96 PNG or SVG." },
+  const fields: {
+    key: BrandingKey;
+    label: string;
+    help: string;
+    maxKb: number;
+    accept: string;
+  }[] = [
+    {
+      key: "logo_url",
+      label: "Main logo",
+      help: "Header · footer · login screen. Transparent PNG or SVG, 512×512 recommended.",
+      maxKb: 180,
+      accept: "image/png,image/jpeg,image/webp,image/svg+xml",
+    },
+    {
+      key: "favicon_url",
+      label: "Favicon",
+      help: "Browser tab icon. Empty = uses main logo. PNG, SVG, or ICO, 96×96 recommended.",
+      maxKb: 60,
+      accept: "image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon",
+    },
   ];
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      {fields.map((f) => {
-        const v = values[f.key] ?? "";
-        return (
-          <div key={f.key}>
-            <div className="flex items-center justify-between mb-2">
-              <Label htmlFor={f.key}>{f.label}</Label>
-              {v && (
-                <button onClick={() => resetOne(f.key)} className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white">clear</button>
-              )}
-            </div>
-            <Input
-              id={f.key}
-              value={v}
-              onChange={(e) => stage(f.key, e.target.value)}
-              onBlur={(e) => commit(f.key, e.target.value)}
-              placeholder="https://... or /favicon.png"
-              className="bg-black/40 border-white/10 font-mono text-sm"
+      {fields.map((f) => (
+        <AssetField key={f.key} field={f} value={values[f.key] ?? ""} stage={stage} commit={commit} resetOne={resetOne} />
+      ))}
+    </div>
+  );
+}
+
+function AssetField({
+  field, value, stage, commit, resetOne,
+}: {
+  field: { key: BrandingKey; label: string; help: string; maxKb: number; accept: string };
+  value: string;
+  stage: (k: BrandingKey, v: string) => void;
+  commit: (k: BrandingKey, v: string) => void;
+  resetOne: (k: BrandingKey) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!field.accept.split(",").some((t) => file.type === t.trim())) {
+      toast.error("Unsupported file", { description: `Use ${field.accept.replace(/image\//g, "").toUpperCase()}` });
+      return;
+    }
+    if (file.size > field.maxKb * 1024) {
+      toast.error("File too large", { description: `Max ${field.maxKb} KB (was ${Math.round(file.size / 1024)} KB)` });
+      return;
+    }
+    setUploading(true);
+    try {
+      const dataUrl = await readAsDataURL(file);
+      // Sanity — sanitizer will reject anything else, but bail early with a clearer message.
+      if (!dataUrl.startsWith("data:image/")) throw new Error("not an image");
+      commit(field.key, dataUrl);
+      toast.success("Uploaded", { description: `${file.name} · ${Math.round(file.size / 1024)} KB` });
+    } catch (err: any) {
+      toast.error("Upload failed", { description: err?.message ?? "Try a smaller image" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <Label htmlFor={field.key}>{field.label}</Label>
+        {value && (
+          <button onClick={() => resetOne(field.key)} className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white">
+            clear
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          id={field.key}
+          value={value}
+          onChange={(e) => stage(field.key, e.target.value)}
+          onBlur={(e) => commit(field.key, e.target.value)}
+          placeholder="Paste URL or upload →"
+          className="bg-black/40 border-white/10 font-mono text-xs flex-1"
+        />
+        <input ref={fileRef} type="file" accept={field.accept} onChange={handleFile} className="hidden" />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="whitespace-nowrap"
+        >
+          <Upload className="w-3.5 h-3.5 mr-1.5" />
+          {uploading ? "Reading…" : "Upload"}
+        </Button>
+      </div>
+      <p className="text-[11px] text-white/40 mt-1">{field.help} · Max {field.maxKb} KB.</p>
+
+      {/* Masked glow / shine preview — matches the /login header exactly. */}
+      <div className="mt-3 aspect-[3/1] rounded border border-white/10 bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--brand-accent)_18%,transparent),transparent_70%)] bg-black/40 flex items-center justify-center overflow-hidden relative">
+        {value ? (
+          <div className="relative h-24 w-24">
+            <img
+              src={value}
+              alt={field.label + " preview"}
+              className="h-full w-full object-contain"
+              style={{
+                filter: `drop-shadow(0 0 18px color-mix(in oklab, var(--brand-accent) 80%, transparent))`,
+              }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+                const parent = (e.currentTarget as HTMLImageElement).parentElement;
+                if (parent && !parent.querySelector(".asset-err")) {
+                  const s = document.createElement("span");
+                  s.className = "asset-err text-[11px] text-rose-300 uppercase tracking-widest";
+                  s.textContent = "Image failed to load";
+                  parent.appendChild(s);
+                }
+              }}
             />
-            <p className="text-[11px] text-white/40 mt-1">{f.help}</p>
-            <div className="mt-3 aspect-[3/1] rounded border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,42,58,0.12),transparent_70%)] bg-black/40 flex items-center justify-center overflow-hidden">
-              {v ? (
-                <img
-                  src={v}
-                  alt={f.label + " preview"}
-                  className="max-h-24 max-w-[70%] object-contain drop-shadow-[0_0_18px_rgba(255,42,58,0.4)]"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                    const parent = (e.currentTarget as HTMLImageElement).parentElement;
-                    if (parent && !parent.querySelector(".asset-err")) {
-                      const s = document.createElement("span");
-                      s.className = "asset-err text-[11px] text-rose-300 uppercase tracking-widest";
-                      s.textContent = "Image failed to load";
-                      parent.appendChild(s);
-                    }
-                  }}
-                />
-              ) : (
-                <span className="text-[11px] text-white/40 uppercase tracking-widest">No image · using default</span>
-              )}
-            </div>
+            {/* Shine mask — clipped to the alpha of the uploaded logo. */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                WebkitMaskImage: `url(${JSON.stringify(value)})`,
+                maskImage: `url(${JSON.stringify(value)})`,
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+                WebkitMaskSize: "contain",
+                maskSize: "contain",
+                background: `linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.85) 50%, transparent 70%)`,
+                backgroundSize: "300% 100%",
+                animation: `assets-shine var(--brand-shine-duration, 4.8s) linear infinite`,
+              }}
+            />
           </div>
-        );
-      })}
+        ) : (
+          <span className="text-[11px] text-white/40 uppercase tracking-widest">No image · using default</span>
+        )}
+        <style>{`@keyframes assets-shine { 0% { background-position: 200% 0 } 100% { background-position: -100% 0 } }`}</style>
+      </div>
     </div>
   );
 }
