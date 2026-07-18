@@ -134,7 +134,7 @@ function PostLoginRedirect() {
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event: string) => {
       if (event !== "SIGNED_IN") return;
       const { consumeRedirect } = await import("../lib/post-login-redirect");
       const target = consumeRedirect();
