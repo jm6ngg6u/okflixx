@@ -771,8 +771,6 @@ function BackgroundSongPage() {
         fetchVersionUrl={fetchVersionUrl}
       />
 
-      </div>
-
       {/* Analytics */}
       <div className="glass p-5">
         <div className="flex items-start gap-3 mb-4">
