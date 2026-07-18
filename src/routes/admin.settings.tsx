@@ -871,7 +871,9 @@ function MaintenanceControls(props: {
             <MaintenanceView
               b={brand}
               message={previewMsg}
-              remainingLabel={withinWindow ? fmtCountdown(endsMs - nowTick) : null}
+              remainingLabel={!isNaN(endsMs) ? fmtCountdown(Math.max(0, endsMs - nowTick)) : null}
+              startsAt={startsIso || null}
+              endsAt={endsIso || null}
               channels={[]}
               user={null}
               compact
