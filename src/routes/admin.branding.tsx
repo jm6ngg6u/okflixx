@@ -336,6 +336,35 @@ function BrandingStudio() {
                 ))}
               </div>
             </div>
+
+            <div className="mt-6 rounded-xl border border-white/10 p-4">
+              <div className="text-[11px] font-mono uppercase tracking-widest text-white/50 mb-3">
+                Global per-element size (%) — applies site-wide
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {([
+                  ["size_wordmark_nav", "Nav wordmark"],
+                  ["size_hero_kicker", "Hero kicker"],
+                  ["size_hero_title", "Hero title"],
+                  ["size_hero_sub", "Hero subheading"],
+                  ["size_section_kicker", "Section kicker"],
+                  ["size_section_title", "Section title"],
+                  ["size_card_title", "Card title"],
+                  ["size_body", "Body copy"],
+                ] as const).map(([k, label]) => (
+                  <div key={k}>
+                    <Label>{label} — {values[k] || "100"}%</Label>
+                    <Slider className="mt-3" min={60} max={160} step={2}
+                      value={[parseInt(values[k] || "100", 10) || 100]}
+                      onValueChange={(v) => stage(k, String(v[0]))}
+                      onValueCommit={(v) => commit(k, String(v[0]))} />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-white/40 mt-3">
+                Real-time — every branded surface (home, login, admin) scales instantly.
+              </p>
+            </div>
           </Section>
         </TabsContent>
 
