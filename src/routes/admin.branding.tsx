@@ -69,6 +69,17 @@ const MESSAGES: Row[] = [
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
   { key: "error_generic", label: "Generic activation error", multiline: true },
+  { key: "login_kicker", label: "Login — card kicker" },
+  { key: "login_title", label: "Login — card title" },
+  { key: "login_subtitle", label: "Login — card subtitle" },
+  { key: "login_tagline_1", label: "Login — hero tagline (white)" },
+  { key: "login_tagline_2", label: "Login — hero tagline (accent)" },
+  { key: "login_description", label: "Login — hero description", multiline: true },
+  { key: "login_button", label: "Login — button label" },
+  { key: "login_button_busy", label: "Login — button (loading)" },
+  { key: "login_footer_prompt", label: "Login — footer prompt" },
+  { key: "login_footer_cta", label: "Login — footer CTA" },
+  { key: "login_status", label: "Login — status pill" },
 ];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
