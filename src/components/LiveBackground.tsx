@@ -347,8 +347,11 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }
       }
 
       ctx.globalCompositeOperation = "lighter";
-      for (const b of beams) {
+      for (let i = 0; i < beams.length; i++) {
+        const b = beams[i];
         if (!reducedMotion) b.phase += b.speed * 16;
+        // Adaptive quality: skip beams under sustained low FPS.
+        if (beamStride > 1 && (i % beamStride) !== 0) continue;
         drawBeam(b, tGlobal);
       }
       ctx.globalCompositeOperation = "source-over";
