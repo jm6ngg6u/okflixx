@@ -86,15 +86,34 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
 
     for (const r of rows ?? []) {
       let proxyPayload: any = null;
+      let proxyId: string | null = null;
       if (proxyMode) {
         const { data: pr } = await supabaseAdmin.rpc("pick_next_proxy");
         const p = Array.isArray(pr) ? pr[0] : pr;
         if (p) {
           proxyPayload = { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password };
-          await supabaseAdmin.rpc("release_proxy", { _id: p.id, _success: true });
+          proxyId = p.id;
+        } else {
+          // Strict proxy mode: skip rather than silently going direct so the toggle is honoured.
+          const b = "no_proxy_available";
+          reasons[b] = (reasons[b] ?? 0) + 1;
+          await supabaseAdmin.from("cookie_pool").update({
+            last_checked_at: new Date().toISOString(),
+            last_checked_mode: "proxy",
+            last_error: "Proxy mode ON but no proxies available.",
+          }).eq("id", r.id);
+          checked++;
+          continue;
         }
       }
       const out = await checkCookieViaWorker({ cookies: r.cookies_json as any[], proxy: proxyPayload });
+      if (proxyId) {
+        await supabaseAdmin.rpc("release_proxy", {
+          _id: proxyId,
+          _success: !out.transient,
+          _err: out.transient ? out.error ?? "Proxy or Netflix check failed" : undefined,
+        });
+      }
       await supabaseAdmin.from("cookie_pool").update({
         status: out.status,
         is_valid: out.is_valid,
