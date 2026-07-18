@@ -203,11 +203,11 @@ export function MaintenanceView({
           {(message || b.maint_message).trim()}
         </p>
 
-        {/* Countdown + formatted return time */}
-        {(remainingLabel || endsFormatted) && (
+        {/* Countdown + timezone-aware start/end times */}
+        {(remainingLabel || endsFormatted || startsFormatted) && (
           <div
-            className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
-            style={{ marginTop: fx(28), padding: `${fx(10)} ${fx(18)}` }}
+            className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
+            style={{ marginTop: fx(28), padding: `${fx(12)} ${fx(20)}` }}
           >
             {remainingLabel && (
               <div className="flex items-center gap-3">
@@ -216,16 +216,27 @@ export function MaintenanceView({
                 </span>
                 <span
                   className="font-[family:var(--brand-font-display)] font-bold text-white tabular-nums"
-                  style={{ fontSize: fx(compact ? 14 : 18, "countdown") }}
+                  style={{ fontSize: fx(compact ? 16 : 22, "countdown") }}
                 >
                   {remainingLabel}
                 </span>
               </div>
             )}
-            {endsFormatted && (
-              <span className="font-mono text-white/40 tabular-nums" style={{ fontSize: fx(10, "countdown") }}>
-                {endsFormatted}
-              </span>
+            {(startsFormatted || endsFormatted) && (
+              <div className="flex flex-col items-center gap-0.5 pt-1 border-t border-white/5 w-full mt-1">
+                {startsFormatted && (
+                  <div className="flex items-center gap-2 font-mono text-white/50 tabular-nums" style={{ fontSize: fx(10, "countdown") }}>
+                    <span className="uppercase tracking-widest text-white/35">Window opens</span>
+                    <span>{startsFormatted}</span>
+                  </div>
+                )}
+                {endsFormatted && (
+                  <div className="flex items-center gap-2 font-mono text-white/60 tabular-nums" style={{ fontSize: fx(10.5, "countdown") }}>
+                    <span className="uppercase tracking-widest text-white/40">Back online</span>
+                    <span>{endsFormatted}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
