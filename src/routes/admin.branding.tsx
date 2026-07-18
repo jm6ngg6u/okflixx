@@ -12,13 +12,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Palette, Type, Sparkles, MessageSquareText, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Palette, Type, Sparkles, MessageSquareText, RotateCcw, CheckCircle2, Save, Trash2, Undo2, ImageIcon, BookmarkPlus, Wand2 } from "lucide-react";
 import {
   listBranding,
   setBranding,
   resetBranding,
   BRANDING_DEFAULTS,
   FONT_WHITELIST,
+  listBrandingPresets,
+  saveBrandingPreset,
+  applyBrandingPreset,
+  deleteBrandingPreset,
+  undoLastBranding,
+  peekBrandingHistory,
   type BrandingKey,
 } from "@/lib/branding.functions";
 import { useBrand } from "@/lib/branding-context";
@@ -34,10 +40,12 @@ type Row = { key: BrandingKey; label: string; placeholder?: string; multiline?: 
 const IDENTITY: Row[] = [
   { key: "name_prefix", label: "Brand name — prefix", placeholder: "EMBER" },
   { key: "name_suffix", label: "Brand name — accent", placeholder: "LORD" },
-  { key: "tagline", label: "Tagline (browser tab)" },
+  { key: "tagline", label: "Tagline" },
+  { key: "browser_title", label: "Browser tab title" },
   { key: "meta_description", label: "Meta description (SEO)", multiline: true },
   { key: "footer_legal", label: "Footer legal line" },
 ];
+
 
 const MESSAGES: Row[] = [
   { key: "hero_kicker", label: "Hero kicker (live badge)" },
