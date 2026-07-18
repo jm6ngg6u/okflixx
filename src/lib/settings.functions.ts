@@ -268,6 +268,35 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const staleCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: staleRows } = await supabaseAdmin
+      .from("job_runs")
+      .select("id, control, progress")
+      .is("finished_at", null)
+      .lt("started_at", staleCutoff);
+    for (const row of staleRows ?? []) {
+      const action = row.control === "stop" || row.control === "cancel" ? row.control : "timeout";
+      const previous = row.progress && typeof row.progress === "object" ? row.progress : {};
+      await supabaseAdmin
+        .from("job_runs")
+        .update({
+          finished_at: new Date().toISOString(),
+          ok: action === "stop",
+          summary: {
+            ...previous,
+            stopped: action === "stop" || undefined,
+            cancelled: action === "cancel" || undefined,
+            timed_out: action === "timeout" || undefined,
+          },
+          error: action === "cancel"
+            ? "Cancelled by admin"
+            : action === "timeout"
+              ? "Worker timed out before reporting completion"
+              : null,
+        })
+        .eq("id", row.id);
+    }
     const { data, error } = await supabase
       .from("job_runs")
       .select("id, job, started_at, finished_at, ok, summary, progress, error, control")
