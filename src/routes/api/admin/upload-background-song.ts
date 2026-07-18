@@ -46,16 +46,30 @@ export const Route = createFileRoute("/api/admin/upload-background-song")({
             return Response.json({ ok: false, error: "no_file" }, { status: 400 });
           }
           const MAX = 15 * 1024 * 1024;
+          if (file.size <= 0) {
+            return Response.json({ ok: false, error: "empty_file" }, { status: 400 });
+          }
           if (file.size > MAX) {
             return Response.json({ ok: false, error: "file_too_large", max_bytes: MAX }, { status: 400 });
           }
-          const type = file.type || "audio/mpeg";
-          if (!type.startsWith("audio/")) {
+
+          // Some browsers omit or misreport MIME for m4a/aac/flac. Accept either
+          // an audio/* MIME OR a recognized audio extension.
+          const rawName = file.name || "background.mp3";
+          const extMatch = rawName.toLowerCase().match(/\.(mp3|wav|ogg|m4a|aac|flac)$/);
+          const providedType = file.type || "";
+          const isAudioMime = providedType.startsWith("audio/") || providedType === "application/ogg";
+          if (!isAudioMime && !extMatch) {
             return Response.json({ ok: false, error: "not_audio" }, { status: 400 });
           }
+          const extToMime: Record<string, string> = {
+            mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg",
+            m4a: "audio/mp4", aac: "audio/aac", flac: "audio/flac",
+          };
+          const ext = extMatch ? `.${extMatch[1]}` : ".mp3";
+          const type = isAudioMime ? providedType : (extToMime[ext.slice(1)] ?? "audio/mpeg");
 
-          const origName = (file.name || "background.mp3").replace(/[^\w.\-]+/g, "_");
-          const ext = origName.includes(".") ? origName.slice(origName.lastIndexOf(".")) : ".mp3";
+          const origName = rawName.replace(/[^\w.\-]+/g, "_");
           const path = `bg-${Date.now()}${ext}`;
 
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -77,11 +91,17 @@ export const Route = createFileRoute("/api/admin/upload-background-song")({
             is_current: true,
           });
 
+          // Preserve the admin's current playback toggle — don't silently re-enable
+          // a track the admin has paused. Only default to "true" on first-ever upload.
+          const { data: existingEnabled } = await supabaseAdmin
+            .from("app_settings").select("value").eq("key", "background_song_enabled").maybeSingle();
+          const enabledValue = existingEnabled?.value ?? "true";
+
           const nowIso = new Date().toISOString();
           await supabaseAdmin.from("app_settings").upsert([
             { key: "background_song_path", value: path, updated_at: nowIso, updated_by: userId },
             { key: "background_song_name", value: origName, updated_at: nowIso, updated_by: userId },
-            { key: "background_song_enabled", value: "true", updated_at: nowIso, updated_by: userId },
+            { key: "background_song_enabled", value: enabledValue, updated_at: nowIso, updated_by: userId },
             { key: "background_song_updated_at", value: nowIso, updated_at: nowIso, updated_by: userId },
           ]);
           await supabaseAdmin.from("admin_activity_log").insert({
