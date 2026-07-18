@@ -40,6 +40,18 @@ const silentSubs = new Set<BoolSub>();
 let fpsFrames = 0;
 let fpsSampleAt = 0;
 let fps = 60;
+let fpsPaused = false; // true when tab hidden or reduced-motion throttles the loop
+
+// AudioContext lockdown (iOS Safari private mode, older browsers).
+let audioBlocked = false;
+export function isAudioBlocked() { return audioBlocked; }
+export function isFpsPaused() { return fpsPaused; }
+export function setFpsPaused(v: boolean) {
+  if (fpsPaused === v) return;
+  fpsPaused = v;
+  fpsFrames = 0;
+  fpsSampleAt = 0;
+}
 
 // ---- Reactivity toggle ---------------------------------------------------
 
