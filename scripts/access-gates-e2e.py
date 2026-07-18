@@ -11,14 +11,12 @@ Scenarios covered
   2. Access-key gate ON        — payload with NO key       → error
   3. Access-key gate ON        — payload with random key   → invalid_key
   4. Access-key gate ON        — payload with disabled key → error
-  5. Captcha gate ON           — payload with NO token     → captcha_required
-  6. Captcha gate ON           — payload with fake token   → captcha_failed / invalid
-  7. Login gate ON             — anonymous payload         → login_required
-  8. Optimistic UI rollback    — force a 500 on setGateSettings and confirm
+  5. Login gate ON             — anonymous payload         → login_required
+  6. Optimistic UI rollback    — force a 500 on setGateSettings and confirm
                                   the toggle snaps back within 500 ms
 
 The script relies on the admin session cookie to flip gates for scenarios
-2–7. It uses the same bearer-token flow the app uses (LOVABLE_BROWSER_*
+2–5. It uses the same bearer-token flow the app uses (LOVABLE_BROWSER_*
 env vars), so it works whenever the local session is injected.
 
 Run:
@@ -128,7 +126,6 @@ async def set_gates(page: Page, patch: dict[str, Any]) -> None:
     for k, v in patch.items():
         label = {
             "accessKeyRequired": "Access key gate",
-            "captchaRequired": "Captcha gate",
             "loginRequired": "Login gate",
         }.get(k)
         if not label:
@@ -155,7 +152,7 @@ async def scenario_malformed_code(page: Page, url: str) -> None:
 
 async def scenario_access_key_gate(page: Page, url: str) -> None:
     print("\n[2/3/4] Access-key gate — payloads must be refused")
-    await set_gates(page, {"accessKeyRequired": True, "captchaRequired": False, "loginRequired": False})
+    await set_gates(page, {"accessKeyRequired": True, "loginRequired": False})
 
     # No key
     r = await call_activate(page, url, {"code": "AAAA1111", "elapsedMs": 3000})
@@ -168,25 +165,9 @@ async def scenario_access_key_gate(page: Page, url: str) -> None:
     expect(b.get("ok") is not True, "random invalid key", f"error={b.get('error')} msg={b.get('message')}")
 
 
-async def scenario_captcha_gate(page: Page, url: str) -> None:
-    print("\n[5/6] Captcha gate — token required and validated server-side")
-    await set_gates(page, {"accessKeyRequired": False, "captchaRequired": True, "loginRequired": False})
-
-    r = await call_activate(page, url, {"code": "AAAA1111", "elapsedMs": 3000})
-    b = r["body"] or {}
-    expect(b.get("ok") is not True, "no token supplied", f"error={b.get('error')}")
-
-    r = await call_activate(
-        page, url,
-        {"code": "AAAA1111", "elapsedMs": 3000, "captchaToken": "fake-token-abc", "captchaWidgetProvider": "turnstile"},
-    )
-    b = r["body"] or {}
-    expect(b.get("ok") is not True, "fake token", f"error={b.get('error')}")
-
-
 async def scenario_login_gate(page: Page, url: str) -> None:
-    print("\n[7] Login gate — anon must be blocked")
-    await set_gates(page, {"accessKeyRequired": False, "captchaRequired": False, "loginRequired": True})
+    print("\n[5] Login gate — anon must be blocked")
+    await set_gates(page, {"accessKeyRequired": False, "loginRequired": True})
 
     # Fire from a NEW context that has no session at all — the only way to be
     # truly anonymous while the admin browser still has cookies.
@@ -200,14 +181,14 @@ async def scenario_login_gate(page: Page, url: str) -> None:
 
 
 async def scenario_optimistic_rollback(page: Page) -> None:
-    print("\n[8] Optimistic UI rollback — forced 500 must snap the switch back")
+    print("\n[6] Optimistic UI rollback — forced 500 must snap the switch back")
     await page.goto(f"{BASE}/admin/access", wait_until="domcontentloaded")
 
     # Intercept the next setGateSettings call and force a 500.
     async def handler(route: Route):
         if "setGateSettings" in route.request.url or route.request.method == "POST":
             body = route.request.post_data or ""
-            if "accessKeyRequired" in body or "captchaRequired" in body or "loginRequired" in body:
+            if "accessKeyRequired" in body or "loginRequired" in body:
                 await route.fulfill(status=500, body='{"error":"forced by test"}')
                 return
         await route.continue_()
@@ -249,16 +230,15 @@ async def main() -> int:
 
         # Reset all gates OFF so scenario 1 tests pure schema rejection.
         if has_session:
-            await set_gates(page, {"accessKeyRequired": False, "captchaRequired": False, "loginRequired": False})
+            await set_gates(page, {"accessKeyRequired": False, "loginRequired": False})
         await scenario_malformed_code(page, url)
 
         if has_session:
             await scenario_access_key_gate(page, url)
-            await scenario_captcha_gate(page, url)
             await scenario_login_gate(page, url)
             await scenario_optimistic_rollback(page)
             # Leave gates OFF at the end so we don't lock the app for others.
-            await set_gates(page, {"accessKeyRequired": False, "captchaRequired": False, "loginRequired": False})
+            await set_gates(page, {"accessKeyRequired": False, "loginRequired": False})
 
         await browser.close()
 
