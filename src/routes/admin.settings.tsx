@@ -556,25 +556,28 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
             }
             local={local} set={set} onSave={save} busy={busy} min={0} max={200}
           />
-          {!gateOn && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={setUnlimited}
-                disabled={rlUnlimited}
-                className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                ∞ Set unlimited
-              </button>
-              <button
-                type="button"
-                onClick={setDefault10}
-                className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] transition"
-              >
-                Reset to 10
-              </button>
-            </div>
-          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={setUnlimited}
+              disabled={rlUnlimited}
+              className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              ∞ Set unlimited
+            </button>
+            <button
+              type="button"
+              onClick={setDefault10}
+              className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] transition"
+            >
+              Reset to 10
+            </button>
+            {gateOn && (
+              <span className="text-[10px] font-mono uppercase tracking-widest text-white/40 self-center">
+                · Stored value used if gate turns off
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
