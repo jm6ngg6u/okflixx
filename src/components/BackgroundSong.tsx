@@ -339,11 +339,15 @@ export function BackgroundSong() {
     sendEvent("impression");
   }, [q.data?.enabled, q.data?.url]);
 
-  // Fire an out_of_schedule event once when the schedule blocks playback.
+  // Fire out_of_schedule when the window closes; reset when it reopens so
+  // repeat closures are still logged for analytics.
   useEffect(() => {
-    if (q.data?.enabled && q.data.url && q.data.scheduleEnabled && !inWindow && !fired.current.oos) {
+    if (!q.data?.enabled || !q.data.url || !q.data.scheduleEnabled) return;
+    if (!inWindow && !fired.current.oos) {
       fired.current.oos = true;
       sendEvent("out_of_schedule");
+    } else if (inWindow && fired.current.oos) {
+      fired.current.oos = false;
     }
   }, [q.data?.enabled, q.data?.url, q.data?.scheduleEnabled, inWindow]);
 
