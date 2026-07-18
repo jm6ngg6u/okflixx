@@ -49,7 +49,7 @@ function LoginPage() {
     }
   }
 
-  const brandName = brand?.wordmark || "EMBERLORD";
+  const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
   const tagline1 = "COMMAND THE";
   const tagline2 = "FLAME";
 
