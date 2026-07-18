@@ -760,49 +760,17 @@ function BackgroundSongPage() {
 
 
       {/* Version history */}
-      <div className="glass p-5">
-        <div className="flex items-start gap-3 mb-4">
-          <HistoryIcon className="w-4 h-4 text-[#ff2a3a] mt-1" />
-          <div>
-            <div className="font-display text-lg leading-tight">Version history</div>
-            <div className="text-xs text-white/50 mt-1 max-w-xl">
-              Every upload is kept so you can roll back or clean up. The current track is highlighted and can't be deleted directly — restore another version first.
-            </div>
-          </div>
-        </div>
-        {history.isLoading ? (
-          <div className="text-xs text-white/40 font-mono">Loading history…</div>
-        ) : (history.data?.length ?? 0) === 0 ? (
-          <div className="text-xs text-white/40 font-mono">No previous uploads yet.</div>
-        ) : (
-          <div className="divide-y divide-white/5 border border-white/5 rounded-md overflow-hidden">
-            {history.data!.map((row) => (
-              <div key={row.id} className={`flex flex-wrap items-center gap-3 p-3 ${row.isCurrent ? "bg-[#ff2a3a]/[0.06]" : "bg-white/[0.02]"}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm text-white/90 truncate">{row.name}</span>
-                    {row.isCurrent && <Badge variant="outline" className="bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30 text-[10px]">CURRENT</Badge>}
-                  </div>
-                  <div className="mt-1 text-[11px] font-mono text-white/40 truncate">
-                    {fmtSize(row.sizeBytes)} · {fmtDate(row.uploadedAt)} · {row.uploaderLabel}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" className="border-white/15 bg-white/5"
-                    disabled={row.isCurrent || restoreMut.isPending}
-                    onClick={() => restoreMut.mutate(row.id)}>
-                    <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Restore
-                  </Button>
-                  <Button size="sm" variant="outline" className="border-white/15 bg-white/5 text-red-200 hover:text-red-100"
-                    disabled={row.isCurrent || deleteVerMut.isPending}
-                    onClick={() => { if (confirm(`Delete ${row.name}? This removes the file from storage permanently.`)) deleteVerMut.mutate(row.id); }}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      <VersionHistoryCard
+        rows={history.data ?? []}
+        isLoading={history.isLoading}
+        isFetching={history.isFetching}
+        onRestore={(id) => restoreMut.mutate(id)}
+        onDelete={(id) => deleteVerMut.mutate(id)}
+        restorePending={restoreMut.isPending}
+        deletePending={deleteVerMut.isPending}
+        fetchVersionUrl={fetchVersionUrl}
+      />
+
       </div>
 
       {/* Analytics */}
