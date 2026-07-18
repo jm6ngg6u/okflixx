@@ -120,6 +120,11 @@ const KEY_LABELS: Partial<Record<BrandingKey, string>> = (() => {
   m.wordmark_pulse = "Wordmark pulse";
   m.logo_url = "Main logo";
   m.favicon_url = "Favicon";
+  m.maint_flash = "Logo flash halo";
+  m.maint_shine = "Logo shine loop";
+  m.maint_wordmark_glow = "Wordmark auto glow";
+  m.maint_intensity = "Animation intensity";
+  m.maint_font_scale = "Font size scale";
   return m;
 })();
 function labelFor(k: string) {
