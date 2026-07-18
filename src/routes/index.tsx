@@ -598,10 +598,10 @@ function HomePage() {
 
               <button
                 onClick={handleActivate}
-                disabled={submitting}
+                disabled={submitting || !!gate.data?.maintenance}
                 className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? "Activating…" : b.activate_cta}
+                {gate.data?.maintenance ? "Temporarily unavailable" : submitting ? "Activating…" : b.activate_cta}
               </button>
 
 
