@@ -396,7 +396,7 @@ function HomePage() {
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto">
         <Link to="/" className="flex items-center gap-3 group">
           <img src={logo} alt="Emberlord" data-wave-origin className="h-10 w-10 object-contain logo-shine group-hover:scale-110 transition" width={40} height={40} />
-          <span className="font-display text-xl tracking-tight wordmark-pulse"><Wordmark /></span>
+          <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse"><Wordmark /></span>
         </Link>
         <div className="hidden md:flex gap-8 text-sm text-white/70">
           <a href="#activate" className="hover:text-white transition">Activate</a>
@@ -474,15 +474,15 @@ function HomePage() {
         <div className="relative z-10 max-w-4xl mx-auto px-6 md:px-12 pt-16 pb-24 text-center flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-xs text-white/75 mb-8 reveal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse" />
-            <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
+            <span className="font-mono uppercase tracking-widest brand-hero-kicker">{b.hero_kicker}</span>
           </div>
 
-          <h1 className="font-display text-[clamp(2.6rem,6.5vw,5.4rem)] leading-[0.98] tracking-tight reveal">
+          <h1 className="font-display brand-hero-title leading-[0.98] tracking-tight reveal">
             {b.hero_headline_1} <br />
             <span className="text-shine">{b.hero_headline_2}</span>
           </h1>
 
-          <p className="mt-6 max-w-lg text-white/65 text-base md:text-lg leading-relaxed reveal">
+          <p className="mt-6 max-w-lg text-white/65 md:text-lg leading-relaxed reveal brand-hero-sub">
             {b.hero_sub}
           </p>
 
@@ -497,7 +497,7 @@ function HomePage() {
                   <span className="w-2 h-2 rounded-full bg-white/20" />
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-1">{b.code_card_title}</h3>
+              <h3 className="font-display brand-card-title mb-1">{b.code_card_title}</h3>
               <p className="text-white/50 text-sm mb-6">{b.code_card_help}</p>
 
               <CodeInput ref={codeRef} />
@@ -717,8 +717,8 @@ function HomePage() {
       <section id="features" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_features_kicker}</div>
-            <h2 className="font-display text-4xl md:text-6xl">{b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.</h2>
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_features_kicker}</div>
+            <h2 className="font-display brand-section-title">{b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
@@ -728,7 +728,7 @@ function HomePage() {
             ].map((f) => (
               <div key={f.t} className="glass glass-hover p-8 reveal">
                 <div className="font-mono text-xs text-[#ff2a3a] mb-6">/{f.i}</div>
-                <div className="font-display text-2xl mb-3">{f.t}</div>
+                <div className="font-display brand-card-title mb-3">{f.t}</div>
                 <p className="text-white/60 text-sm leading-relaxed">{f.d}</p>
               </div>
             ))}
@@ -740,14 +740,14 @@ function HomePage() {
       <section id="plans" className="relative py-28 px-6 md:px-12">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_plan_kicker}</div>
-            <h2 className="font-display text-4xl md:text-6xl">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_plan_kicker}</div>
+            <h2 className="font-display brand-section-title">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
             <p className="mt-5 text-white/60 max-w-xl mx-auto">Premium UHD unlocked for every activated TV — every country, every device. No card, no trial, no catch.</p>
           </div>
 
           <div className="glass glow-ring-anim p-10 md:p-12 reveal text-center">
             <div className="font-mono text-[10px] uppercase tracking-widest text-[#ff2a3a] mb-4">◆ Premium UHD · Global</div>
-            <div className="font-display text-2xl mb-2">Emberlord Premium</div>
+            <div className="font-display brand-card-title mb-2">Emberlord Premium</div>
             <div className="flex items-baseline justify-center gap-2 mb-8">
               <span className="font-display text-7xl text-shine">$0</span>
               <span className="text-white/40 text-sm">/ forever</span>
@@ -772,8 +772,8 @@ function HomePage() {
       <section id="devices" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_devices_kicker}</div>
-            <h2 className="font-display text-4xl md:text-6xl">{b.section_devices_title_1} <span className="text-shine">{b.section_devices_title_2}</span></h2>
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_devices_kicker}</div>
+            <h2 className="font-display brand-section-title">{b.section_devices_title_1} <span className="text-shine">{b.section_devices_title_2}</span></h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {["Smart TV", "Apple TV", "Roku", "Fire TV", "Chromecast", "PS5 / PS4", "Xbox", "Nvidia Shield"].map((d) => (
