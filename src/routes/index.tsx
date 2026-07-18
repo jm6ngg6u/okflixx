@@ -524,33 +524,8 @@ function HomePage() {
                     </div>
                   )}
 
-                  {/* Captcha gate */}
-                  {gate.data?.captchaRequired && gate.data.captchaSiteKey && (
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
-                        <ShieldCheck className="w-3.5 h-3.5 text-[#ff8a90]" />
-                        <span>Verify you're human</span>
-                        {captchaToken && (
-                          <span className="ml-auto inline-flex items-center gap-1 text-emerald-300">
-                            <CheckCircle2 className="w-3 h-3" /> Verified
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-white/45 leading-snug mb-2">
-                        Please complete the check below to continue.
-                      </p>
 
-                      <div
-                        ref={captchaWidgetRef}
-                        className="min-h-[78px]"
-                      />
-                      {captchaError && (
-                        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-200">
-                          {captchaError}
-                        </div>
-                      )}
-                    </div>
-                  )}
+
                   </div>
                 </div>
               )}
