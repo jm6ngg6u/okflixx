@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { LogOut, Send, Instagram, Phone, ShieldCheck, Loader2 } from "lucide-react";
+import { LogOut, Send, Instagram, Phone, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrand } from "@/lib/branding-context";
 import { getPublicContacts } from "@/lib/settings.functions";
@@ -37,45 +37,30 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
   const fetchContacts = useServerFn(getPublicContacts);
 
   const [user, setUser] = useState<{ email: string | null; avatar: string | null; name: string | null } | null>(null);
-  const [isStaff, setIsStaff] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
   const [now, setNow] = useState(() => Date.now());
 
-  // Session identity + staff bypass check
+  // Session identity
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       const u = data?.user;
       if (!mounted) return;
-      if (!u) { setUser(null); setIsStaff(false); return; }
+      if (!u) { setUser(null); return; }
       const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
       setUser({
         email: u.email ?? null,
         avatar: (meta.avatar_url as string) ?? (meta.picture as string) ?? null,
         name: (meta.full_name as string) ?? (meta.name as string) ?? null,
       });
-      // RLS allows a user to read their own roles; failure = not staff.
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.id);
-      const staff = !!roles?.some((r: any) => r.role === "admin" || r.role === "moderator");
-      if (mounted) setIsStaff(staff);
-    })();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      // Re-run identity check on any auth transition
-      supabase.auth.getUser().then(({ data }) => {
-        const u = data?.user ?? null;
-        if (!mounted) return;
-        if (!u) { setUser(null); setIsStaff(false); return; }
-        const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
-        setUser({
-          email: u.email ?? null,
-          avatar: (meta.avatar_url as string) ?? (meta.picture as string) ?? null,
-          name: (meta.full_name as string) ?? (meta.name as string) ?? null,
-        });
-      });
-    });
+    };
+    loadUser();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => { loadUser(); });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
+
 
   // Countdown ticker (only relevant when an end time is set)
   useEffect(() => {
@@ -156,21 +141,30 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
           Maintenance in progress
         </div>
 
-        {/* Logo */}
-        <img
-          src={b.logo_url}
-          alt={brandName}
-          className="mt-8 h-24 w-24 object-contain drop-shadow-[0_0_36px_rgba(var(--brand-accent-rgb),0.55)] animate-pulse"
-        />
+        {/* Logo — flashing halo + sweeping shine */}
+        <div className="relative mt-8 h-28 w-28">
+          <span
+            aria-hidden
+            className="absolute inset-[-14%] rounded-full blur-2xl maintenance-flash"
+            style={{ background: "radial-gradient(closest-side, rgba(var(--brand-accent-rgb),0.75), transparent 70%)" }}
+          />
+          <img
+            src={b.logo_url}
+            alt={brandName}
+            className="relative h-28 w-28 object-contain maintenance-logo-shine"
+            style={{ filter: "drop-shadow(0 0 28px rgba(var(--brand-accent-rgb),0.65))" }}
+          />
+        </div>
 
-        {/* Wordmark */}
+        {/* Wordmark — auto glow pulse */}
         <h1
-          className="mt-6 font-[family:var(--brand-font-display)] text-4xl sm:text-6xl font-extrabold tracking-tight text-white"
+          className="mt-6 font-[family:var(--brand-font-display)] text-4xl sm:text-6xl font-extrabold tracking-tight text-white maintenance-wordmark-glow"
           style={{ letterSpacing: "var(--brand-letter-spacing)" }}
         >
           {b.name_prefix}
           <span className="text-[color:var(--brand-accent)]">{b.name_suffix}</span>
         </h1>
+
 
         {/* Headline */}
         <h2 className="mt-6 font-[family:var(--brand-font-display)] text-2xl sm:text-3xl font-semibold text-white/95">
@@ -218,17 +212,6 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
               })}
             </div>
           </div>
-        )}
-
-        {/* Admin bypass */}
-        {isStaff && (
-          <a
-            href="/admin"
-            className="mt-10 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-[11px] font-mono uppercase tracking-[0.25em] text-emerald-300 hover:bg-emerald-400/20 transition"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Staff bypass · open admin
-          </a>
         )}
 
         {/* Footer */}
