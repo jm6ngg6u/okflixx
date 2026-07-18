@@ -117,14 +117,46 @@ function HomePage() {
   const redeemFn = useServerFn(redeemAccessKey);
 
 
-  // Gate config polled every 2s so admin toggles apply near-instantly.
+  // Realtime push on app_settings — banner flips within ~200ms.
+  // A 30s poll is retained purely as a safety net for missed events.
+  const qc = useQueryClient();
   const gate = useQuery({
     queryKey: ["public-gate"],
     queryFn: () => fetchGate(),
-    refetchInterval: 2000,
+    refetchInterval: 30_000,
     refetchIntervalInBackground: false,
-    staleTime: 1_000,
+    staleTime: 5_000,
   });
+  useEffect(() => {
+    const ch = supabase
+      .channel("public-gate-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings" },
+        (payload: any) => {
+          const key = (payload.new?.key ?? payload.old?.key) as string | undefined;
+          if (!key) return;
+          if (
+            key === "maintenance_enabled" ||
+            key === "maintenance_message" ||
+            key === "maintenance_starts_at" ||
+            key === "maintenance_ends_at" ||
+            key === "access_key_required" ||
+            key === "login_required"
+          ) {
+            qc.invalidateQueries({ queryKey: ["public-gate"] });
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+  // Auto-tick every 30s so a scheduled window flips on/off in-place without user action.
+  useEffect(() => {
+    if (!gate.data?.maintenanceStartsAt && !gate.data?.maintenanceEndsAt) return;
+    const t = window.setInterval(() => qc.invalidateQueries({ queryKey: ["public-gate"] }), 30_000);
+    return () => window.clearInterval(t);
+  }, [qc, gate.data?.maintenanceStartsAt, gate.data?.maintenanceEndsAt]);
 
   const [accessKey, setAccessKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
