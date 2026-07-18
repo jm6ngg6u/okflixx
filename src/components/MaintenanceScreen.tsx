@@ -330,6 +330,7 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
         b={b}
         message={message}
         remainingLabel={remainingLabel}
+        endsAt={endsAt}
         channels={channels}
         user={user}
         signingOut={signingOut}
