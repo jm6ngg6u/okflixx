@@ -165,7 +165,9 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyCss(b);
     ensureFontLink(b);
+    applyIdentity(b);
   }, [b]);
+
 
   // Supabase realtime — refetch instantly on any branding_* app_settings change.
   useEffect(() => {
