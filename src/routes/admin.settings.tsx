@@ -983,9 +983,9 @@ function MaintenanceControls(props: {
             />
           </div>
         </div>
-        {scheduleInvalid && (
+        {scheduleError && (
           <div className="text-[11px] text-rose-300 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" /> End time must be after start time.
+            <AlertTriangle className="w-3.5 h-3.5" /> {scheduleError}
           </div>
         )}
         <div className="flex flex-wrap justify-end gap-2 pt-1">
