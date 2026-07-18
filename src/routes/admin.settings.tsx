@@ -33,8 +33,21 @@ function SettingsPage() {
   const doRunCookies = useServerFn(runCookiesAutocheckNow);
   const doRunProxies = useServerFn(runProxiesAutocheckNow);
 
-  const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
+  // Live poll every 2s so job "next-run" ticks down and remote edits appear.
+  const q = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => fetchSettings(),
+    refetchInterval: 2000,
+    refetchIntervalInBackground: false,
+  });
   const [local, setLocal] = useState<Record<string, string>>({});
+  // Track which keys the admin is editing so the 2s poll doesn't wipe them.
+  const dirtyRef = useRef<Set<string>>(new Set());
+  // Per-key busy flag → Save button spinner, disabled state.
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  // Free-text filter across all setting labels.
+  const [filter, setFilter] = useState("");
+  const testWebhookFn = useServerFn(testPoolAlertWebhook);
 
   const fetchRuns = useServerFn(listRecentJobRuns);
 
