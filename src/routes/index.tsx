@@ -384,8 +384,12 @@ function HomePage() {
 
 
 
+  const homeScale = Math.max(60, Math.min(160, parseInt((b as any).home_scale || "100", 10) || 100)) / 100;
   return (
-    <div className="relative min-h-screen text-white">
+    <div
+      className="relative min-h-screen text-white"
+      style={{ ["--brand-surface-scale" as any]: homeScale }}
+    >
       <LiveBackground />
       {success && <SuccessOverlay payload={success} onClose={() => setSuccess(null)} />}
 
