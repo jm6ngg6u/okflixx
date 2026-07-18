@@ -117,12 +117,13 @@ function HomePage() {
   const redeemFn = useServerFn(redeemAccessKey);
 
 
-  // Gate config polled every 10s so admin toggles reach the landing page.
+  // Gate config polled every 2s so admin toggles apply near-instantly.
   const gate = useQuery({
     queryKey: ["public-gate"],
     queryFn: () => fetchGate(),
-    refetchInterval: 10_000,
-    staleTime: 5_000,
+    refetchInterval: 2000,
+    refetchIntervalInBackground: false,
+    staleTime: 1_000,
   });
 
   const [accessKey, setAccessKey] = useState("");
