@@ -857,36 +857,26 @@ function MaintenanceControls(props: {
           </div>
         </div>
 
-        {/* Live preview — matches the public banner styling. */}
+        {/* Live preview — mirrors the full-screen takeover, driven by the
+            current Branding Studio values so per-word font size, colors,
+            glow, and copy all update instantly here. */}
         <div className="space-y-2">
           <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Live preview</label>
-          <div className="relative overflow-hidden rounded-2xl border border-amber-400/25 bg-gradient-to-r from-amber-500/[0.10] via-[#ff2a3a]/[0.10] to-amber-500/[0.10] backdrop-blur-xl px-4 py-4 shadow-[0_0_40px_-10px_rgba(255,42,58,0.45)]">
-            <div className="absolute inset-0 pointer-events-none opacity-40 [background:radial-gradient(600px_120px_at_20%_0%,rgba(255,180,80,0.18),transparent),radial-gradient(600px_120px_at_80%_100%,rgba(255,42,58,0.18),transparent)]" />
-            <div className="relative flex items-start gap-3">
-              <div className="shrink-0 mt-0.5">
-                <div className="relative">
-                  <img src={brandLogo} alt="" className="h-8 w-8 object-contain" width={32} height={32} />
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
-                  </span>
-                </div>
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-amber-300/90 mb-1">
-                  Maintenance in progress
-                </div>
-                <div className="font-display text-base leading-tight text-white">Service temporarily unavailable</div>
-                <div className="mt-1 text-[13px] text-white/75 leading-relaxed break-words">
-                  {previewMsg}
-                </div>
-              </div>
-            </div>
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#050505] max-h-[420px] overflow-y-auto">
+            <MaintenanceView
+              b={brand}
+              message={previewMsg}
+              remainingLabel={withinWindow ? fmtCountdown(endsMs - nowTick) : null}
+              channels={[]}
+              user={null}
+              compact
+            />
           </div>
           <div className="text-[10px] text-white/40 font-mono">
             {clean.length >= 8 ? "Shown to users." : "Empty / too short — using default message."}
           </div>
         </div>
+
       </div>
 
       {/* Schedule */}
