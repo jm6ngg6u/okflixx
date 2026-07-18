@@ -117,12 +117,13 @@ function HomePage() {
   const redeemFn = useServerFn(redeemAccessKey);
 
 
-  // Gate config polled every 10s so admin toggles reach the landing page.
+  // Gate config polled every 2s so admin toggles apply near-instantly.
   const gate = useQuery({
     queryKey: ["public-gate"],
     queryFn: () => fetchGate(),
-    refetchInterval: 10_000,
-    staleTime: 5_000,
+    refetchInterval: 2000,
+    refetchIntervalInBackground: false,
+    staleTime: 1_000,
   });
 
   const [accessKey, setAccessKey] = useState("");
@@ -398,6 +399,44 @@ function HomePage() {
         </div>
       </nav>
 
+      {/* MAINTENANCE BANNER — visible while admin has maintenance ON */}
+      {gate.data?.maintenance && (
+        <div className="relative z-20 max-w-5xl mx-auto px-6 md:px-12 -mt-2 mb-2">
+          <div
+            role="alert"
+            aria-live="polite"
+            className="relative overflow-hidden rounded-2xl border border-amber-400/25 bg-gradient-to-r from-amber-500/[0.10] via-[#ff2a3a]/[0.10] to-amber-500/[0.10] backdrop-blur-xl px-5 md:px-7 py-4 md:py-5 shadow-[0_0_40px_-10px_rgba(255,42,58,0.45)]"
+          >
+            <div className="absolute inset-0 pointer-events-none opacity-40 [background:radial-gradient(600px_120px_at_20%_0%,rgba(255,180,80,0.18),transparent),radial-gradient(600px_120px_at_80%_100%,rgba(255,42,58,0.18),transparent)]" />
+            <div className="relative flex items-start gap-4">
+              <div className="shrink-0 mt-0.5">
+                <div className="relative">
+                  <img src={logo} alt="" className="h-10 w-10 object-contain logo-shine" width={40} height={40} />
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400" />
+                  </span>
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/90">Maintenance in progress</span>
+                  <span className="hidden sm:inline-block h-px flex-1 bg-gradient-to-r from-amber-400/40 to-transparent" />
+                </div>
+                <h2 className="font-display text-lg md:text-xl leading-tight text-white">
+                  <span className="text-shine">Service temporarily unavailable</span>
+                </h2>
+                <p className="mt-1 text-sm md:text-[15px] text-white/75 leading-relaxed">
+                  {gate.data.maintenanceMessage || "We're performing scheduled maintenance. New activations are paused — please check back shortly."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
       {/* HERO — CENTERED */}
       <section id="activate" className="relative">
         <div className="relative z-10 max-w-4xl mx-auto px-6 md:px-12 pt-16 pb-24 text-center flex flex-col items-center">
@@ -597,10 +636,10 @@ function HomePage() {
 
               <button
                 onClick={handleActivate}
-                disabled={submitting}
+                disabled={submitting || !!gate.data?.maintenance}
                 className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? "Activating…" : b.activate_cta}
+                {gate.data?.maintenance ? "Temporarily unavailable" : submitting ? "Activating…" : b.activate_cta}
               </button>
 
 

@@ -190,6 +190,7 @@ function SettingsPage() {
       toast.success(`Saved ${k.replace(/_/g, " ")}`);
       qc.invalidateQueries({ queryKey: ["admin-settings"] });
       qc.invalidateQueries({ queryKey: ["public-contacts"] });
+      qc.invalidateQueries({ queryKey: ["public-gate"] });
     } catch (e: any) {
       // Rollback local optimistic value.
       setLocal((s) => ({ ...s, [k]: prev ?? "" }));
@@ -286,16 +287,27 @@ function SettingsPage() {
           <div className="flex items-center gap-4">
             <Switch checked={maintOn} disabled={!!busy["maintenance_enabled"]} onCheckedChange={async (v) => {
               setBusy((b) => ({ ...b, maintenance_enabled: true }));
+              // Optimistic — flip the switch immediately.
+              const prev = local.maintenance_enabled;
+              setLocal((s) => ({ ...s, maintenance_enabled: v ? "1" : "0" }));
               try {
-                await doMaint({ data: { enabled: v, message: local.maintenance_message ?? "" } });
-                setLocal((s) => ({ ...s, maintenance_enabled: v ? "1" : "0" }));
+                // Toggle-only: do NOT resend the banner message here or an
+                // un-hydrated local state would wipe the saved copy.
+                await doMaint({ data: { enabled: v } });
                 dirtyRef.current.delete("maintenance_enabled");
-                toast.success(`Maintenance ${v ? "enabled" : "disabled"}`);
+                toast.success(`Maintenance ${v ? "enabled" : "disabled"}`, {
+                  description: v ? "Public site is now showing the maintenance banner." : "Public site is live again.",
+                });
                 qc.invalidateQueries({ queryKey: ["admin-settings"] });
-              } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+                qc.invalidateQueries({ queryKey: ["public-gate"] });
+              } catch (e: any) {
+                setLocal((s) => ({ ...s, maintenance_enabled: prev }));
+                toast.error(e?.message ?? "Toggle failed");
+              }
               finally { setBusy((b) => { const n = { ...b }; delete n.maintenance_enabled; return n; }); }
             }} />
             <span className="text-sm text-white/60">{maintOn ? "Public site is in maintenance" : "Public site is live"}</span>
+            {busy["maintenance_enabled"] && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/50" />}
           </div>
           <div className="space-y-1">
             <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Banner message</label>
@@ -304,16 +316,43 @@ function SettingsPage() {
               onChange={(e) => set("maintenance_message", e.target.value)}
               rows={2}
               placeholder="We'll be back shortly."
+              maxLength={2000}
               className="bg-white/5 border-white/10"
             />
+            <div className="flex items-center justify-between text-[10px] text-white/40 font-mono">
+              <span>{(local.maintenance_message ?? "").length}/2000</span>
+              {dirtyRef.current.has("maintenance_message") && <span className="text-amber-300/80">UNSAVED CHANGES</span>}
+            </div>
           </div>
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => save("maintenance_message")} className="btn-red">
-              <Save className="w-3.5 h-3.5 mr-1.5" /> Save message
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!busy["maintenance_message"] || !dirtyRef.current.has("maintenance_message")}
+              onClick={() => {
+                const remote = q.data?.settings?.maintenance_message ?? "";
+                setLocal((s) => ({ ...s, maintenance_message: remote }));
+                dirtyRef.current.delete("maintenance_message");
+                toast("Reverted to saved message");
+              }}
+              className="border-white/10 bg-white/5 hover:bg-white/10"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Revert
+            </Button>
+            <Button
+              size="sm"
+              disabled={!!busy["maintenance_message"]}
+              onClick={() => save("maintenance_message")}
+              className="btn-red"
+            >
+              {busy["maintenance_message"]
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving…</>
+                : <><Save className="w-3.5 h-3.5 mr-1.5" /> Save message</>}
             </Button>
           </div>
         </div>
       </Section>
+
 
       {/* Activation flow */}
 
