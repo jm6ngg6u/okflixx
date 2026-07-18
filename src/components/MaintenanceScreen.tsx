@@ -185,7 +185,7 @@ export function MaintenanceView({
         {/* Headline */}
         <h2
           className="font-[family:var(--brand-font-display)] font-semibold text-white/95"
-          style={{ marginTop: fx(24), fontSize: fx(compact ? 18 : 26) }}
+          style={{ marginTop: fx(24), fontSize: fx(compact ? 18 : 26, "headline") }}
         >
           {b.maint_headline}
         </h2>
