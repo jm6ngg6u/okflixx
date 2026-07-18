@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import "../lib/toast-format";
 import { BrandingProvider } from "../lib/branding-context";
+import { supabase } from "../integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -118,14 +119,46 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function PostLoginRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    let mounted = true;
+    // Fire once on mount in case we already have a session from the OAuth return.
+    (async () => {
+      const { consumeRedirect } = await import("../lib/post-login-redirect");
+      const { data } = await supabase.auth.getSession();
+      if (!mounted || !data.session) return;
+      const target = consumeRedirect();
+      if (target && target !== window.location.pathname + window.location.search) {
+        router.navigate({ to: target, replace: true });
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event: string) => {
+      if (event !== "SIGNED_IN") return;
+      const { consumeRedirect } = await import("../lib/post-login-redirect");
+      const target = consumeRedirect();
+      if (target) router.navigate({ to: target, replace: true });
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [router]);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <BrandingProvider>
+        <PostLoginRedirect />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
+
       <Toaster
         theme="dark"
         position="top-center"

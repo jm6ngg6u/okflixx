@@ -30,8 +30,11 @@ function AccountPage() {
       const ok = !!data.user;
       setAuthed(ok);
       setReady(true);
-      if (!ok) navigate({ to: "/login" });
+      if (!ok) {
+        navigate({ to: "/login", search: { redirect: "/account" }, replace: true });
+      }
     });
+    return () => { mounted = false; };
   }, [navigate]);
 
   const query = useQuery({

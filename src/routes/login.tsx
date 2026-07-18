@@ -6,8 +6,15 @@ import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 import logo from "@/assets/brand-logo.png";
 import { useBrand } from "@/lib/branding-context";
+import {
+  loginSearchSchema,
+  stashRedirect,
+  consumeRedirect,
+  sanitizeRedirect,
+} from "@/lib/post-login-redirect";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: loginSearchSchema,
   head: () => ({
     meta: [
       { title: "Sign in — Emberlord" },
@@ -21,16 +28,28 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const brand = useBrand();
+  const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
 
+  // Persist the intended destination as soon as the login page mounts so the
+  // Google popup / redirect flow can pick it up on return.
+  useEffect(() => {
+    if (search.redirect) stashRedirect(search.redirect);
+  }, [search.redirect]);
+
+  // If the user is already signed in, honor the redirect target immediately.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/" });
+      if (!data.session) return;
+      const target = consumeRedirect() ?? sanitizeRedirect(search.redirect) ?? "/";
+      navigate({ to: target, replace: true });
     });
-  }, [navigate]);
+  }, [navigate, search.redirect]);
 
   async function handleGoogle() {
     setBusy(true);
+    // Re-stash right before OAuth in case the URL was edited.
+    stashRedirect(search.redirect ?? null);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
@@ -42,12 +61,15 @@ function LoginPage() {
         return;
       }
       if (result.redirected) return;
-      navigate({ to: "/" });
+      // Popup path — session is set. Resolve the intended target.
+      const target = consumeRedirect() ?? sanitizeRedirect(search.redirect) ?? "/";
+      navigate({ to: target, replace: true });
     } catch (err: any) {
       toast.error(err?.message ?? "Sign-in failed");
       setBusy(false);
     }
   }
+
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
   const tagline1 = "COMMAND THE";
