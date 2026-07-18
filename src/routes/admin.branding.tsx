@@ -205,6 +205,12 @@ function BrandingStudio() {
         </div>
         <div className="flex items-center gap-2">
           <UndoButton />
+          {mutate.isPending && (
+            <Badge variant="outline" className="border-none bg-sky-500/15 text-sky-300 gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-300 animate-pulse" />
+              Saving {labelFor((mutate.variables as any)?.key ?? "")}…
+            </Badge>
+          )}
           <Badge variant="outline" className={`border-none ${dirtyCount ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
             {dirtyCount ? `${dirtyCount} unsaved` : "All synced"}
           </Badge>
