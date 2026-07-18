@@ -697,8 +697,17 @@ function MaintenanceControls(props: {
   const endsLocal = toLocalInputValue(endsIso);
   const startsMs = startsIso ? Date.parse(startsIso) : NaN;
   const endsMs = endsIso ? Date.parse(endsIso) : NaN;
+  const scheduleHalfFilled = (!!startsIso && !endsIso) || (!startsIso && !!endsIso);
   const scheduleInvalid =
-    !isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs;
+    scheduleHalfFilled ||
+    (!isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs);
+  const scheduleError = scheduleHalfFilled
+    ? (startsIso
+        ? "Set an end time — without it the “Estimated back in” countdown won't render."
+        : "Set a start time — a maintenance window needs both start and end.")
+    : (!isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs)
+      ? "End time must be after start time."
+      : null;
   const scheduleDirty =
     dirtyRef.current.has("maintenance_starts_at") ||
     dirtyRef.current.has("maintenance_ends_at");
