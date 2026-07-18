@@ -8,8 +8,8 @@ export type CodeInputHandle = {
 /**
  * 8-box TV code input with animated conic border around the group.
  */
-export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: string) => void }>(
-  function CodeInput({ onComplete }, ref) {
+export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: string) => void; onChange?: (filled: number, code: string) => void }>(
+  function CodeInput({ onComplete, onChange }, ref) {
   const LEN = 8;
   const [digits, setDigits] = useState<string[]>(Array(LEN).fill(""));
   const refs = useRef<Array<HTMLInputElement | null>>([]);
@@ -20,8 +20,12 @@ export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: strin
   }), [digits]);
 
   useEffect(() => {
-    if (digits.every((d) => d) && onComplete) onComplete(digits.join(""));
-  }, [digits, onComplete]);
+    const code = digits.join("");
+    const filled = digits.filter(Boolean).length;
+    if (onChange) onChange(filled, code);
+    if (filled === LEN && onComplete) onComplete(code);
+  }, [digits, onComplete, onChange]);
+
 
   const setAt = (i: number, v: string) => {
     setDigits((prev) => {
