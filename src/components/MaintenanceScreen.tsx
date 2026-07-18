@@ -193,7 +193,7 @@ export function MaintenanceView({
         {/* Admin message */}
         <p
           className="max-w-xl leading-relaxed text-white/70"
-          style={{ marginTop: fx(14), fontSize: fx(compact ? 12 : 15) }}
+          style={{ marginTop: fx(14), fontSize: fx(compact ? 12 : 15, "message") }}
         >
           {(message || b.maint_message).trim()}
         </p>
