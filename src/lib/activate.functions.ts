@@ -354,13 +354,34 @@ export const submitActivation = createServerFn({ method: "POST" })
                 : `Least-recently-used across ${eligibleCount ?? "?"} eligible cookie(s)`,
       };
 
-      // 5b. Optionally lock a proxy.
+      // 5b. Optionally lock a proxy. STRICT proxy mode: if enabled but no
+      // proxy is available, do NOT fall back to direct — mark this attempt as
+      // no_proxy so the "Route via proxy pool" toggle is honoured end-to-end.
       let proxyRow: any = null;
       if (proxyMode) {
         const { data: proxyRows } = await supabaseAdmin.rpc("pick_next_proxy");
         proxyRow = Array.isArray(proxyRows) ? proxyRows[0] : proxyRows;
-        // If proxy mode is ON but no proxy is available, fall back to direct
-        // rather than failing — matches the bot's fail-open behaviour.
+        if (!proxyRow) {
+          await supabaseAdmin.from("activation_attempts").insert({
+            code,
+            result: "no_proxy",
+            ip_hash: ipHash,
+            user_agent: userAgent,
+            country,
+            cookie_id: cookie.id,
+            proxy_mode: true,
+            attempt_number: attemptNumber,
+            user_id: verifiedUserId,
+            selection_reason: { ...selectionReason, outcome: "no_proxy_available" },
+            error_message: "Proxy mode is ON but no proxies are available.",
+          });
+          return {
+            ok: false,
+            error: "no_proxy",
+            attempts: attemptNumber,
+            message: "Proxy mode is ON but no proxies are available. Please try again shortly.",
+          };
+        }
       }
 
       const proxyPayload = proxyRow
@@ -372,6 +393,7 @@ export const submitActivation = createServerFn({ method: "POST" })
             password: proxyRow.password ?? null,
           }
         : null;
+
 
       // 5c. Call the worker.
       const outcome = await activateTVViaWorker({
