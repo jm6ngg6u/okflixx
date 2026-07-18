@@ -1,12 +1,14 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 
@@ -15,6 +17,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import "../lib/toast-format";
 import { BrandingProvider } from "../lib/branding-context";
 import { supabase } from "../integrations/supabase/client";
+import { getGateConfig } from "../lib/access-keys.functions";
+import { MaintenanceScreen } from "../components/MaintenanceScreen";
 
 function NotFoundComponent() {
   return (
@@ -156,8 +160,10 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <BrandingProvider>
         <PostLoginRedirect />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <MaintenanceGate>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </MaintenanceGate>
 
       <Toaster
         theme="dark"
@@ -184,4 +190,45 @@ function RootComponent() {
       </BrandingProvider>
     </QueryClientProvider>
   );
+}
+
+/**
+ * Global maintenance takeover. When admin has maintenance mode ON (manual or
+ * inside the scheduled window), replaces every public route with a full-screen
+ * MaintenanceScreen. Admin, auth, login, and preview routes are exempt so
+ * staff can still log in and disable maintenance. Uses the same public-gate
+ * query as the landing page (Realtime-invalidated), so state flips within a
+ * couple of seconds across every open tab.
+ */
+function MaintenanceGate({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const qc = useQueryClient();
+  const fetchGate = useServerFn(getGateConfig);
+
+  // Match the landing page's query key/shape so cache is shared.
+  const gate = useQuery({
+    queryKey: ["public-gate"],
+    queryFn: () => fetchGate(),
+    staleTime: 2000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const exempt =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/bg-preview") ||
+    pathname.startsWith("/api/");
+
+  if (!exempt && gate.data?.maintenance) {
+    return (
+      <MaintenanceScreen
+        message={gate.data.maintenanceMessage || ""}
+        endsAt={gate.data.maintenanceEndsAt ?? null}
+        onCleared={() => qc.invalidateQueries({ queryKey: ["public-gate"] })}
+      />
+    );
+  }
+  return <>{children}</>;
 }
