@@ -420,15 +420,27 @@ function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   );
 }
 
-function NumField({ k, label, hint, local, set, onSave, min, max }: any) {
+function NumField({ k, label, hint, local, set, onSave, busy, min, max }: any) {
+  const raw = local[k] ?? "";
+  const n = raw === "" ? NaN : Number(raw);
+  const outOfRange = raw !== "" && (Number.isNaN(n) || (min != null && n < min) || (max != null && n > max));
+  const isBusy = !!busy?.[k];
   return (
     <div className="space-y-1">
       <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</label>
       <div className="flex gap-2">
-        <Input type="number" min={min} max={max} value={local[k] ?? ""} onChange={(e) => set(k, e.target.value)} className="bg-white/5 border-white/10 font-mono" />
-        <Button size="sm" onClick={() => onSave(k)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+        <Input
+          type="number" min={min} max={max} value={raw}
+          onChange={(e) => set(k, e.target.value)}
+          className={`bg-white/5 font-mono ${outOfRange ? "border-red-500/50" : "border-white/10"}`}
+        />
+        <Button size="sm" disabled={isBusy || outOfRange || raw === ""} onClick={() => onSave(k)} className="btn-red shrink-0">
+          {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        </Button>
       </div>
-      {hint && <div className="text-[11px] text-white/40">{hint}</div>}
+      {outOfRange
+        ? <div className="text-[11px] text-red-300">Value must be between {min} and {max}.</div>
+        : hint && <div className="text-[11px] text-white/40">{hint}</div>}
     </div>
   );
 }
@@ -437,30 +449,38 @@ function NumField({ k, label, hint, local, set, onSave, min, max }: any) {
 
 
 
-function TextField({ k, label, placeholder, local, set, onSave }: any) {
+function TextField({ k, label, placeholder, local, set, onSave, busy }: any) {
+  const isBusy = !!busy?.[k];
   return (
     <div className="space-y-1">
       <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</label>
       <div className="flex gap-2">
         <Input placeholder={placeholder} value={local[k] ?? ""} onChange={(e) => set(k, e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-        <Button size="sm" onClick={() => onSave(k)} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+        <Button size="sm" disabled={isBusy} onClick={() => onSave(k)} className="btn-red shrink-0">
+          {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        </Button>
       </div>
     </div>
   );
 }
-function ToggleField({ k, label, hint, local, set, onSave, defaultOn }: any) {
+function ToggleField({ k, label, hint, local, set, onSave, busy, defaultOn }: any) {
   const raw = local[k];
   const on = raw === "1" || (raw === undefined && !!defaultOn);
+  const isBusy = !!busy?.[k];
   return (
     <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] p-3">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         <div className="text-[11px] text-white/40">{hint ?? (on ? "Enabled" : "Disabled")}</div>
       </div>
-      <Switch checked={on} onCheckedChange={(v) => {
-        set(k, v ? "1" : "0");
-        setTimeout(() => onSave(k), 0);
-      }} />
+      <div className="flex items-center gap-2">
+        {isBusy && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/50" />}
+        <Switch checked={on} disabled={isBusy} onCheckedChange={(v) => {
+          const nv = v ? "1" : "0";
+          set(k, nv);
+          onSave(k, nv);          // pass explicit value → no stale-closure bug
+        }} />
+      </div>
     </div>
   );
 }
