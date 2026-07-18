@@ -160,8 +160,10 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <BrandingProvider>
         <PostLoginRedirect />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <MaintenanceGate>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </MaintenanceGate>
 
       <Toaster
         theme="dark"
