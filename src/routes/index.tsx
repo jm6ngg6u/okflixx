@@ -13,6 +13,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { KeyRound, Lock, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
+import { useBrand } from "@/lib/branding-context";
+
+function Wordmark() {
+  const b = useBrand();
+  return (
+    <>
+      {b.name_prefix}
+      <span className="text-brand-accent">{b.name_suffix}</span>
+    </>
+  );
+}
 
 // Lightweight browser fingerprint — canvas + UA + screen + timezone + language.
 async function computeFingerprint(): Promise<string> {
@@ -92,6 +103,7 @@ type SuccessPayload = {
 
 function HomePage() {
   useReveal();
+  const b = useBrand();
   const codeRef = useRef<CodeInputHandle>(null);
   const honeypotRef = useRef<HTMLInputElement>(null);
   const mountedAtRef = useRef<number>(Date.now());
