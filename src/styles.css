@@ -499,74 +499,45 @@ html, body {
     inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
-/* Subtle shared glow — soft red border with a gentle rotating highlight.
-   Matches the understated premium look (like the emberlord card). */
+/* Shared glow — matches the Emberlord Premium card (.glow-ring-anim):
+   a thin rotating conic-gradient ring in brand red with transparent gaps. */
 .activation-panel,
 .live-count-panel,
 .glow-border {
   position: relative;
   isolation: isolate;
-  border-color: rgba(var(--brand-accent-rgb), 0.38) !important;
+  border-color: rgba(var(--brand-accent-rgb), 0.22) !important;
   box-shadow:
-    0 0 0 1px rgba(var(--brand-accent-rgb), 0.18),
-    0 0 14px rgba(var(--brand-accent-rgb), 0.18),
-    0 0 34px rgba(var(--brand-accent-rgb), 0.10),
     0 14px 34px -22px rgba(0,0,0,0.75),
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    inset 0 0 22px rgba(var(--brand-accent-rgb), 0.04) !important;
-  animation: liveBorderPulse 4.2s ease-in-out infinite;
+    inset 0 1px 0 rgba(255,255,255,0.06) !important;
 }
 
-.activation-panel::after,
-.live-count-panel::after,
-.glow-border::after,
 .activation-panel::before,
 .live-count-panel::before,
 .glow-border::before {
   content: "";
   position: absolute;
-  inset: -1px;
+  inset: 0;
   border-radius: inherit;
-  padding: 1px;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--live-border-angle, 0deg),
+    #ff2a3a 0%,
+    transparent 25%,
+    #e50914 50%,
+    transparent 75%,
+    #ff2a3a 100%
+  );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
   pointer-events: none;
+  animation: liveBorderSpin 6s linear infinite;
+  z-index: 0;
 }
 
-.activation-panel::after,
-.live-count-panel::after,
-.glow-border::after {
-  background:
-    linear-gradient(135deg,
-      rgba(var(--brand-accent-rgb), 0.55) 0%,
-      rgba(255,255,255,0.22) 28%,
-      rgba(var(--brand-accent-rgb), 0.5) 52%,
-      rgba(var(--brand-accent-rgb), 0.28) 100%);
-  opacity: 0.5;
-  z-index: 1;
-}
-
-.activation-panel::before,
-.live-count-panel::before,
-.glow-border::before {
-  background: conic-gradient(
-    from var(--live-border-angle),
-    rgba(var(--brand-accent-rgb), 0.10) 0deg,
-    rgba(var(--brand-accent-rgb), 0.10) 240deg,
-    rgba(var(--brand-accent-rgb), 0.55) 272deg,
-    rgba(255,255,255,0.85) 286deg,
-    rgba(var(--brand-accent-rgb), 0.55) 300deg,
-    rgba(var(--brand-accent-rgb), 0.14) 332deg,
-    rgba(var(--brand-accent-rgb), 0.10) 360deg
-  );
-  filter: drop-shadow(0 0 3px rgba(var(--brand-accent-rgb), 0.45));
-  animation: liveBorderSpin 5.5s linear infinite;
-  opacity: 0.85;
-  z-index: 1;
-}
 
 .activation-panel > *,
 .live-count-panel > *,
