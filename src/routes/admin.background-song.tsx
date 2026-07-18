@@ -250,7 +250,22 @@ function BackgroundSongPage() {
     d.scheduleStart !== scheduleStart ||
     d.scheduleEnd !== scheduleEnd
   );
-  const titleDirty = !!d && d.trackTitle !== trackTitleDraft;
+  // Match server normalization: strip control/zero-width, collapse whitespace, trim, cap.
+  const normalizeTitle = (raw: string) => raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  const normalizedTitleDraft = normalizeTitle(trackTitleDraft);
+  const titleDirty = !!d && d.trackTitle !== normalizedTitleDraft;
+  const titleCharCount = normalizedTitleDraft.length;
+  const fileFallback = d?.name?.replace(/\.[a-z0-9]+$/i, "") || "Background";
+  const titlePreview = normalizedTitleDraft || fileFallback;
+  const saveTitle = () => {
+    if (!titleDirty || titleMut.isPending) return;
+    titleMut.mutate(normalizedTitleDraft);
+  };
 
   // ---- Schedule validation + live-status helpers ------------------------
   const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
