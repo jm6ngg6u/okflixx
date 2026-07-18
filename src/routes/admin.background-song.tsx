@@ -897,6 +897,27 @@ function KpiTile({ label, value, sub, tone }: { label: string; value: string; su
   );
 }
 
+function AnalyticsTile({ label, v24, v7d, vPrev }: { label: string; v24: number; v7d: number; vPrev: number }) {
+  const delta = v24 - vPrev;
+  const pct = vPrev > 0 ? Math.round((delta / vPrev) * 100) : v24 > 0 ? 100 : 0;
+  const up = delta > 0;
+  const down = delta < 0;
+  const deltaCls = up ? "text-emerald-300" : down ? "text-[#ff6b7a]" : "text-white/40";
+  const arrow = up ? "▲" : down ? "▼" : "•";
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+      <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono">{label}</div>
+      <div className="mt-1 font-display text-2xl leading-none text-white">{v24.toLocaleString()}</div>
+      <div className="mt-1 flex items-center justify-between text-[10px] font-mono">
+        <span className="text-white/40"><span className="text-white/60">24h</span> · {v7d.toLocaleString()} 7d</span>
+        <span className={deltaCls}>{arrow} {vPrev === 0 && v24 === 0 ? "0%" : `${pct >= 0 ? "+" : ""}${pct}%`}</span>
+      </div>
+    </div>
+  );
+}
+
+
+
 
 function SliderRow({
   icon, title, hint, value, display, onChange, onCommit, saving,
