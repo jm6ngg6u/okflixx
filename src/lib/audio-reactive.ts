@@ -103,6 +103,7 @@ function setSilent(v: boolean) {
 
 /** Called once per animation frame by the visual loop. */
 export function noteFrame() {
+  if (fpsPaused) return; // hidden tab / reduced-motion: don't skew fps average
   const t = performance.now();
   if (!fpsSampleAt) fpsSampleAt = t;
   fpsFrames++;
