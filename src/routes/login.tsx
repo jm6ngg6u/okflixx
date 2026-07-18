@@ -72,18 +72,19 @@ function LoginPage() {
 
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
+  const heroLogo = brand?.logo_url || logo;
   const tagline1 = "COMMAND THE";
   const tagline2 = "FLAME";
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
+    <div className="relative min-h-dvh overflow-hidden bg-[#050505] text-white">
       {/* Ambient background flames */}
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <div className="absolute -top-40 -left-40 h-[540px] w-[540px] rounded-full bg-[#ff2a3a] opacity-[0.12] blur-[140px]" />
         <div className="absolute top-1/3 -right-40 h-[520px] w-[520px] rounded-full bg-[#7a0010] opacity-[0.25] blur-[160px]" />
         <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-[#ff2a3a] opacity-[0.08] blur-[140px]" />
         {/* Diagonal ember streaks */}
-        <svg className="absolute inset-0 h-full w-full opacity-40" preserveAspectRatio="none">
+        <svg className="absolute inset-0 h-full w-full opacity-40" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <linearGradient id="ember-streak" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="transparent" />
@@ -99,12 +100,20 @@ function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#050505_85%)]" />
       </div>
 
+      {/* Skip link for keyboard users */}
+      <a
+        href="#signin-card"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-black"
+      >
+        Skip to sign-in
+      </a>
+
       {/* Top bar */}
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <img src={logo} alt="" className="h-9 w-9 drop-shadow-[0_0_14px_rgba(255,42,58,0.55)]" />
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 sm:py-6">
+        <Link to="/" className="flex items-center gap-2.5 group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a] focus-visible:ring-offset-2 focus-visible:ring-offset-black" aria-label={`${brandName} home`}>
+          <img src={heroLogo} alt="" className="h-8 w-8 sm:h-9 sm:w-9 drop-shadow-[0_0_14px_rgba(255,42,58,0.55)]" />
           <span
-            className="text-lg font-extrabold tracking-[0.14em]"
+            className="text-base sm:text-lg font-extrabold tracking-[0.14em]"
             style={{ fontFamily: "var(--brand-font-display, Sora), sans-serif" }}
           >
             {brandName}
@@ -112,35 +121,40 @@ function LoginPage() {
         </Link>
         <Link
           to="/"
-          className="text-xs uppercase tracking-[0.22em] text-white/50 hover:text-white transition"
+          className="text-[10px] sm:text-xs uppercase tracking-[0.22em] text-white/50 hover:text-white transition rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a] focus-visible:ring-offset-2 focus-visible:ring-offset-black px-1"
         >
           ← Back to site
         </Link>
       </header>
 
-      <main className="relative z-10 mx-auto grid max-w-7xl gap-16 px-6 pb-16 pt-4 lg:grid-cols-2 lg:pt-10">
+      <main
+        id="main"
+        className="relative z-10 mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-2 sm:px-6 sm:gap-12 lg:grid-cols-2 lg:gap-16 lg:pt-10 lg:pb-16"
+      >
         {/* LEFT — Mascot & tagline */}
-        <section className="flex flex-col items-center justify-center text-center lg:items-start lg:text-left">
+        <section className="flex flex-col items-center justify-center text-center lg:items-start lg:text-left" aria-labelledby="tagline-heading">
           <div className="relative">
-            <div className="absolute inset-0 -z-10 mx-auto h-full w-full rounded-full bg-[#ff2a3a] opacity-30 blur-[90px]" />
+            <div className="absolute inset-0 -z-10 mx-auto h-full w-full rounded-full bg-[#ff2a3a] opacity-30 blur-[90px]" aria-hidden="true" />
             <img
-              src={logo}
-              alt="Emberlord crest"
-              className="h-64 w-64 sm:h-80 sm:w-80 drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] animate-[float_6s_ease-in-out_infinite]"
+              src={heroLogo}
+              alt=""
+              className="h-40 w-40 sm:h-56 sm:w-56 lg:h-80 lg:w-80 drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite]"
             />
           </div>
 
           <h1
-            className="mt-6 text-5xl sm:text-6xl font-black leading-[0.95] tracking-tight"
+            id="tagline-heading"
+            className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-black leading-[0.95] tracking-tight"
             style={{ fontFamily: "var(--brand-font-display, Sora), sans-serif" }}
           >
             <span className="text-white">{tagline1}</span>{" "}
             <span
-              className="bg-gradient-to-r from-[#ff2a3a] via-[#ff6b3d] to-[#ff2a3a] bg-clip-text text-transparent [background-size:200%_100%] animate-[shine_var(--brand-shine-duration,4.8s)_linear_infinite]"
+              className="bg-gradient-to-r from-[#ff2a3a] via-[#ff6b3d] to-[#ff2a3a] bg-clip-text text-transparent [background-size:200%_100%] motion-safe:animate-[shine_var(--brand-shine-duration,4.8s)_linear_infinite]"
             >
               {tagline2}
             </span>
           </h1>
+
 
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/60">
             Sign in to access the private trident — activate Netflix on any Smart TV, Apple TV, Roku, PS5 and beyond.
