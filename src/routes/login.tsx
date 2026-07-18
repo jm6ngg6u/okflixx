@@ -168,16 +168,12 @@ function LoginPage() {
           aria-labelledby="tagline-heading"
         >
           {/* Mascot with periodic shine sweep */}
-          <div className="relative">
-            <div
-              className="absolute inset-0 -z-10 mx-auto h-full w-full rounded-full bg-[#ff2a3a] opacity-30 blur-[100px]"
-              aria-hidden="true"
-            />
-            <div className="relative overflow-hidden rounded-[999px]">
+          <div className="relative inline-block">
+            <div className="relative inline-block overflow-hidden">
               <img
                 src={heroLogo}
                 alt=""
-                className="h-40 w-40 select-none drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:h-56 sm:w-56 lg:h-72 lg:w-72"
+                className="h-40 w-40 select-none object-contain drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:h-56 sm:w-56 lg:h-72 lg:w-72"
                 draggable={false}
               />
               {/* Shine flash (Florzin-style logo shine every few seconds) */}
@@ -193,6 +189,7 @@ function LoginPage() {
               />
             </div>
           </div>
+
 
           {/* Two-tone tagline */}
           <h1
