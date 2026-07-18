@@ -100,9 +100,19 @@ function sanitize(key: BrandingKey, raw: string): string {
   if (key === "font_display_weight" || key === "font_body_weight") {
     return WEIGHTS.has(v) ? v : BRANDING_DEFAULTS[key];
   }
+  if (key === "logo_url" || key === "favicon_url") {
+    const s = v.trim();
+    if (!s) return "";
+    // Allow http(s), same-origin absolute paths, data URLs (images only).
+    if (/^https?:\/\//i.test(s) && s.length <= 512) return s;
+    if (/^\/[^\s<>"']{0,511}$/.test(s)) return s;
+    if (/^data:image\/(png|jpe?g|gif|svg\+xml|webp|x-icon|vnd\.microsoft\.icon);base64,[a-zA-Z0-9+/=]+$/.test(s) && s.length <= 200000) return s;
+    return "";
+  }
   // Free text — trim + clip. No HTML allowed; consumers render as text.
   return v.replace(/[<>]/g, "").slice(0, 240);
 }
+
 
 export type BrandingMap = Record<BrandingKey, string>;
 
