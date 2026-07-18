@@ -165,6 +165,7 @@ function BrandingStudio() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <UndoButton />
           <Badge variant="outline" className={`border-none ${dirtyCount ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
             {dirtyCount ? `${dirtyCount} unsaved` : "All synced"}
           </Badge>
@@ -188,12 +189,15 @@ function BrandingStudio() {
       <LivePreview />
 
       <Tabs defaultValue="identity" className="w-full">
-        <TabsList className="bg-black/40 border border-white/10">
+        <TabsList className="bg-black/40 border border-white/10 flex-wrap">
           <TabsTrigger value="identity"><Palette className="w-3.5 h-3.5 mr-2" />Identity</TabsTrigger>
+          <TabsTrigger value="assets"><ImageIcon className="w-3.5 h-3.5 mr-2" />Assets</TabsTrigger>
           <TabsTrigger value="messages"><MessageSquareText className="w-3.5 h-3.5 mr-2" />Messages</TabsTrigger>
           <TabsTrigger value="typography"><Type className="w-3.5 h-3.5 mr-2" />Typography</TabsTrigger>
           <TabsTrigger value="effects"><Sparkles className="w-3.5 h-3.5 mr-2" />Effects</TabsTrigger>
+          <TabsTrigger value="presets"><Wand2 className="w-3.5 h-3.5 mr-2" />Presets</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="identity" className="mt-4">
           <Section title="Site identity" desc="Wordmark, tab title, and legal footer.">
