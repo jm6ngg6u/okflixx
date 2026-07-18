@@ -72,7 +72,28 @@ export function recordBgsError(err: unknown) {
   updateBgsHealth({ lastError: msg, lastErrorAt: Date.now() });
 }
 
+export const MAX_BGS_RETRIES = 6;
+
 export function bumpBgsRetries() {
-  state = { ...state, retries: state.retries + 1, updatedAt: Date.now() };
+  const next = Math.min(state.retries + 1, MAX_BGS_RETRIES + 1);
+  state = { ...state, retries: next, updatedAt: Date.now() };
   for (const l of listeners) l();
 }
+
+export function resetBgsRetries() {
+  if (state.retries === 0) return;
+  state = { ...state, retries: 0, updatedAt: Date.now() };
+  for (const l of listeners) l();
+}
+
+export function bgsRetryBackoffMs(): number {
+  // 2s, 4s, 8s, 16s, 32s, 60s
+  const seq = [2000, 4000, 8000, 16000, 32000, 60000];
+  const idx = Math.min(state.retries, seq.length - 1);
+  return seq[idx];
+}
+
+export function bgsRetriesExhausted(): boolean {
+  return state.retries >= MAX_BGS_RETRIES;
+}
+
