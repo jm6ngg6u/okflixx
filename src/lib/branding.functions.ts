@@ -41,6 +41,19 @@ export const BRANDING_DEFAULTS = {
   success_title: "You're in.",
   success_kicker: "// Activation complete",
   error_generic: "We couldn't activate your TV right now. Please try again in a moment.",
+  // Login page (Google-only)
+  login_kicker: "Wield the trident",
+  login_title: "Create Account",
+  login_subtitle: "Join thousands of other operatives today.",
+  login_tagline_1: "JOIN THE",
+  login_tagline_2: "ELITE",
+  login_description:
+    "Create your account to access our private gateway and start activating Netflix on any Smart TV, Apple TV, Roku, or console.",
+  login_button: "Continue with Google",
+  login_button_busy: "Opening Google…",
+  login_footer_prompt: "Already have security clearance?",
+  login_footer_cta: "Login",
+  login_status: "Gateway online",
   // Typography (whitelisted below)
   font_display: "Sora",
   font_body: "Inter",
