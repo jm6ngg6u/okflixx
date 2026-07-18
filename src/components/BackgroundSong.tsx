@@ -301,6 +301,8 @@ export function BackgroundSong() {
   }, []);
 
   // Silence-detected subscription — warn once + force STATIC + try recovery.
+  // Toast is latched per page session; a fresh warning only fires after a
+  // successful REACTIVE resume clears the latch.
   useEffect(() => {
     const off = onSilenceChange((v) => {
       setAnalyserSilent(v);
@@ -308,15 +310,17 @@ export function BackgroundSong() {
       if (v && !fired.current.silence) {
         fired.current.silence = true;
         sendEvent("silence_detected");
-        toast.warning("Audio analyser blocked", {
-          description: "Analyser returned silence for 3s — reactive background switched to STATIC. Check CORS or unmute the song.",
+        toast.warning("Reactive background paused", {
+          id: "bgs-silence",
+          description: "Audio analyser returned silence for 3s — switched to STATIC. Will auto-restore when signal returns.",
         });
         setReactiveEnabled(false);
         attemptRecovery("silence");
       } else if (!v && fired.current.silence) {
-        // Analyser recovered — allow a fresh warning on any future silence
-        // and let the play effect re-enable reactive automatically.
+        // Signal returned → reactive auto-restores via the play effect.
         fired.current.silence = false;
+        toast.dismiss("bgs-silence");
+        toast.success("Reactive background restored", { id: "bgs-silence-ok", duration: 2500 });
       }
     });
     return off;
