@@ -104,22 +104,7 @@ function AccessAdminPage() {
   });
 
 
-  // ─── Captcha config (site key + provider) ────────────────────────────
-  const [siteKeyDraft, setSiteKeyDraft] = useState<string | null>(null);
-  const savedSiteKey = config.data?.captchaSiteKey ?? "";
-  const siteKeyDirty = siteKeyDraft !== null && siteKeyDraft !== savedSiteKey;
 
-  // ─── Captcha test panel ──────────────────────────────────────────────
-  const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testCaptchaKeys>> | null>(null);
-  const testMut = useMutation({
-    mutationFn: () => runTestKeys(),
-    onSuccess: (r) => {
-      setTestResult(r);
-      if (r.ok) toast.success("Captcha handshake healthy");
-      else toast.error("Captcha test failed", { description: r.summary });
-    },
-    onError: (e: any) => toast.error("Test failed", { description: e?.message ?? "" }),
-  });
 
   // ─── Key generator ───────────────────────────────────────────────────
   const [genType, setGenType] = useState<KeyType>("unlimited");
