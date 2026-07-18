@@ -1,84 +1,44 @@
-## Branding Studio — new admin surface
+Goal: make Maintenance Mode unbypassable, instant on refresh, fully admin-controlled (copy/typography/effects/schedule/timezone), with high-fidelity previews. Ship each item; no filler features.
 
-A new **/admin/branding** menu that lets you rewrite every public string, swap fonts, and tune visual effects site-wide. Changes hit the live site within ~2 seconds (Supabase realtime + 2s poll fallback), no rebuild.
+## 1. Backend enforcement (unbypassable)
+- Add `src/lib/maintenance.server.ts`:
+  - `assertServiceAvailable()` — reads `app_settings` (maintenance_enabled + scheduled window) via `supabaseAdmin`. If active → throw `Response('Service temporarily unavailable', { status: 503, headers: { 'Retry-After': <seconds-until-end-or-300>, 'Cache-Control': 'no-store' } })`.
+- Call it at the top of every activation/renewal handler in `src/lib/activate.functions.ts` (activate, renew, status, key redemption) BEFORE cookie/proxy work, so no state is mutated.
+- Public routes under `src/routes/api/public/hooks/*` are cron-only (auto-checks) → leave alone. Public activation server fns are the enforcement surface.
+- Staff bypass: none. Admin routes are separate (`/admin/*`) and don't call these fns.
 
-### What you can control
+## 2. Kill cached UI flash on refresh
+- `getGateConfig` server fn: `setResponseHeaders({ 'Cache-Control': 'no-store, must-revalidate' })` inside handler.
+- `src/routes/__root.tsx`: SSR loader already prefetches gate (done last turn). Ensure `staleTime: 0` for `public-gate` query and pass `initialData` from loader so first paint is authoritative. Add `<meta http-equiv="Cache-Control" content="no-store">` to `__root` head for maintenance-affected pages.
+- `MaintenanceGate`: render decision uses SSR-primed data synchronously; no `useEffect` gate.
 
-**Identity**
-- Brand name (split into two parts, e.g. `EMBER` + `LORD`) — used in nav, footer, hero micro-label, browser tab
-- Tagline / meta description
-- Footer legal line
+## 3. Countdown w/ timezone + formatted window
+- Extend branding keys: `maint_timezone` (IANA, default `UTC`), `maint_time_format` (`24h`|`12h`).
+- Admin Branding → Maintenance tab: timezone select (common IANA list) + format toggle.
+- `MaintenanceView`: show formatted "Ends: <date, time TZ>" line above/below the live countdown, using `Intl.DateTimeFormat` with the configured tz.
+- Admin Settings scheduler already sets start/end (UTC). Display converts to configured tz.
 
-**Messages** (every headline and CTA on `/`)
-- Hero headline + sub-headline
-- "Enter TV Code" card title + helper text
-- Section titles: *Built for 2026*, plan title + price line, *Every screen. One code.*, testimonials line, final CTA
-- Success overlay title (`You're in.`) and receipt copy
-- Generic error banner text (verification / activation failure)
+## 4. Per-word font-size control
+- Branding schema: add `maint_size_status`, `maint_size_wordmark`, `maint_size_headline`, `maint_size_message`, `maint_size_countdown`, `maint_size_contacts`, `maint_size_footer` (percent 60–160, default 100).
+- `MaintenanceView`: multiply each element's base px by the per-element scale × global `maint_font_scale`.
+- Admin Branding: one slider per element under "Maintenance → Typography sizes".
 
-**Typography**
-- Display font, Body font, Mono font — pick from a curated Google Fonts list (Sora, Inter, Work Sans, Space Grotesk, Manrope, Outfit, Bricolage Grotesque, JetBrains Mono, IBM Plex Mono, etc.)
-- Per-family weight (400 – 800)
-- Global letter-spacing scale
-- Font is loaded automatically via an injected `<link>` in `__root` head-content when the value changes
+## 5. Preview toggles in Admin → Branding
+- Identity toggle: Guest vs Signed-in Google user (mock chip: avatar placeholder + `you@gmail.com`).
+- Viewport toggle: Mobile (390px) vs Desktop (1280px) frame with scaled iframe-like container using CSS transform + fixed width wrapper.
+- Both toggles state-local to Branding page; feed props into `MaintenanceView`.
 
-**Effects**
-- Brand accent color (hex → CSS var `--brand-accent`, replaces the hard-coded `#ff2a3a`)
-- Glow intensity 0–100 (drives `--brand-glow-strength` used by `.text-shine`, buttons, logo halo)
-- Shine sweep speed (slow / medium / fast / off)
-- Letter-spacing tightness (tight / normal / loose)
-- Optional pulsing halo behind the wordmark
+## 6. Confirm cleanup items already done
+- "Staff bypass · open admin" link removed — verify no residual copy.
+- Logo shine/flash + wordmark glow: keyframes always-on, toggles in admin already exist — verify defaults ON.
+- Admin can edit all maintenance copy — already in `MAINT_MESSAGES`; add the 2 new keys (timezone, format) and 7 size keys.
 
-### How it works
+## 7. Verification
+- Typecheck (`tsgo --noEmit`) — must pass.
+- Manual: enable maintenance → refresh public route → confirm no flash → confirm `/api/`-adjacent server fn calls throw 503 with the standard message → disable → recovers within poll.
 
-```text
-app_settings (branding_* keys)
-     │
-     ├─ getPublicBranding()  ── anon read, 2s cache
-     │        │
-     │        ▼
-     │   BrandingProvider (root)
-     │        ├─ writes CSS vars to :root  (accent, glow, spacing, --font-*)
-     │        ├─ injects Google Fonts <link> for chosen families
-     │        └─ exposes useBrand() → strings map with hard-coded fallbacks
-     │
-     └─ setBranding()  ── admin-only, per-key upsert + audit log
-              │
-              ▼
-        realtime notify → all open tabs refetch instantly
-```
-
-- Fallback defaults live in code, so a wiped row never breaks the site.
-- Admin edits are optimistic with rollback on error, mirroring the contact page.
-- Live preview card on the admin page renders the hero, CTA and success overlay with the values you're typing before you save.
-
-### Files
-
-- **New** `src/lib/branding.functions.ts` — `getPublicBranding`, `listBranding` (admin), `setBranding` (admin), `resetBranding` (admin)
-- **New** `src/lib/branding-context.tsx` — `<BrandingProvider>`, `useBrand()`, font-link injector, CSS-var applier, realtime subscription
-- **New** `src/routes/admin.branding.tsx` — 4-tab UI (Identity · Messages · Typography · Effects) + live preview panel
-- **Edit** `src/routes/__root.tsx` — mount `<BrandingProvider>` inside `RootComponent`
-- **Edit** `src/routes/index.tsx` — swap hard-coded strings/accent for `useBrand()` values with fallbacks (nav wordmark, hero, sections, footer, success overlay)
-- **Edit** `src/routes/admin.tsx` — add "Branding" entry to admin nav
-- **Edit** `src/styles.css` — replace hard-coded `#ff2a3a` and glow constants with CSS vars, keep visual defaults identical when vars are unset
-
-### Data model
-
-No migration required. Uses existing `app_settings (key text pk, value text)` with keys prefixed `branding_*`:
-`branding_name_prefix`, `branding_name_suffix`, `branding_tagline`, `branding_hero_headline`, … `branding_font_display`, `branding_font_body`, `branding_font_mono`, `branding_accent_hex`, `branding_glow`, `branding_shine_speed`, `branding_letter_spacing`.
-
-### Guardrails
-
-- Every string has a hard-coded default; missing/blank rows fall back automatically.
-- Font family list is whitelisted; free-text is stripped to alphanumerics + spaces before injection.
-- Accent hex is validated (`^#[0-9a-f]{6}$`) before being written to CSS vars.
-- All writes go through an admin-only server fn and are recorded in `admin_activity_log` with prefix `branding.*`.
-- Realtime + 2s polling; if realtime is unavailable the poll still catches changes.
-
-### Out of scope for this pass
-
-- Per-page/per-language variants (single global set for now)
-- Rich-text/markdown for messages (plain text only, kept for safety)
-- Image/logo swap (already covered by existing favicon flow)
-
-Confirm and I'll build it end-to-end in the next turn.
+## Technical notes
+- Timezone list kept small (~30 common IANAs) to avoid a huge dropdown; free-text fallback allowed.
+- 503 body is a stable JSON `{ error: 'service_unavailable', message: 'Service temporarily unavailable' }` so the client can render a consistent toast if a request slips through mid-flip.
+- All new branding keys default sensibly so existing installs render unchanged.
+- No new dependencies.
