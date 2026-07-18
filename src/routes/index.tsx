@@ -219,13 +219,8 @@ function HomePage() {
   }
 
   // Reset just the *attempt* state. Keeps the code the user typed but drops
-  // captcha tokens / pass / 24h session / key input / inline errors, then
-  // re-solves whichever gates are currently enabled.
+  // access key input / 24h session / inline errors.
   const resetAttempt = () => {
-    setCaptchaToken("");
-    setCaptchaError(null);
-    setCaptchaPassToken(null);
-    try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
     setAccessKey("");
     setKeyError(null);
     if (sessionToken) {
@@ -233,14 +228,9 @@ function HomePage() {
       setSessionToken(null);
     }
     setLoginError(null);
-    // Reset the captcha widget so a fresh challenge renders.
-    try {
-      const api: any = captchaWidgetProviderRef.current === "hcaptcha"
-        ? (window as any).hcaptcha : (window as any).turnstile;
-      api?.reset?.();
-    } catch { /* noop */ }
-    toast("Attempt reset", { description: "Re-run the security checks below." });
+    toast("Attempt reset", { description: "Re-run the checks below." });
   };
+
 
   const handleActivate = async () => {
     // Client throttle — 3s cooldown between submits.
