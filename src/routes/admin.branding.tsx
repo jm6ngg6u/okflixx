@@ -48,7 +48,7 @@ const IDENTITY: Row[] = [
 ];
 
 
-const MESSAGES: Row[] = [
+const HOME_MESSAGES: Row[] = [
   { key: "hero_kicker", label: "Hero kicker (live badge)" },
   { key: "hero_headline_1", label: "Hero headline — line 1" },
   { key: "hero_headline_2", label: "Hero headline — line 2 (accent)" },
@@ -70,23 +70,28 @@ const MESSAGES: Row[] = [
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
   { key: "error_generic", label: "Generic activation error", multiline: true },
-  { key: "login_kicker", label: "Login — card kicker" },
-  { key: "login_title", label: "Login — card title" },
-  { key: "login_subtitle", label: "Login — card subtitle" },
-  { key: "login_tagline_1", label: "Login — hero tagline (white)" },
-  { key: "login_tagline_2", label: "Login — hero tagline (accent)" },
-  { key: "login_description", label: "Login — hero description", multiline: true },
-  { key: "login_button", label: "Login — button label" },
-  { key: "login_button_busy", label: "Login — button (loading)" },
-  { key: "login_footer_prompt", label: "Login — footer prompt" },
-  { key: "login_footer_cta", label: "Login — footer CTA" },
-  { key: "login_status", label: "Login — status pill" },
-  { key: "login_error_title", label: "Login — error title" },
-  { key: "login_error_hint", label: "Login — error hint / help copy", multiline: true },
-  { key: "login_help_url", label: "Login — help link URL", placeholder: "https://…" },
-  { key: "login_help_label", label: "Login — help link label" },
-  { key: "login_expected_origin", label: "Login — expected origin (env check)", placeholder: "https://your-site.lovable.app" },
 ];
+
+const LOGIN_MESSAGES: Row[] = [
+  { key: "login_kicker", label: "Card kicker" },
+  { key: "login_title", label: "Card title" },
+  { key: "login_subtitle", label: "Card subtitle" },
+  { key: "login_tagline_1", label: "Hero tagline (white)" },
+  { key: "login_tagline_2", label: "Hero tagline (accent)" },
+  { key: "login_description", label: "Hero description", multiline: true },
+  { key: "login_button", label: "Button label" },
+  { key: "login_button_busy", label: "Button (loading)" },
+  { key: "login_footer_prompt", label: "Footer prompt" },
+  { key: "login_footer_cta", label: "Footer CTA" },
+  { key: "login_status", label: "Status pill" },
+  { key: "login_error_title", label: "Error title" },
+  { key: "login_error_hint", label: "Error hint / help copy", multiline: true },
+  { key: "login_help_url", label: "Help link URL", placeholder: "https://…" },
+  { key: "login_help_label", label: "Help link label" },
+  { key: "login_expected_origin", label: "Expected origin (env check)", placeholder: "https://your-site.lovable.app" },
+];
+
+const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
@@ -231,34 +236,52 @@ function BrandingStudio() {
         </div>
       </header>
 
-      <LivePreview />
-
-      <Tabs defaultValue="identity" className="w-full">
+      <Tabs defaultValue="home" className="w-full">
         <TabsList className="bg-black/40 border border-white/10 flex-wrap">
-          <TabsTrigger value="identity"><Palette className="w-3.5 h-3.5 mr-2" />Identity</TabsTrigger>
+          <TabsTrigger value="home"><Palette className="w-3.5 h-3.5 mr-2" />Home page</TabsTrigger>
+          <TabsTrigger value="login"><LogIn className="w-3.5 h-3.5 mr-2" />Login page</TabsTrigger>
+          <TabsTrigger value="identity"><MessageSquareText className="w-3.5 h-3.5 mr-2" />Identity & SEO</TabsTrigger>
           <TabsTrigger value="assets"><ImageIcon className="w-3.5 h-3.5 mr-2" />Assets</TabsTrigger>
-          <TabsTrigger value="messages"><MessageSquareText className="w-3.5 h-3.5 mr-2" />Messages</TabsTrigger>
           <TabsTrigger value="typography"><Type className="w-3.5 h-3.5 mr-2" />Typography</TabsTrigger>
           <TabsTrigger value="effects"><Sparkles className="w-3.5 h-3.5 mr-2" />Effects</TabsTrigger>
           <TabsTrigger value="presets"><Wand2 className="w-3.5 h-3.5 mr-2" />Presets</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="home" className="mt-4 space-y-4">
+          <PreviewFrame
+            title="Home hero — live preview"
+            subtitle="Kicker, wordmark, headline, CTA."
+            icon={<Palette className="w-3.5 h-3.5" />}
+          >
+            <HomeHeroPreview b={values as unknown as BrandingMap} />
+          </PreviewFrame>
+          <Section title="Home page copy" desc="Every headline, kicker, CTA and receipt shown on the landing page.">
+            <FieldGrid rows={HOME_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="login" className="mt-4 space-y-4">
+          <PreviewFrame
+            title="Login card — live preview"
+            subtitle="Mascot glow, shine sweep, Google button, status pill."
+            icon={<LogIn className="w-3.5 h-3.5" />}
+          >
+            <LoginPreview b={values as unknown as BrandingMap} />
+          </PreviewFrame>
+          <Section title="Login page copy" desc="Every string shown on /login — hero side and card side.">
+            <FieldGrid rows={LOGIN_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+        </TabsContent>
 
         <TabsContent value="identity" className="mt-4">
-          <Section title="Site identity" desc="Wordmark, tab title, and legal footer. Tab title updates instantly in every open browser tab.">
+          <Section title="Site identity" desc="Wordmark parts, browser tab title, SEO description and footer. Tab title updates in every open browser tab.">
             <FieldGrid rows={IDENTITY} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
         <TabsContent value="assets" className="mt-4">
-          <Section title="Logo & favicon" desc="Paste an https URL, a same-origin path (/favicon.png), or a data URL. Changes appear across the site and browser tab within 2 seconds.">
+          <Section title="Logo & favicon" desc="Upload a file or paste an https / same-origin / data URL. Changes appear across the site and browser tab within 2 seconds.">
             <AssetsPanel values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
-          </Section>
-        </TabsContent>
-
-        <TabsContent value="messages" className="mt-4">
-          <Section title="Site copy" desc="Every visible headline, section kicker, CTA and receipt message.">
-            <FieldGrid rows={MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
@@ -448,55 +471,16 @@ function FontPicker({
   );
 }
 
-/** Two independent live previews — Home hero on the left, Login card on the right.
- *  Each has its own header, focus button, and updates instantly from CSS vars. */
-function LivePreview() {
-  const b = useBrand();
-  const [focus, setFocus] = useState<null | "home" | "login">(null);
-
-  const showHome = focus !== "login";
-  const showLogin = focus !== "home";
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {showHome && (
-        <PreviewFrame
-          title="Home hero"
-          subtitle="Landing page — kicker, wordmark, CTA."
-          icon={<Palette className="w-3.5 h-3.5" />}
-          focused={focus === "home"}
-          onToggleFocus={() => setFocus(focus === "home" ? null : "home")}
-        >
-          <HomeHeroPreview b={b} />
-        </PreviewFrame>
-      )}
-      {showLogin && (
-        <PreviewFrame
-          title="Login card"
-          subtitle="Google sign-in surface — mascot, glow, shine."
-          icon={<LogIn className="w-3.5 h-3.5" />}
-          focused={focus === "login"}
-          onToggleFocus={() => setFocus(focus === "login" ? null : "login")}
-        >
-          <LoginPreview b={b} />
-        </PreviewFrame>
-      )}
-    </div>
-  );
-}
-
 function PreviewFrame({
-  title, subtitle, icon, focused, onToggleFocus, children,
+  title, subtitle, icon, children,
 }: {
   title: string;
   subtitle: string;
   icon: ReactNode;
-  focused: boolean;
-  onToggleFocus: () => void;
   children: ReactNode;
 }) {
   return (
-    <div className={`glass relative overflow-hidden ${focused ? "lg:col-span-2" : ""}`}>
+    <div className="glass relative overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-white/10 bg-black/40">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex items-center justify-center w-6 h-6 rounded-md bg-white/[0.06] text-brand-accent">
@@ -507,17 +491,9 @@ function PreviewFrame({
             <div className="text-[10px] uppercase tracking-widest text-white/40 truncate">{subtitle}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-300">
-            <CheckCircle2 className="w-3 h-3" /> Live
-          </span>
-          <button
-            onClick={onToggleFocus}
-            className="text-[10px] uppercase tracking-widest text-white/50 hover:text-white transition px-2 py-1 rounded border border-white/10"
-          >
-            {focused ? "Show both" : "Focus"}
-          </button>
-        </div>
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-300 shrink-0">
+          <CheckCircle2 className="w-3 h-3" /> Live · updates every 2s
+        </span>
       </div>
       <div className="p-6 md:p-7">{children}</div>
     </div>
