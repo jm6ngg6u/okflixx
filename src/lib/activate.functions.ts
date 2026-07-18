@@ -263,25 +263,28 @@ export const submitActivation = createServerFn({ method: "POST" })
     const gateActive = loginRequired || accessKeyRequired;
     if (!verifiedUserId && !gateActive) {
       const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
-      const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
-        _ip_hash: ipHash,
-        _minutes: 10,
-      });
-      if ((recent ?? 0) >= rlWindow) {
-        await supabaseAdmin.from("activation_attempts").insert({
-          code,
-          result: "rate_limited",
-          ip_hash: ipHash,
-          user_agent: userAgent,
-          country,
-          proxy_mode: false,
-          user_id: verifiedUserId,
+      // 0 = unlimited (skip the check entirely).
+      if (rlWindow > 0) {
+        const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
+          _ip_hash: ipHash,
+          _minutes: 10,
         });
-        return {
-          ok: false,
-          error: "rate_limited",
-          message: `Too many attempts from this network. Try again in a few minutes (limit ${rlWindow} / 10 min).`,
-        };
+        if ((recent ?? 0) >= rlWindow) {
+          await supabaseAdmin.from("activation_attempts").insert({
+            code,
+            result: "rate_limited",
+            ip_hash: ipHash,
+            user_agent: userAgent,
+            country,
+            proxy_mode: false,
+            user_id: verifiedUserId,
+          });
+          return {
+            ok: false,
+            error: "rate_limited",
+            message: `Too many attempts from this network. Try again in a few minutes (limit ${rlWindow} / 10 min).`,
+          };
+        }
       }
     }
 

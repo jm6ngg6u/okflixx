@@ -460,12 +460,18 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
   const loginOn = local.login_required === "1";
   const keyOn = local.access_key_required === "1";
   const gateOn = loginOn || keyOn;
-  const rlValue = parseInt(local.rate_limit_per_10min ?? "10", 10) || 10;
+  const rlRaw = local.rate_limit_per_10min ?? "10";
+  const rlValue = parseInt(rlRaw, 10);
+  const rlUnlimited = !Number.isNaN(rlValue) && rlValue === 0;
+  const rlDisplay = rlUnlimited ? "Unlimited" : `${rlValue || 10} / 10 min`;
   const maxA = parseInt(local.max_activation_attempts ?? "3", 10) || 3;
 
   const activeLabels: string[] = [];
   if (loginOn) activeLabels.push("Login");
   if (keyOn) activeLabels.push("Access Key");
+
+  const setUnlimited = () => set("rate_limit_per_10min", "0");
+  const setDefault10 = () => set("rate_limit_per_10min", "10");
 
   return (
     <div className={`glass p-5 ${gateOn ? "border-emerald-500/20" : ""}`}>
@@ -484,10 +490,16 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
           className={
             gateOn
               ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-mono text-[10px]"
-              : "bg-amber-500/15 text-amber-300 border-amber-500/30 font-mono text-[10px]"
+              : rlUnlimited
+                ? "bg-sky-500/15 text-sky-300 border-sky-500/30 font-mono text-[10px]"
+                : "bg-amber-500/15 text-amber-300 border-amber-500/30 font-mono text-[10px]"
           }
         >
-          {gateOn ? `GATED · ${activeLabels.join(" + ")}` : "PUBLIC · IP LIMITED"}
+          {gateOn
+            ? `GATED · ${activeLabels.join(" + ")}`
+            : rlUnlimited
+              ? "PUBLIC · UNLIMITED"
+              : "PUBLIC · IP LIMITED"}
         </Badge>
       </div>
 
@@ -495,14 +507,25 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
       <div className={`mb-4 rounded-md border px-3 py-2.5 text-xs flex items-start gap-2 ${
         gateOn
           ? "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-100/90"
-          : "border-amber-500/25 bg-amber-500/[0.06] text-amber-100/90"
+          : rlUnlimited
+            ? "border-sky-500/25 bg-sky-500/[0.06] text-sky-100/90"
+            : "border-amber-500/25 bg-amber-500/[0.06] text-amber-100/90"
       }`}>
-        {gateOn ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
+        {gateOn
+          ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          : rlUnlimited
+            ? <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            : <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
         <div className="leading-relaxed">
           {gateOn ? (
             <>
               <span className="font-semibold">{activeLabels.join(" & ")} gate active.</span>{" "}
               Per-IP rate limit is <span className="font-mono">disabled</span> — gated users are throttled by their per-user daily limit and key quota. Cookie retry cap ({maxA}/activation) still applies.
+            </>
+          ) : rlUnlimited ? (
+            <>
+              <span className="font-semibold">Unlimited public activation.</span>{" "}
+              No per-IP throttling — any anonymous caller can hit the endpoint without limit. Only the cookie retry cap ({maxA}/activation) protects the pool. Recommended only when an access gate or upstream WAF is in place.
             </>
           ) : (
             <>
@@ -527,15 +550,41 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
             hint={
               gateOn
                 ? `Idle — ${activeLabels.join(" + ")} gate is enforcing throttling. Turn gates off in Access to reactivate.`
-                : `Currently: allow ${rlValue} attempts per IP every 10 min for anonymous callers.`
+                : rlUnlimited
+                  ? `Unlimited (0) — no per-IP cap. Anonymous callers can activate without any throttling.`
+                  : `Currently: allow ${rlValue} attempts per IP every 10 min for anonymous callers. Set to 0 for unlimited.`
             }
-            local={local} set={set} onSave={save} busy={busy} min={1} max={200}
+            local={local} set={set} onSave={save} busy={busy} min={0} max={200}
           />
+          {!gateOn && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={setUnlimited}
+                disabled={rlUnlimited}
+                className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                ∞ Set unlimited
+              </button>
+              <button
+                type="button"
+                onClick={setDefault10}
+                className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] transition"
+              >
+                Reset to 10
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="mt-4 grid sm:grid-cols-3 gap-2 text-[11px]">
-        <PolicyChip label="Anonymous" value={gateOn ? "Blocked by gate" : `${rlValue} / 10 min per IP`} ok={!gateOn} />
+        <PolicyChip
+          label="Anonymous"
+          value={gateOn ? "Blocked by gate" : rlDisplay + (rlUnlimited ? "" : " per IP")}
+          ok={!gateOn && !rlUnlimited}
+          warn={!gateOn && rlUnlimited}
+        />
         <PolicyChip label="Signed-in" value="Per-user daily limit" ok />
         <PolicyChip label="Cookie retries" value={`${maxA} per activation`} ok />
       </div>
@@ -543,11 +592,14 @@ function ActivationFlowSection({ local, set, save, busy }: any) {
   );
 }
 
-function PolicyChip({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+function PolicyChip({ label, value, ok, warn }: { label: string; value: string; ok?: boolean; warn?: boolean }) {
+  const border = warn
+    ? "border-sky-500/30 bg-sky-500/[0.06]"
+    : ok
+      ? "border-white/10 bg-white/[0.03]"
+      : "border-rose-500/25 bg-rose-500/[0.05]";
   return (
-    <div className={`rounded-md border px-3 py-2 flex items-center justify-between ${
-      ok ? "border-white/10 bg-white/[0.03]" : "border-rose-500/25 bg-rose-500/[0.05]"
-    }`}>
+    <div className={`rounded-md border px-3 py-2 flex items-center justify-between ${border}`}>
       <span className="font-mono uppercase tracking-widest text-[9px] text-white/50">{label}</span>
       <span className="font-mono text-white/85 text-[11px]">{value}</span>
     </div>
