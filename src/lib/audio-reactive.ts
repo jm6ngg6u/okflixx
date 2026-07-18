@@ -33,8 +33,19 @@ let last: Levels = { ...ZERO };
 // Silence detection state.
 let silenceStart = 0;
 let silent = false;
+let recoveryFrames = 0; // consecutive frames of valid signal before clearing STATIC (hysteresis).
 type BoolSub = (v: boolean) => void;
 const silentSubs = new Set<BoolSub>();
+
+/**
+ * Reset the silence window. Call when the tab becomes visible again so
+ * throttled rAF during a hidden tab can't trip a false 3s silence fallback
+ * the instant the user returns.
+ */
+export function resetSilenceWindow() {
+  silenceStart = 0;
+  recoveryFrames = 0;
+}
 
 // FPS meter.
 let fpsFrames = 0;
@@ -255,15 +266,26 @@ export function getLevels(): Levels {
 
   last = { bass, mid, treble, level, beat: Math.min(1, beatEnv) };
 
-  // Silence detection — only meaningful while the audio is actually playing.
+  // Silence detection — only meaningful while audio is *actually* playing.
+  // Guards: not paused, not muted, volume > 0, and playhead advancing.
+  // Threshold is a weighted-band RMS; hysteresis requires ~6 valid frames
+  // (~100ms at 60fps) before clearing STATIC to avoid flapping on transients.
   const playing = !!attachedEl && !attachedEl.paused && !attachedEl.muted && attachedEl.volume > 0;
   const now = performance.now();
-  if (playing && level < 0.002 && bass < 0.002) {
+  const SILENCE_FLOOR = 0.0015;   // below → treat as silence (dither-tolerant)
+  const RECOVERY_FLOOR = 0.008;   // above → count toward recovery
+  const RECOVERY_FRAMES = 6;      // ~100ms sustained signal to flip back to REACTIVE
+
+  if (playing && level < SILENCE_FLOOR && bass < SILENCE_FLOOR) {
+    recoveryFrames = 0;
     if (!silenceStart) silenceStart = now;
     else if (now - silenceStart > 3000) setSilent(true);
-  } else if (level > 0.01 || bass > 0.01) {
-    silenceStart = 0;
-    setSilent(false);
+  } else if (level > RECOVERY_FLOOR || bass > RECOVERY_FLOOR) {
+    recoveryFrames++;
+    if (recoveryFrames >= RECOVERY_FRAMES) {
+      silenceStart = 0;
+      if (silent) setSilent(false);
+    }
   }
 
   return last;

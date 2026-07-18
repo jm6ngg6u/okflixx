@@ -9,6 +9,7 @@ import {
   setIntensity,
   setSensitivity,
   onSilenceChange,
+  resetSilenceWindow,
 } from "@/lib/audio-reactive";
 import { Volume2, VolumeX, Music4, Play } from "lucide-react";
 import { toast } from "sonner";
@@ -162,10 +163,17 @@ export function BackgroundSong() {
     window.setTimeout(() => { retryingRef.current = false; }, 6000);
   };
 
-  // Reset retry budget when the tab becomes visible again (user came back).
+  // Reset retry budget AND silence window when the tab becomes visible.
+  // Prevents throttled rAF during a hidden tab from firing a false STATIC
+  // fallback the moment the user returns.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const h = () => { if (document.visibilityState === "visible") resetBgsRetries(); };
+    const h = () => {
+      if (document.visibilityState === "visible") {
+        resetBgsRetries();
+        resetSilenceWindow();
+      }
+    };
     document.addEventListener("visibilitychange", h);
     return () => document.removeEventListener("visibilitychange", h);
   }, []);
@@ -293,6 +301,8 @@ export function BackgroundSong() {
   }, []);
 
   // Silence-detected subscription — warn once + force STATIC + try recovery.
+  // Toast is latched per page session; a fresh warning only fires after a
+  // successful REACTIVE resume clears the latch.
   useEffect(() => {
     const off = onSilenceChange((v) => {
       setAnalyserSilent(v);
@@ -300,15 +310,17 @@ export function BackgroundSong() {
       if (v && !fired.current.silence) {
         fired.current.silence = true;
         sendEvent("silence_detected");
-        toast.warning("Audio analyser blocked", {
-          description: "Analyser returned silence for 3s — reactive background switched to STATIC. Check CORS or unmute the song.",
+        toast.warning("Reactive background paused", {
+          id: "bgs-silence",
+          description: "Audio analyser returned silence for 3s — switched to STATIC. Will auto-restore when signal returns.",
         });
         setReactiveEnabled(false);
         attemptRecovery("silence");
       } else if (!v && fired.current.silence) {
-        // Analyser recovered — allow a fresh warning on any future silence
-        // and let the play effect re-enable reactive automatically.
+        // Signal returned → reactive auto-restores via the play effect.
         fired.current.silence = false;
+        toast.dismiss("bgs-silence");
+        toast.success("Reactive background restored", { id: "bgs-silence-ok", duration: 2500 });
       }
     });
     return off;
