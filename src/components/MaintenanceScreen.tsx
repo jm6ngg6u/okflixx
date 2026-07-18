@@ -18,16 +18,17 @@ type Props = {
 };
 
 function fmtRemaining(ms: number): string {
-  if (ms <= 0) return "any moment now";
+  if (!Number.isFinite(ms) || ms <= 0) return "any moment now";
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  if (d > 0) return `${d}d ${pad(h)}h ${pad(m)}m`;
-  if (h > 0) return `${h}h ${pad(m)}m ${pad(sec)}s`;
-  if (m > 0) return `${m}m ${pad(sec)}s`;
+  // Compact "12m 34s" style — always shows two units for stability, drops
+  // trailing zero-unit only when the value is truly under one unit.
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
 }
 
