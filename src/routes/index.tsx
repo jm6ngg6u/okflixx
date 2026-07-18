@@ -664,16 +664,40 @@ function HomePage() {
                   </div>
                 </div>
               )}
-              {/* Generic in-flight indicator — no internal stage names */}
+              {/* SYSTEM progress — three stages, always in sync with the pipeline. Not editable. */}
               {submitting && (
-                <div className="mt-6 rounded-lg border border-[#ff2a3a]/30 bg-[#ff2a3a]/5 p-3">
-                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-[#ff8a90] mb-2">
+                <div className="mt-6 rounded-xl border border-[#ff2a3a]/30 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4">
+                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.28em] text-[#ff8a90] mb-3">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Activating your TV
+                    Activating — please keep this tab open
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      { k: "Verifying code", d: "01" },
+                      { k: "Linking device", d: "02" },
+                      { k: "Finalizing", d: "03" },
+                    ].map((s, i) => (
+                      <div
+                        key={s.k}
+                        className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5"
+                      >
+                        <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-white/40">{s.d}</div>
+                        <div className="text-[11px] text-white/80 truncate">{s.k}</div>
+                        <div className="mt-1 h-0.5 rounded-full bg-white/5 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90]"
+                            style={{ animation: `stage-fill 1.8s ease-out ${i * 0.6}s forwards`, width: "0%" }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                   <div className="h-1 rounded-full bg-white/5 overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-[#ff2a3a] to-[#ff8a90] activation-progress-bar" />
                   </div>
+                  <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.2em] text-white/40">
+                    Secure channel · Encrypted · No credentials required
+                  </p>
                 </div>
               )}
 
@@ -681,18 +705,18 @@ function HomePage() {
                 <div
                   role="alert"
                   aria-live="polite"
-                  className="mt-4 rounded-lg border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4"
+                  className="mt-4 rounded-xl border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4 animate-fade-in"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="shrink-0 w-8 h-8 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
+                    <div className="shrink-0 w-9 h-9 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
                       <AlertCircle className="w-4 h-4 text-[#ff8a90]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ff8a90]">
-                        Activation failed
+                      <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#ff8a90]">
+                        Activation didn't complete
                       </div>
                       <p className="mt-2 text-sm text-white/90 leading-relaxed">
-                        We couldn't activate your TV right now. Please try again in a moment.
+                        Something interrupted the link to your TV. Double-check the on-screen code, then try again — no charges, no lockouts.
                       </p>
                       <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <button
@@ -702,7 +726,7 @@ function HomePage() {
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <RotateCcw className={`w-3 h-3 ${retryCountdown > 0 && autoRetry ? "animate-spin-slow" : ""}`} />
-                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Try again"}
+                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Retry activation"}
                         </button>
                         <button
                           type="button"
@@ -721,9 +745,20 @@ function HomePage() {
               <button
                 onClick={handleActivate}
                 disabled={submitting || !!gate.data?.maintenance}
-                className="btn-red w-full mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="btn-red w-full mt-5 disabled:opacity-60 disabled:cursor-not-allowed group relative overflow-hidden"
               >
-                {gate.data?.maintenance ? "Temporarily unavailable" : submitting ? "Activating…" : b.activate_cta}
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  {gate.data?.maintenance ? (
+                    <>Temporarily unavailable</>
+                  ) : submitting ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Activating your TV…</>
+                  ) : (
+                    <>Activate my TV <span aria-hidden>→</span></>
+                  )}
+                </span>
+                {!submitting && !gate.data?.maintenance && (
+                  <span aria-hidden className="absolute inset-y-0 -left-1/3 w-1/3 bg-white/20 skew-x-[-20deg] translate-x-0 group-hover:translate-x-[400%] transition-transform duration-700" />
+                )}
               </button>
 
 
