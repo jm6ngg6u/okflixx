@@ -223,9 +223,22 @@ function SettingsPage() {
         icon={Zap}
         title="Proxy mode"
         subtitle="Route every cookie check and TV activation through the proxy pool. Auto-check jobs use whichever mode is active when they run."
-        pill={<Badge variant="outline" className={proxyOn
-          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-          : "bg-white/10 text-white/60 border-white/15"}>{proxyOn ? "PROXIED" : "DIRECT"}</Badge>}
+        pill={
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={proxyOn
+              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+              : "bg-white/10 text-white/60 border-white/15"}>{proxyOn ? "PROXIED" : "DIRECT"}</Badge>
+            {proxyOn && proxyStatusQ.data && (
+              <Badge variant="outline" className={
+                (proxyStatusQ.data.usable ?? 0) > 0
+                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/25 font-mono text-[10px]"
+                  : "bg-rose-500/15 text-rose-300 border-rose-500/30 font-mono text-[10px]"
+              }>
+                {proxyStatusQ.data.usable}/{proxyStatusQ.data.total} USABLE
+              </Badge>
+            )}
+          </div>
+        }
       >
         <div className="flex items-center gap-4">
           <Switch checked={proxyOn} disabled={!!busy["proxy_mode"]} onCheckedChange={async () => {
@@ -237,12 +250,27 @@ function SettingsPage() {
               dirtyRef.current.delete("proxy_mode");
               toast.success(`Proxy mode ${r.proxy_mode ? "enabled" : "disabled"}`);
               qc.invalidateQueries({ queryKey: ["admin-settings"] });
+              qc.invalidateQueries({ queryKey: ["admin-proxy-status"] });
             } catch (e: any) { toast.error(e?.message ?? "Toggle failed"); }
             finally { setBusy((b) => { const n = { ...b }; delete n.proxy_mode; return n; }); }
           }} />
-          <span className="text-sm text-white/60">{proxyOn ? "Traffic routed via proxy pool" : "Direct edge connections"}</span>
+          <div className="text-sm">
+            <div className="text-white/80">{proxyOn ? "Traffic routed via proxy pool" : "Direct edge connections"}</div>
+            {proxyOn && proxyStatusQ.data && (proxyStatusQ.data.usable ?? 0) === 0 && (
+              <div className="text-rose-300 mt-1 text-xs flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                No usable proxies — cookie checks and activations will fail until proxies recover.
+              </div>
+            )}
+            {proxyOn && proxyStatusQ.data && (proxyStatusQ.data.quarantined ?? 0) > 0 && (
+              <div className="text-amber-300/80 mt-1 text-xs">
+                {proxyStatusQ.data.quarantined} quarantined · avg latency {proxyStatusQ.data.avg_latency_ms}ms
+              </div>
+            )}
+          </div>
         </div>
       </Section>
+
 
       {/* Maintenance mode */}
       <Section
