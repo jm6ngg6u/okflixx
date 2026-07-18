@@ -117,13 +117,15 @@ function HomePage() {
   const redeemFn = useServerFn(redeemAccessKey);
   const fetchSuccessCount = useServerFn(getSuccessActivationCount);
 
-  // Live successful-activation counter — polled every 2s. Counts ONLY result='success'.
+  // Live successful-activation counter — realtime broadcast + short-interval safety poll.
+  // Counts ONLY result='success'. No invalid / error / rate-limited rows.
   const successCount = useQuery({
     queryKey: ["public-activation-success-count"],
     queryFn: () => fetchSuccessCount(),
-    refetchInterval: 2_000,
+    refetchInterval: 5_000,
     refetchIntervalInBackground: false,
-    staleTime: 1_000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
 
