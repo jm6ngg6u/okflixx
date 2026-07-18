@@ -718,6 +718,8 @@ function MaintenanceControls(props: {
   })();
 
   const previewMsg = clean.length >= 8 ? clean : DEFAULT_MAINT_MSG;
+  const brand = useBrand();
+
 
   async function saveMessage() {
     if (messageInvalid || messageTooLong || busy["maintenance_message"]) return;
