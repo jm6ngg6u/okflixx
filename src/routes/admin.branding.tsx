@@ -805,6 +805,8 @@ function MaintenancePreviewFrame({ values }: { values: Record<string, string> })
               b={values as unknown as BrandingMap}
               message={values.maint_message}
               remainingLabel="12m 34s"
+              startsAt={new Date(Date.now() - 5 * 60_000).toISOString()}
+              endsAt={new Date(Date.now() + 12 * 60_000 + 34_000).toISOString()}
               channels={[
                 { kind: "telegram", name: "Telegram", href: "#" },
                 { kind: "instagram", name: "Instagram", href: "#" },
