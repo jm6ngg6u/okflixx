@@ -177,6 +177,19 @@ function LoginPage() {
   const loginFooterPrompt = brand?.login_footer_prompt || "Already have security clearance?";
   const loginFooterCta = brand?.login_footer_cta || "Login";
   const loginStatus = brand?.login_status || "Gateway online";
+  const loginErrorTitle = brand?.login_error_title || "Sign-in failed";
+  const loginErrorHint = brand?.login_error_hint || "";
+  const loginHelpUrl = (brand?.login_help_url || "").trim();
+  const loginHelpLabel = brand?.login_help_label || "Need help?";
+  const expectedOrigin = (brand?.login_expected_origin || "").trim().replace(/\/$/, "");
+
+  // Env / redirect-URI mismatch banner — admin sets the canonical origin;
+  // if the visitor is on a different one (a stale preview, a mistyped domain)
+  // we warn BEFORE the OAuth round-trip so they don't burn a redirect attempt.
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const originMismatch =
+    !!expectedOrigin && !!currentOrigin && expectedOrigin !== currentOrigin;
+
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-[#050505] text-white">
