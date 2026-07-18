@@ -579,7 +579,7 @@ function JobScheduleCard({
         <div className="min-w-0 pr-3">
           <div className="text-xs">{cleanupLabel}</div>
         </div>
-        <Switch checked={cleanupOn} onCheckedChange={(v) => { set(cleanupKey, v ? "1" : "0"); setTimeout(() => onSave(cleanupKey), 0); }} />
+        <Switch checked={cleanupOn} onCheckedChange={(v) => { const nv = v ? "1" : "0"; set(cleanupKey, nv); onSave(cleanupKey, nv); }} />
       </div>
 
       <div className="flex flex-wrap gap-2">
