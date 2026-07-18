@@ -431,6 +431,14 @@ function LoginPage() {
         .login-hero-logo {
           animation: float 6s ease-in-out infinite, logo-flash 3.8s ease-in-out infinite;
         }
+        @keyframes header-logo-pulse {
+          0%, 100% { filter: drop-shadow(0 0 8px rgba(255,42,58,0.4)) drop-shadow(0 0 18px rgba(255,42,58,0.25)); }
+          50%      { filter: drop-shadow(0 0 14px rgba(255,42,58,0.85)) drop-shadow(0 0 28px rgba(255,107,61,0.55)); }
+        }
+        .header-logo-glow {
+          animation: header-logo-pulse 2.6s ease-in-out infinite;
+          object-fit: contain;
+        }
         .beam-shimmer {
           animation: beam-drift 9s ease-in-out infinite alternate;
           transform-origin: center;
