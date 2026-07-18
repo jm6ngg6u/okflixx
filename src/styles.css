@@ -38,6 +38,22 @@
   --brand-letter-spacing: 0em;
   --brand-font-display-weight: 700;
   --brand-font-body-weight: 400;
+
+  /* Toast design tokens — shared across admin + public. */
+  --toast-bg: rgba(11, 11, 13, 0.95);
+  --toast-border: rgba(255, 255, 255, 0.10);
+  --toast-radius: 12px;
+  --toast-pad-x: 16px;
+  --toast-pad-y: 14px;
+  --toast-shadow: 0 20px 60px -20px rgba(var(--brand-accent-rgb), 0.35);
+  --toast-title-size: 15px;
+  --toast-desc-size: 12.5px;
+  --toast-success: #34d399;
+  --toast-error: #ff4d5e;
+  --toast-warning: #fbbf24;
+  --toast-info: #38bdf8;
+  --toast-loading: #a8a8a8;
+
 }
 
 /* Font-loading fallback: BrandingProvider sets data-brand-font-fallback="1"
