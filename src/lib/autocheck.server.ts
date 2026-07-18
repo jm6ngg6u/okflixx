@@ -148,7 +148,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     const abortCurrentCheck = new AbortController();
     const stopWatchingControl = watchJobControl(jobId, (signal) => {
       control = signal;
-      abortCurrentCheck.abort(signal);
+      if (signal === "cancel") abortCurrentCheck.abort(signal);
     });
 
     for (const r of rows ?? []) {
@@ -199,8 +199,17 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
           continue;
         }
       }
-      const out = await checkCookieViaWorker({ cookies: r.cookies_json as any[], proxy: proxyPayload });
-      if (control) break;
+      const out = await checkCookieViaWorker({
+        cookies: r.cookies_json as any[],
+        proxy: proxyPayload,
+        signal: abortCurrentCheck.signal,
+      });
+      if (control === "cancel") {
+        if (proxyId) {
+          await supabaseAdmin.from("proxy_pool").update({ is_locked: false, locked_at: null }).eq("id", proxyId);
+        }
+        break;
+      }
       if (proxyId) {
         await supabaseAdmin.rpc("release_proxy", {
           _id: proxyId,
@@ -360,7 +369,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
     const abortCurrentCheck = new AbortController();
     const stopWatchingControl = watchJobControl(jobId, (signal) => {
       control = signal;
-      abortCurrentCheck.abort(signal);
+      if (signal === "cancel") abortCurrentCheck.abort(signal);
     });
     for (const p of rows ?? []) {
       control = await readJobControl(jobId);
@@ -379,7 +388,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
         proxy: { scheme: p.scheme, ip: p.ip, port: p.port, username: p.username, password: p.password },
         signal: abortCurrentCheck.signal,
       });
-      if (control) break;
+      if (control === "cancel") break;
       await supabaseAdmin.from("proxy_pool").update({
         is_valid: res.ok,
         last_error: res.error ?? null,
