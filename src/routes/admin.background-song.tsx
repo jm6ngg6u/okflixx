@@ -55,6 +55,7 @@ function BackgroundSongPage() {
   const fetchInfo = useServerFn(getBackgroundSongAdmin);
   const fetchHistory = useServerFn(listBackgroundSongHistory);
   const fetchAnalytics = useServerFn(getBackgroundSongAnalytics);
+  const fetchTelemetry = useServerFn(getPlaybackTelemetry);
   const doToggle = useServerFn(setBackgroundSongEnabled);
   const doRemove = useServerFn(removeBackgroundSong);
   const doReactive = useServerFn(setBackgroundSongReactive);
