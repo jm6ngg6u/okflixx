@@ -841,7 +841,8 @@ html, body {
   to { --live-border-angle: 360deg; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .live-count-panel::before { animation: none; }
+  .live-count-panel::before,
+  .activation-panel::before { animation: none; }
 }
 @keyframes liveBorderPulse {
   0%, 100% {
