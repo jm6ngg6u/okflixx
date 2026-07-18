@@ -1,79 +1,84 @@
-# Restore admin email + password + TOTP
+## Branding Studio — new admin surface
 
-Keep Google sign-in on `/login` for regular TV-activation users. Rebuild `/auth` (admin) as email + password with mandatory TOTP for anyone holding the admin role. Uses Supabase's built-in MFA — no custom TOTP tables.
+A new **/admin/branding** menu that lets you rewrite every public string, swap fonts, and tune visual effects site-wide. Changes hit the live site within ~2 seconds (Supabase realtime + 2s poll fallback), no rebuild.
 
-## What changes
+### What you can control
 
-**Auth providers (Supabase config)**
-- Re-enable email provider (currently disabled from the Google-only switch).
-- Keep Google enabled.
-- Signups on the admin route are blocked in UI; only pre-existing admin users or invited staff can sign in. Public `/login` remains Google-only.
+**Identity**
+- Brand name (split into two parts, e.g. `EMBER` + `LORD`) — used in nav, footer, hero micro-label, browser tab
+- Tagline / meta description
+- Footer legal line
 
-**`/auth` — admin sign-in flow (rebuild)**
-1. Step 1: Email + password form.
-2. On successful password sign-in, call `supabase.auth.mfa.getAuthenticatorAssuranceLevel()`.
-3. If the user has admin/moderator role:
-   - `currentLevel === 'aal1'` and no TOTP factor → force enrollment (QR + verify).
-   - `currentLevel === 'aal1'` and factor exists → show 6-digit TOTP challenge.
-   - `currentLevel === 'aal2'` → redirect to `/admin`.
-4. If the user has no admin role at all → sign them out and show "not authorized".
-5. A small "Continue with Google" link stays as a fallback path (Google admins still supported; if they hold admin role and have no TOTP, they're forced into enrollment too).
+**Messages** (every headline and CTA on `/`)
+- Hero headline + sub-headline
+- "Enter TV Code" card title + helper text
+- Section titles: *Built for 2026*, plan title + price line, *Every screen. One code.*, testimonials line, final CTA
+- Success overlay title (`You're in.`) and receipt copy
+- Generic error banner text (verification / activation failure)
 
-**`/auth/mfa` — new subroute** (or inline modal on `/auth`)
-- Enrollment view: `supabase.auth.mfa.enroll({ factorType: 'totp' })`, render QR + secret, verify with 6-digit code via `mfa.challenge` + `mfa.verify`.
-- Challenge view: 6-digit input, `mfa.challenge` + `mfa.verify`, on success go to `/admin`.
-- Recovery: on enrollment success, show 8 one-time recovery codes (stored hashed in `admin_recovery_codes`); user must copy/download before continuing.
+**Typography**
+- Display font, Body font, Mono font — pick from a curated Google Fonts list (Sora, Inter, Work Sans, Space Grotesk, Manrope, Outfit, Bricolage Grotesque, JetBrains Mono, IBM Plex Mono, etc.)
+- Per-family weight (400 – 800)
+- Global letter-spacing scale
+- Font is loaded automatically via an injected `<link>` in `__root` head-content when the value changes
 
-**Admin route guard (`src/routes/admin.tsx`)**
-- After confirming admin role, also check `getAuthenticatorAssuranceLevel()`:
-  - Admin without TOTP enrolled → redirect to `/auth/mfa?enroll=1`.
-  - Admin with TOTP but session at `aal1` → redirect to `/auth/mfa?challenge=1`.
-  - Only `aal2` sessions enter `/admin`.
+**Effects**
+- Brand accent color (hex → CSS var `--brand-accent`, replaces the hard-coded `#ff2a3a`)
+- Glow intensity 0–100 (drives `--brand-glow-strength` used by `.text-shine`, buttons, logo halo)
+- Shine sweep speed (slow / medium / fast / off)
+- Letter-spacing tightness (tight / normal / loose)
+- Optional pulsing halo behind the wordmark
 
-**Audit**
-- Log every step to `auth_audit_log`: `password_signin_ok/fail`, `totp_enroll_start/ok`, `totp_challenge_ok/fail`, `recovery_code_used`, `admin_access_granted`.
+### How it works
 
-## Database (one migration)
-
-```sql
--- One-time recovery codes for admins who lose their authenticator
-CREATE TABLE public.admin_recovery_codes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  code_hash text NOT NULL UNIQUE,
-  used_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-GRANT SELECT, INSERT, UPDATE ON public.admin_recovery_codes TO authenticated;
-GRANT ALL ON public.admin_recovery_codes TO service_role;
-ALTER TABLE public.admin_recovery_codes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "own recovery codes" ON public.admin_recovery_codes
-  FOR SELECT TO authenticated USING (user_id = auth.uid());
--- Inserts/updates go through security-definer server fns; no direct write policy.
-
-CREATE INDEX admin_recovery_codes_user_id_idx
-  ON public.admin_recovery_codes (user_id) WHERE used_at IS NULL;
+```text
+app_settings (branding_* keys)
+     │
+     ├─ getPublicBranding()  ── anon read, 2s cache
+     │        │
+     │        ▼
+     │   BrandingProvider (root)
+     │        ├─ writes CSS vars to :root  (accent, glow, spacing, --font-*)
+     │        ├─ injects Google Fonts <link> for chosen families
+     │        └─ exposes useBrand() → strings map with hard-coded fallbacks
+     │
+     └─ setBranding()  ── admin-only, per-key upsert + audit log
+              │
+              ▼
+        realtime notify → all open tabs refetch instantly
 ```
 
-Plus a security-definer RPC `consume_recovery_code(_user_id uuid, _code_hash text)` that atomically marks a code used and returns ok/reason.
+- Fallback defaults live in code, so a wiped row never breaks the site.
+- Admin edits are optimistic with rollback on error, mirroring the contact page.
+- Live preview card on the admin page renders the hero, CTA and success overlay with the values you're typing before you save.
 
-## Files touched
+### Files
 
-- `src/routes/auth.tsx` — full rewrite: email+password form → MFA step → done.
-- `src/routes/auth.mfa.tsx` — new: enrollment + challenge + recovery-code display.
-- `src/routes/admin.tsx` — add AAL2 check after role check.
-- `src/lib/mfa.functions.ts` — new: `generateRecoveryCodes`, `verifyRecoveryCode`, `getMyMfaStatus` server fns.
-- `src/lib/auth-audit.functions.ts` — extend event types.
-- Supabase auth: call `supabase--configure_auth` to re-enable email (auto-confirm off, HIBP on).
+- **New** `src/lib/branding.functions.ts` — `getPublicBranding`, `listBranding` (admin), `setBranding` (admin), `resetBranding` (admin)
+- **New** `src/lib/branding-context.tsx` — `<BrandingProvider>`, `useBrand()`, font-link injector, CSS-var applier, realtime subscription
+- **New** `src/routes/admin.branding.tsx` — 4-tab UI (Identity · Messages · Typography · Effects) + live preview panel
+- **Edit** `src/routes/__root.tsx` — mount `<BrandingProvider>` inside `RootComponent`
+- **Edit** `src/routes/index.tsx` — swap hard-coded strings/accent for `useBrand()` values with fallbacks (nav wordmark, hero, sections, footer, success overlay)
+- **Edit** `src/routes/admin.tsx` — add "Branding" entry to admin nav
+- **Edit** `src/styles.css` — replace hard-coded `#ff2a3a` and glow constants with CSS vars, keep visual defaults identical when vars are unset
 
-## What stays the same
+### Data model
 
-- `/login` (Google) for regular activation users — unchanged.
-- All existing admin gates (`has_role`, RLS, `admin_activity_log`, `admin_access_attempt`).
-- Google as an alternative sign-in for admins who prefer it (still forced through the same TOTP gate).
+No migration required. Uses existing `app_settings (key text pk, value text)` with keys prefixed `branding_*`:
+`branding_name_prefix`, `branding_name_suffix`, `branding_tagline`, `branding_hero_headline`, … `branding_font_display`, `branding_font_body`, `branding_font_mono`, `branding_accent_hex`, `branding_glow`, `branding_shine_speed`, `branding_letter_spacing`.
 
-## Notes / caveats
+### Guardrails
 
-- The **first admin bootstrap** trigger (`handle_new_user_bootstrap`) currently promotes the first-ever signup to admin. This still works — but that first admin will be forced through TOTP enrollment on their next `/admin` visit.
-- Password reset via email OTP will be re-enabled with the email provider; the previously deleted `/reset-password` route will be re-added.
-- Session upgrade to `aal2` follows Supabase's standard flow — no custom JWT handling.
+- Every string has a hard-coded default; missing/blank rows fall back automatically.
+- Font family list is whitelisted; free-text is stripped to alphanumerics + spaces before injection.
+- Accent hex is validated (`^#[0-9a-f]{6}$`) before being written to CSS vars.
+- All writes go through an admin-only server fn and are recorded in `admin_activity_log` with prefix `branding.*`.
+- Realtime + 2s polling; if realtime is unavailable the poll still catches changes.
+
+### Out of scope for this pass
+
+- Per-page/per-language variants (single global set for now)
+- Rich-text/markdown for messages (plain text only, kept for safety)
+- Image/logo swap (already covered by existing favicon flow)
+
+Confirm and I'll build it end-to-end in the next turn.
