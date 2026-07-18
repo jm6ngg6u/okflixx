@@ -252,6 +252,54 @@ function BackgroundSongPage() {
   );
   const titleDirty = !!d && d.trackTitle !== trackTitleDraft;
 
+  // ---- Schedule validation + live-status helpers ------------------------
+  const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const startValid = HHMM_RE.test(scheduleStart);
+  const endValid = HHMM_RE.test(scheduleEnd);
+  const sameTimeError = scheduleEnabled && scheduleStart === scheduleEnd;
+  const scheduleError = !startValid || !endValid
+    ? "Times must be HH:MM (00:00–23:59)."
+    : sameTimeError
+      ? "Start and end cannot be identical while the schedule is on."
+      : "";
+
+  const [scheduleTick, setScheduleTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setScheduleTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const scheduleLive = useMemo(() => {
+    void scheduleTick;
+    if (!scheduleEnabled || !startValid || !endValid || sameTimeError) {
+      return { inWindow: true, nextLabel: "24/7", nextMinutes: 0 };
+    }
+    const parse = (v: string) => {
+      const [h, m] = v.split(":").map(Number);
+      return h * 60 + m;
+    };
+    const s = parse(scheduleStart);
+    const e = parse(scheduleEnd);
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const inW = s < e
+      ? cur >= s && cur <= e
+      : cur >= s || cur <= e;
+    // Minutes until next transition (start when out, end+1 when in).
+    const target = inW ? (e + 1) % 1440 : s;
+    let delta = target - cur;
+    if (delta <= 0) delta += 1440;
+    const hrs = Math.floor(delta / 60);
+    const mins = delta % 60;
+    const label = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+    return { inWindow: inW, nextLabel: label, nextMinutes: delta };
+  }, [scheduleTick, scheduleEnabled, scheduleStart, scheduleEnd, startValid, endValid, sameTimeError]);
+
+  const applyPreset = (start: string, end: string) => {
+    setScheduleEnabled(true);
+    setScheduleStart(start);
+    setScheduleEnd(end);
+  };
+
   return (
     <div className="space-y-6 pb-16">
       {/* Header */}
