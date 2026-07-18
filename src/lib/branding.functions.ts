@@ -165,11 +165,45 @@ export const listBranding = createServerFn({ method: "GET" })
     };
   });
 
+/** Read the current full branding map (admin, no snapshot side-effect). */
+async function readCurrentBranding(): Promise<Record<string, string>> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const dbKeys = KEYS.map((k) => `branding_${k}`);
+  const { data } = await supabaseAdmin
+    .from("app_settings")
+    .select("key,value")
+    .in("key", dbKeys);
+  const map: Record<string, string> = {};
+  for (const r of data ?? []) map[(r as any).key.replace(/^branding_/, "")] = (r as any).value ?? "";
+  return map;
+}
+
+/** Snapshot current branding into history so a future Undo can restore it. */
+async function snapshotBranding(userId: string, reason: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const current = await readCurrentBranding();
+  await supabaseAdmin.from("branding_history").insert({
+    data: current,
+    reason,
+    created_by: userId,
+  });
+  // Keep only the most recent 20 entries.
+  const { data: keep } = await supabaseAdmin
+    .from("branding_history")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const ids = (keep ?? []).map((r: any) => r.id);
+  if (ids.length) {
+    await supabaseAdmin.from("branding_history").delete().not("id", "in", `(${ids.map((i) => `"${i}"`).join(",")})`);
+  }
+}
+
 /** Admin: upsert a single branding key. Value is sanitized server-side. */
 export const setBranding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ key: z.string().min(1).max(64), value: z.string().max(2048) }).parse(d),
+    z.object({ key: z.string().min(1).max(64), value: z.string().max(200000) }).parse(d),
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
@@ -179,6 +213,17 @@ export const setBranding = createServerFn({ method: "POST" })
     if (!(shortKey in BRANDING_DEFAULTS)) throw new Error("Unknown branding key");
     const clean = sanitize(shortKey, data.value);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Debounced snapshot: only if the last history entry is >30s old.
+    const { data: last } = await supabaseAdmin
+      .from("branding_history")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const stale = !last || Date.now() - Date.parse((last as any).created_at) > 30_000;
+    if (stale) await snapshotBranding(userId, `edit:${shortKey}`);
+
     const { error } = await supabaseAdmin
       .from("app_settings")
       .upsert({
@@ -192,7 +237,7 @@ export const setBranding = createServerFn({ method: "POST" })
       admin_id: userId,
       action: `branding.${shortKey}`,
       target: shortKey,
-      details: { value: clean },
+      details: { value: clean.length > 200 ? clean.slice(0, 200) + "…" : clean },
     });
     return { ok: true, key: shortKey, value: clean };
   });
@@ -209,6 +254,7 @@ export const resetBranding = createServerFn({ method: "POST" })
     if (data.key) {
       const shortKey = data.key.replace(/^branding_/, "") as BrandingKey;
       if (!(shortKey in BRANDING_DEFAULTS)) throw new Error("Unknown branding key");
+      await snapshotBranding(userId, `reset:${shortKey}`);
       await supabaseAdmin.from("app_settings").delete().eq("key", `branding_${shortKey}`);
       await supabaseAdmin.from("admin_activity_log").insert({
         admin_id: userId,
@@ -217,6 +263,7 @@ export const resetBranding = createServerFn({ method: "POST" })
       });
       return { ok: true, key: shortKey, value: BRANDING_DEFAULTS[shortKey] };
     }
+    await snapshotBranding(userId, "reset_all");
     const dbKeys = KEYS.map((k) => `branding_${k}`);
     await supabaseAdmin.from("app_settings").delete().in("key", dbKeys);
     await supabaseAdmin.from("admin_activity_log").insert({
@@ -225,3 +272,146 @@ export const resetBranding = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+// -------------------------- Presets & Undo --------------------------
+
+/** Admin: list saved presets. */
+export const listBrandingPresets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("branding_presets")
+      .select("id,name,data,updated_at,created_at")
+      .order("updated_at", { ascending: false });
+    return { presets: data ?? [] };
+  });
+
+/** Admin: save the CURRENT live branding as a named preset (creates or updates). */
+export const saveBrandingPreset = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ name: z.string().min(1).max(64) }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const current = await readCurrentBranding();
+    const cleanName = data.name.replace(/[<>]/g, "").trim().slice(0, 64);
+    const { error } = await supabaseAdmin
+      .from("branding_presets")
+      .upsert(
+        { name: cleanName, data: current, created_by: userId, updated_at: new Date().toISOString() },
+        { onConflict: "name" },
+      );
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "branding.preset.save",
+      target: cleanName,
+    });
+    return { ok: true, name: cleanName };
+  });
+
+/** Admin: apply a saved preset — replaces all branding keys atomically. */
+export const applyBrandingPreset = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: p } = await supabaseAdmin
+      .from("branding_presets")
+      .select("id,name,data")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!p) throw new Error("Preset not found");
+    await snapshotBranding(userId, `preset:${(p as any).name}`);
+    const preset = (p as any).data as Record<string, string>;
+    const rows = KEYS.map((k) => ({
+      key: `branding_${k}`,
+      value: sanitize(k, preset[k] ?? ""),
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    }));
+    const { error } = await supabaseAdmin.from("app_settings").upsert(rows);
+    if (error) throw error;
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "branding.preset.apply",
+      target: (p as any).name,
+    });
+    return { ok: true, name: (p as any).name };
+  });
+
+/** Admin: delete a saved preset. */
+export const deleteBrandingPreset = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("branding_presets").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+/** Admin: undo the last branding change by restoring the most recent snapshot. */
+export const undoLastBranding = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: h } = await supabaseAdmin
+      .from("branding_history")
+      .select("id,data,reason,created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!h) return { ok: false, reason: "no_history" as const };
+    const snap = (h as any).data as Record<string, string>;
+    // Take a snapshot of the CURRENT state before restoring, so undo can be redone.
+    await snapshotBranding(userId, "before_undo");
+    const rows = KEYS.map((k) => ({
+      key: `branding_${k}`,
+      value: sanitize(k, snap[k] ?? ""),
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    }));
+    const { error } = await supabaseAdmin.from("app_settings").upsert(rows);
+    if (error) throw error;
+    // Consume the restored snapshot so a second Undo goes to the entry before it.
+    await supabaseAdmin.from("branding_history").delete().eq("id", (h as any).id);
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      action: "branding.undo",
+      target: (h as any).reason ?? "",
+    });
+    return { ok: true, restoredAt: (h as any).created_at, reason: (h as any).reason };
+  });
+
+/** Admin: peek at the most recent snapshot without applying it (for UI hint). */
+export const peekBrandingHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("branding_history")
+      .select("id,reason,created_at")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    return { entries: data ?? [] };
+  });
+
