@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Zap, ShieldCheck, Radio, Crown } from "lucide-react";
+import { ArrowUpRight, Zap, ShieldCheck, Radio, Crown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ function LoginPage() {
   const brand = useBrand();
   const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (search.redirect) stashRedirect(search.redirect);
@@ -43,39 +44,59 @@ function LoginPage() {
     });
   }, [navigate, search.redirect]);
 
-  async function handleGoogle() {
+  // Full-page redirect fallback — used when popups are blocked or when the
+  // popup helper reports an error. Uses Supabase's OAuth helper directly so
+  // the browser navigates to Google in the top frame; no popup required.
+  async function redirectFallback(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+        queryParams: { prompt: "select_account" },
+      },
+    });
+    if (error) throw error;
+    // Browser is navigating away — nothing else to do.
+  }
+
+  async function handleGoogle(opts?: { forceRedirect?: boolean }) {
     if (busy) return;
     setBusy(true);
+    setErrorMessage(null);
     stashRedirect(search.redirect ?? null);
 
-    // Pre-flight popup check — must run synchronously in the click handler so
-    // the browser attributes the popup to the user gesture. If popups are
-    // blocked (common inside iframe previews or with strict popup blockers),
-    // tell the user how to fix it instead of hanging in "Opening Google…".
+    // Pre-flight popup probe. MUST run synchronously in the click handler so
+    // the browser attributes the resulting popup to the user gesture.
     let probe: Window | null = null;
-    try {
-      probe = window.open("about:blank", "_blank", "width=480,height=640");
-    } catch {
-      probe = null;
+    if (!opts?.forceRedirect) {
+      try {
+        probe = window.open("about:blank", "_blank", "width=480,height=640");
+      } catch {
+        probe = null;
+      }
     }
-    if (!probe || probe.closed) {
-      setBusy(false);
-      toast.error("Popups are blocked. Allow popups for this site, then tap Continue with Google again.");
-      return;
-    }
-    probe.close();
+    const popupBlocked = !opts?.forceRedirect && (!probe || probe.closed);
+    if (probe && !probe.closed) probe.close();
 
-    // Safety: never leave the button stuck if the OAuth popup never resolves.
+    // Safety: never leave the button stuck.
     const stuck = window.setTimeout(() => setBusy(false), 45_000);
 
     try {
+      if (popupBlocked || opts?.forceRedirect) {
+        await redirectFallback();
+        // Browser will navigate; keep busy state so button reads "Opening Google…"
+        return;
+      }
+
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
         extraParams: { prompt: "select_account" },
       });
       if (result.error) {
         window.clearTimeout(stuck);
-        toast.error(result.error.message ?? "Sign-in failed");
+        const msg = result.error.message ?? "Google sign-in failed.";
+        setErrorMessage(msg);
+        toast.error(msg);
         setBusy(false);
         return;
       }
@@ -88,10 +109,13 @@ function LoginPage() {
       navigate({ to: target, replace: true });
     } catch (err: any) {
       window.clearTimeout(stuck);
-      toast.error(err?.message ?? "Sign-in failed");
+      const msg = err?.message ?? "Google sign-in failed.";
+      setErrorMessage(msg);
+      toast.error(msg);
       setBusy(false);
     }
   }
+
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
   const namePrefix = brand?.name_prefix ?? "EMBER";
@@ -355,9 +379,32 @@ function LoginPage() {
                 {loginSubtitle}
               </p>
 
+              {/* Inline error — shows the exact Google/OAuth failure so users
+                  can act on it instead of a disappearing toast. */}
+              {errorMessage && (
+                <div
+                  role="alert"
+                  className="mt-5 flex items-start gap-2.5 rounded-xl border border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.08] px-3.5 py-3 text-sm text-red-100"
+                  style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ff5a68]" aria-hidden="true" />
+                  <div className="flex-1 space-y-2">
+                    <p className="leading-snug text-red-50/95">{errorMessage}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleGoogle({ forceRedirect: true })}
+                      disabled={busy}
+                      className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
+                    >
+                      Try full-page sign-in instead
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Google button — the ONLY sign-in method */}
               <button
-                onClick={handleGoogle}
+                onClick={() => handleGoogle()}
                 disabled={busy}
                 aria-busy={busy}
                 aria-label={busy ? loginButtonBusy : loginButton}
