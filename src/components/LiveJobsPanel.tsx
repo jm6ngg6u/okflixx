@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw, Square, Ban, OctagonAlert, CalendarClock, Timer } from "lucide-react";
 import { toast } from "sonner";
+import { isQuietHoursNow } from "@/lib/quiet-hours";
+
 
 
 type JobRow = {
