@@ -206,26 +206,32 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
+    // Admin sign-in is intentionally password + TOTP only. Google is exposed
+    // as a convenience for admins whose accounts already exist, but we use
+    // Supabase's full-page redirect (no popup) so it always works even inside
+    // iframe previews. The account still lands back on /auth and follows the
+    // same TOTP flow before /admin.
     setBusy(true);
     setErrorMessage(null);
     setStatus("Opening Google sign-in…");
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/auth",
-        extraParams: { prompt: "select_account consent" },
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin + "/auth",
+          queryParams: { prompt: "select_account consent" },
+        },
       });
-      if (result.error) {
-        toast.error(result.error.message ?? "Sign-in failed");
+      if (error) {
+        setErrorMessage(error.message);
+        toast.error(error.message);
         setStatus("");
         setBusy(false);
-        return;
       }
-      if (result.redirected) return;
-      // After Google → same MFA flow
-      window.location.reload();
+      // On success the browser navigates away — nothing else to do.
     } catch (err: any) {
-      setErrorMessage(err?.message ?? "Sign-in failed");
-      toast.error(err?.message ?? "Sign-in failed");
+      setErrorMessage(err?.message ?? "Google sign-in failed.");
+      toast.error(err?.message ?? "Google sign-in failed.");
       setStatus("");
       setBusy(false);
     }
