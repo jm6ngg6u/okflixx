@@ -644,7 +644,97 @@ function PreviewFrame({
       <div className="p-6 md:p-7">{children}</div>
     </div>
   );
+
+/** Maintenance preview with device (mobile/desktop) + identity (guest/user)
+ *  toggles so admins can inspect both breakpoints and both audience states. */
+function MaintenancePreviewFrame({ values }: { values: Record<string, string> }) {
+  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [asUser, setAsUser] = useState(false);
+  const width = device === "mobile" ? 390 : 1180;
+  const height = device === "mobile" ? 720 : 620;
+
+  const mockUser = asUser
+    ? {
+        email: "alex.chen@gmail.com",
+        avatar:
+          "https://lh3.googleusercontent.com/a/ACg8ocKQZ7lMxN6yZ4x9YvR2K3-preview-user",
+        name: "Alex Chen",
+      }
+    : null;
+
+  return (
+    <PreviewFrame
+      title="Maintenance page — live preview"
+      subtitle="Toggle device + identity to inspect every audience state."
+      icon={<Wrench className="w-3.5 h-3.5" />}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="inline-flex rounded-md border border-white/10 bg-black/40 p-0.5">
+          <button
+            type="button"
+            onClick={() => setDevice("desktop")}
+            className={`px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest rounded ${
+              device === "desktop" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"
+            }`}
+          >
+            Desktop
+          </button>
+          <button
+            type="button"
+            onClick={() => setDevice("mobile")}
+            className={`px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest rounded ${
+              device === "mobile" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"
+            }`}
+          >
+            Mobile
+          </button>
+        </div>
+        <div className="inline-flex rounded-md border border-white/10 bg-black/40 p-0.5">
+          <button
+            type="button"
+            onClick={() => setAsUser(false)}
+            className={`px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest rounded ${
+              !asUser ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"
+            }`}
+          >
+            Guest
+          </button>
+          <button
+            type="button"
+            onClick={() => setAsUser(true)}
+            className={`px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest rounded ${
+              asUser ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"
+            }`}
+          >
+            Signed in (Google)
+          </button>
+        </div>
+      </div>
+      <div className="w-full overflow-x-auto">
+        <div
+          className="mx-auto rounded-2xl border border-white/10 bg-[#050505] overflow-hidden shadow-[0_20px_60px_-30px_rgba(255,42,58,0.5)]"
+          style={{ width, maxWidth: "100%", height }}
+        >
+          <div className="h-full overflow-y-auto">
+            <MaintenanceView
+              b={values as unknown as BrandingMap}
+              message={values.maint_message}
+              remainingLabel="12m 34s"
+              channels={[
+                { kind: "telegram", name: "Telegram", href: "#" },
+                { kind: "instagram", name: "Instagram", href: "#" },
+                { kind: "whatsapp", name: "WhatsApp", href: "#" },
+              ]}
+              user={mockUser}
+              compact={device === "mobile"}
+            />
+          </div>
+        </div>
+      </div>
+    </PreviewFrame>
+  );
 }
+
 
 function HomeHeroPreview({ b }: { b: BrandingMap }) {
   return (
