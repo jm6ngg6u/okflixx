@@ -353,7 +353,7 @@ function BackgroundSongPage() {
             hint="Overall glow / brightness multiplier applied to reactive layers."
             value={intensity}
             display={`${intensity.toFixed(2)}×`}
-            onChange={setIntensity}
+            onChange={(v) => { setIntensity(v); setEngineIntensity(v); }}
             onCommit={(v) => intensityMut.mutate(v)}
             saving={intensityMut.isPending}
           />
@@ -363,7 +363,7 @@ function BackgroundSongPage() {
             hint="How strongly the analyser reacts to bass and volume peaks."
             value={sensitivity}
             display={`${sensitivity.toFixed(2)}×`}
-            onChange={setSensitivity}
+            onChange={(v) => { setSensitivity(v); setEngineSensitivity(v); }}
             onCommit={(v) => sensitivityMut.mutate(v)}
             saving={sensitivityMut.isPending}
           />
