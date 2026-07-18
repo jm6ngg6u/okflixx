@@ -44,39 +44,59 @@ function LoginPage() {
     });
   }, [navigate, search.redirect]);
 
-  async function handleGoogle() {
+  // Full-page redirect fallback — used when popups are blocked or when the
+  // popup helper reports an error. Uses Supabase's OAuth helper directly so
+  // the browser navigates to Google in the top frame; no popup required.
+  async function redirectFallback(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+        queryParams: { prompt: "select_account" },
+      },
+    });
+    if (error) throw error;
+    // Browser is navigating away — nothing else to do.
+  }
+
+  async function handleGoogle(opts?: { forceRedirect?: boolean }) {
     if (busy) return;
     setBusy(true);
+    setErrorMessage(null);
     stashRedirect(search.redirect ?? null);
 
-    // Pre-flight popup check — must run synchronously in the click handler so
-    // the browser attributes the popup to the user gesture. If popups are
-    // blocked (common inside iframe previews or with strict popup blockers),
-    // tell the user how to fix it instead of hanging in "Opening Google…".
+    // Pre-flight popup probe. MUST run synchronously in the click handler so
+    // the browser attributes the resulting popup to the user gesture.
     let probe: Window | null = null;
-    try {
-      probe = window.open("about:blank", "_blank", "width=480,height=640");
-    } catch {
-      probe = null;
+    if (!opts?.forceRedirect) {
+      try {
+        probe = window.open("about:blank", "_blank", "width=480,height=640");
+      } catch {
+        probe = null;
+      }
     }
-    if (!probe || probe.closed) {
-      setBusy(false);
-      toast.error("Popups are blocked. Allow popups for this site, then tap Continue with Google again.");
-      return;
-    }
-    probe.close();
+    const popupBlocked = !opts?.forceRedirect && (!probe || probe.closed);
+    if (probe && !probe.closed) probe.close();
 
-    // Safety: never leave the button stuck if the OAuth popup never resolves.
+    // Safety: never leave the button stuck.
     const stuck = window.setTimeout(() => setBusy(false), 45_000);
 
     try {
+      if (popupBlocked || opts?.forceRedirect) {
+        await redirectFallback();
+        // Browser will navigate; keep busy state so button reads "Opening Google…"
+        return;
+      }
+
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
         extraParams: { prompt: "select_account" },
       });
       if (result.error) {
         window.clearTimeout(stuck);
-        toast.error(result.error.message ?? "Sign-in failed");
+        const msg = result.error.message ?? "Google sign-in failed.";
+        setErrorMessage(msg);
+        toast.error(msg);
         setBusy(false);
         return;
       }
@@ -89,10 +109,13 @@ function LoginPage() {
       navigate({ to: target, replace: true });
     } catch (err: any) {
       window.clearTimeout(stuck);
-      toast.error(err?.message ?? "Sign-in failed");
+      const msg = err?.message ?? "Google sign-in failed.";
+      setErrorMessage(msg);
+      toast.error(msg);
       setBusy(false);
     }
   }
+
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
   const namePrefix = brand?.name_prefix ?? "EMBER";
