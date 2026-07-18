@@ -166,7 +166,7 @@ function HomePage() {
   // Live activation counter: system-owned, driven only by successful activation records.
   useEffect(() => {
     const ch = supabase
-      .channel("activation-success-live")
+      .channel("activation-success")
       .on("broadcast", { event: "tick" }, () => {
         qc.setQueryData(["success-activation-count"], (old: any) => {
           if (!old || typeof old.count !== "number") return old;
