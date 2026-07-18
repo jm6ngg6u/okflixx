@@ -256,9 +256,12 @@ export const submitActivation = createServerFn({ method: "POST" })
         };
       }
     }
-    // Per-IP rate limit — a bot/scraper safety net. Signed-in users skip it.
-    if (!verifiedUserId) {
-
+    // Per-IP rate limit — a bot/scraper safety net. Skipped when:
+    //   • the caller is signed-in (per-user daily limit already applies), OR
+    //   • an access gate is ON (login_required / access_key_required) — the
+    //     gate itself throttles abuse, so no extra IP limit is imposed.
+    const gateActive = loginRequired || accessKeyRequired;
+    if (!verifiedUserId && !gateActive) {
       const rlWindow = parseInt(await getSetting(supabaseAdmin, "rate_limit_per_10min", "10"), 10);
       const { data: recent } = await supabaseAdmin.rpc("count_recent_attempts", {
         _ip_hash: ipHash,
@@ -274,7 +277,11 @@ export const submitActivation = createServerFn({ method: "POST" })
           proxy_mode: false,
           user_id: verifiedUserId,
         });
-        return { ok: false, error: "rate_limited" };
+        return {
+          ok: false,
+          error: "rate_limited",
+          message: `Too many attempts from this network. Try again in a few minutes (limit ${rlWindow} / 10 min).`,
+        };
       }
     }
 
