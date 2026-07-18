@@ -474,15 +474,15 @@ function HomePage() {
         <div className="relative z-10 max-w-4xl mx-auto px-6 md:px-12 pt-16 pb-24 text-center flex flex-col items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-xs text-white/75 mb-8 reveal">
             <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse" />
-            <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
+            <span className="font-mono uppercase tracking-widest brand-hero-kicker">{b.hero_kicker}</span>
           </div>
 
-          <h1 className="font-display text-[clamp(2.6rem,6.5vw,5.4rem)] leading-[0.98] tracking-tight reveal">
+          <h1 className="font-display brand-hero-title leading-[0.98] tracking-tight reveal">
             {b.hero_headline_1} <br />
             <span className="text-shine">{b.hero_headline_2}</span>
           </h1>
 
-          <p className="mt-6 max-w-lg text-white/65 text-base md:text-lg leading-relaxed reveal">
+          <p className="mt-6 max-w-lg text-white/65 md:text-lg leading-relaxed reveal brand-hero-sub">
             {b.hero_sub}
           </p>
 
