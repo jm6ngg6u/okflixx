@@ -92,7 +92,15 @@ const LOGIN_MESSAGES: Row[] = [
   { key: "login_expected_origin", label: "Expected origin (env check)", placeholder: "https://your-site.lovable.app" },
 ];
 
-const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES];
+const MAINT_MESSAGES: Row[] = [
+  { key: "maint_status_pill", label: "Status pill" },
+  { key: "maint_headline", label: "Headline" },
+  { key: "maint_message", label: "Body message", multiline: true },
+  { key: "maint_countdown_label", label: "Countdown label" },
+  { key: "maint_contacts_label", label: "Contacts kicker" },
+];
+
+const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES, ...MAINT_MESSAGES];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
