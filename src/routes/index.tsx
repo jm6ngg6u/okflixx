@@ -163,6 +163,16 @@ function HomePage() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
+  // Realtime broadcast: every successful TV activation across the site pushes a
+  // "tick" here so the live counter increments with zero visible delay.
+  useEffect(() => {
+    const ch = supabase
+      .channel("activation-success")
+      .on("broadcast", { event: "tick" }, () => {
+        qc.invalidateQueries({ queryKey: ["public-activation-success-count"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   // Auto-tick every 30s so a scheduled window flips on/off in-place without user action.
   useEffect(() => {
     if (!gate.data?.maintenanceStartsAt && !gate.data?.maintenanceEndsAt) return;
