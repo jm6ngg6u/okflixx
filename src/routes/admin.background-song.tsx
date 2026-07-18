@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import {
   Music4, Upload, Trash2, Play, Pause, CheckCircle2, AlertCircle, Loader2, Activity,
   Clock, Sliders, History as HistoryIcon, BarChart3, RotateCcw, Signal, Type, Zap,
+  Search, Download, Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 
