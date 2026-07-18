@@ -112,6 +112,9 @@ function HomePage() {
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
   // Single generic in-flight indicator; internal stages are not exposed.
   const [stage, setStage] = useState<"idle" | "working">("idle");
+  // Live digit count from the CodeInput so Stage 01 (ENTER) fills instantly as user types.
+  const [codeLen, setCodeLen] = useState(0);
+
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
