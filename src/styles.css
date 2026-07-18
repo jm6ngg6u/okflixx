@@ -40,6 +40,16 @@
   --brand-font-body-weight: 400;
 }
 
+/* Font-loading fallback: BrandingProvider sets data-brand-font-fallback="1"
+   on <html> when a Google Font fails/timeouts, so the site still renders
+   in a clean system stack instead of a naked serif. */
+:root[data-brand-font-fallback="1"] {
+  --brand-font-display: "system-ui";
+  --brand-font-body: "system-ui";
+  --brand-font-mono: "ui-monospace";
+}
+
+
 .text-brand-accent { color: var(--brand-accent); }
 .bg-brand-accent { background-color: var(--brand-accent); }
 .border-brand-accent { border-color: var(--brand-accent); }

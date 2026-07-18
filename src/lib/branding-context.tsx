@@ -58,11 +58,16 @@ function applyCss(b: BrandingMap) {
 }
 
 const FONT_LINK_ID = "branding-fonts-link";
+const FONT_LOAD_TIMEOUT_MS = 4000;
 
-/** Inject a single Google Fonts <link> that loads the three chosen families. */
+/** Inject a single Google Fonts <link> that loads the three chosen families,
+ *  with fallback handling: if a font fails to load within the timeout, we
+ *  emit a `data-brand-font-fallback="1"` attribute on <html> so CSS can
+ *  degrade to system fonts without a flash of unstyled text. */
 function ensureFontLink(b: BrandingMap) {
   if (typeof document === "undefined") return;
   const families = Array.from(new Set([b.font_display, b.font_body, b.font_mono])).filter(Boolean);
+  if (!families.length) return;
   const spec = families
     .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, "+")}:wght@300;400;500;600;700;800`)
     .join("&");
@@ -72,10 +77,71 @@ function ensureFontLink(b: BrandingMap) {
     link = document.createElement("link");
     link.id = FONT_LINK_ID;
     link.rel = "stylesheet";
+    // Preconnect for perf.
+    ["https://fonts.googleapis.com", "https://fonts.gstatic.com"].forEach((h) => {
+      if (!document.querySelector(`link[rel="preconnect"][href="${h}"]`)) {
+        const pc = document.createElement("link");
+        pc.rel = "preconnect";
+        pc.href = h;
+        if (h.includes("gstatic")) pc.crossOrigin = "anonymous";
+        document.head.appendChild(pc);
+      }
+    });
     document.head.appendChild(link);
   }
-  if (link.href !== href) link.href = href;
+  if (link.href === href) return;
+  link.href = href;
+  link.onerror = () => {
+    console.warn("[branding] font stylesheet failed to load — falling back to system fonts");
+    document.documentElement.setAttribute("data-brand-font-fallback", "1");
+  };
+  // Watch the FontFace registry: if any target family isn't loaded within
+  // FONT_LOAD_TIMEOUT_MS, mark the document so CSS can fall back.
+  document.documentElement.removeAttribute("data-brand-font-fallback");
+  if ("fonts" in document) {
+    const check = Promise.all(
+      families.map((f) => (document as any).fonts.load(`1em "${f}"`).catch(() => null)),
+    );
+    const timeout = new Promise((res) => setTimeout(() => res("timeout"), FONT_LOAD_TIMEOUT_MS));
+    Promise.race([check, timeout]).then((r) => {
+      if (r === "timeout") {
+        console.warn("[branding] font families slow to load, using fallbacks");
+        document.documentElement.setAttribute("data-brand-font-fallback", "1");
+      }
+    });
+  }
 }
+
+/** Apply logo, favicon, and browser tab title live. */
+function applyIdentity(b: BrandingMap) {
+  if (typeof document === "undefined") return;
+  const title = (b.browser_title || `${b.name_prefix}${b.name_suffix} — ${b.tagline}`).trim();
+  if (title && document.title !== title) document.title = title;
+  const favicon = (b.favicon_url || b.logo_url || "").trim();
+  if (favicon) {
+    let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"][data-brand="1"]');
+    if (!icon) {
+      icon = document.createElement("link");
+      icon.rel = "icon";
+      icon.setAttribute("data-brand", "1");
+      document.head.appendChild(icon);
+    }
+    // Guess type from extension / data URL.
+    const ext = favicon.startsWith("data:image/")
+      ? favicon.slice(5, favicon.indexOf(";")) || "image/png"
+      : /\.svg(\?|$)/i.test(favicon)
+      ? "image/svg+xml"
+      : /\.ico(\?|$)/i.test(favicon)
+      ? "image/x-icon"
+      : /\.jpe?g(\?|$)/i.test(favicon)
+      ? "image/jpeg"
+      : "image/png";
+    icon.type = ext;
+    if (icon.href !== favicon) icon.href = favicon;
+  }
+}
+
+
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
   const fetchBranding = useServerFn(getPublicBranding);
@@ -99,7 +165,9 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyCss(b);
     ensureFontLink(b);
+    applyIdentity(b);
   }, [b]);
+
 
   // Supabase realtime — refetch instantly on any branding_* app_settings change.
   useEffect(() => {
