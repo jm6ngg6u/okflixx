@@ -740,8 +740,8 @@ function HomePage() {
       <section id="plans" className="relative py-28 px-6 md:px-12">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-brand-accent mb-4">{b.section_plan_kicker}</div>
-            <h2 className="font-display text-4xl md:text-6xl">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_plan_kicker}</div>
+            <h2 className="font-display brand-section-title">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
             <p className="mt-5 text-white/60 max-w-xl mx-auto">Premium UHD unlocked for every activated TV — every country, every device. No card, no trial, no catch.</p>
           </div>
 
