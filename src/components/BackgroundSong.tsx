@@ -16,6 +16,9 @@ import {
   updateBgsHealth,
   recordBgsError,
   bumpBgsRetries,
+  resetBgsRetries,
+  bgsRetryBackoffMs,
+  bgsRetriesExhausted,
   type BgsStatus,
 } from "@/lib/background-song-health";
 import { BackgroundSongHealthPanel } from "@/components/BackgroundSongHealthPanel";
