@@ -391,26 +391,8 @@ function BrandingStudio() {
 
 
         <TabsContent value="maintenance" className="mt-4 space-y-4">
-          <PreviewFrame
-            title="Maintenance page — live preview"
-            subtitle="Halo, shine, wordmark glow, font scale and copy all live here."
-            icon={<Wrench className="w-3.5 h-3.5" />}
-          >
-            <div className="rounded-xl border border-white/10 bg-[#050505] overflow-hidden">
-              <MaintenanceView
-                b={values as unknown as BrandingMap}
-                message={values.maint_message}
-                remainingLabel="12m 34s"
-                channels={[
-                  { kind: "telegram", name: "Telegram", href: "#" },
-                  { kind: "instagram", name: "Instagram", href: "#" },
-                  { kind: "whatsapp", name: "WhatsApp", href: "#" },
-                ]}
-                user={null}
-                compact
-              />
-            </div>
-          </PreviewFrame>
+          <MaintenancePreviewFrame values={values} />
+
           <SurfaceActionBar
             label="Maintenance page"
             rows={MAINT_MESSAGES}
