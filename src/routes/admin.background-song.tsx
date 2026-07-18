@@ -70,6 +70,12 @@ function BackgroundSongPage() {
   const info = useQuery({ queryKey: ["bg-song-admin"], queryFn: () => fetchInfo(), refetchInterval: 15_000 });
   const history = useQuery({ queryKey: ["bg-song-history"], queryFn: () => fetchHistory() });
   const analytics = useQuery({ queryKey: ["bg-song-analytics"], queryFn: () => fetchAnalytics(), refetchInterval: 30_000 });
+  const telemetry = useQuery({
+    queryKey: ["bg-song-telemetry"],
+    queryFn: () => fetchTelemetry(),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: false,
+  });
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["bg-song-admin"] });
