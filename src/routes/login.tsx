@@ -30,6 +30,7 @@ function LoginPage() {
   const brand = useBrand();
   const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (search.redirect) stashRedirect(search.redirect);
