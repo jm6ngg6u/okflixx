@@ -431,3 +431,254 @@ function LivePreview() {
     </div>
   );
 }
+
+// -------------------------- Undo / Presets / Assets --------------------------
+
+function UndoButton() {
+  const undo = useServerFn(undoLastBranding);
+  const peek = useServerFn(peekBrandingHistory);
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["branding-history-peek"],
+    queryFn: () => peek(),
+    refetchInterval: 4000,
+  });
+  const hasHistory = (q.data?.entries?.length ?? 0) > 0;
+  const last = q.data?.entries?.[0];
+  const m = useMutation({
+    mutationFn: () => undo(),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error("Nothing to undo");
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["admin-branding"] });
+      qc.invalidateQueries({ queryKey: ["public-branding"] });
+      qc.invalidateQueries({ queryKey: ["branding-history-peek"] });
+      toast.success("Reverted last branding change");
+    },
+    onError: () => toast.error("Undo failed"),
+  });
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={!hasHistory || m.isPending}
+      onClick={() => m.mutate()}
+      title={last ? `Undo: ${last.reason ?? "last change"} · ${new Date(last.created_at).toLocaleTimeString()}` : "No history"}
+    >
+      <Undo2 className="w-3.5 h-3.5 mr-2" />
+      {m.isPending ? "Reverting…" : "Undo"}
+    </Button>
+  );
+}
+
+function AssetsPanel({
+  values, stage, commit, resetOne,
+}: {
+  values: Record<BrandingKey, string>;
+  stage: (k: BrandingKey, v: string) => void;
+  commit: (k: BrandingKey, v: string) => void;
+  resetOne: (k: BrandingKey) => void;
+}) {
+  const fields: { key: BrandingKey; label: string; help: string }[] = [
+    { key: "logo_url", label: "Main logo URL", help: "Shown in the header, footer, and login screen. Recommended: transparent PNG, 512×512." },
+    { key: "favicon_url", label: "Favicon URL", help: "Browser tab icon. If empty, the main logo is used. Recommended: 96×96 PNG or SVG." },
+  ];
+  return (
+    <div className="grid md:grid-cols-2 gap-6">
+      {fields.map((f) => {
+        const v = values[f.key] ?? "";
+        return (
+          <div key={f.key}>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor={f.key}>{f.label}</Label>
+              {v && (
+                <button onClick={() => resetOne(f.key)} className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white">clear</button>
+              )}
+            </div>
+            <Input
+              id={f.key}
+              value={v}
+              onChange={(e) => stage(f.key, e.target.value)}
+              onBlur={(e) => commit(f.key, e.target.value)}
+              placeholder="https://... or /favicon.png"
+              className="bg-black/40 border-white/10 font-mono text-sm"
+            />
+            <p className="text-[11px] text-white/40 mt-1">{f.help}</p>
+            <div className="mt-3 aspect-[3/1] rounded border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,42,58,0.12),transparent_70%)] bg-black/40 flex items-center justify-center overflow-hidden">
+              {v ? (
+                <img
+                  src={v}
+                  alt={f.label + " preview"}
+                  className="max-h-24 max-w-[70%] object-contain drop-shadow-[0_0_18px_rgba(255,42,58,0.4)]"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                    const parent = (e.currentTarget as HTMLImageElement).parentElement;
+                    if (parent && !parent.querySelector(".asset-err")) {
+                      const s = document.createElement("span");
+                      s.className = "asset-err text-[11px] text-rose-300 uppercase tracking-widest";
+                      s.textContent = "Image failed to load";
+                      parent.appendChild(s);
+                    }
+                  }}
+                />
+              ) : (
+                <span className="text-[11px] text-white/40 uppercase tracking-widest">No image · using default</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PresetsPanel() {
+  const listP = useServerFn(listBrandingPresets);
+  const saveP = useServerFn(saveBrandingPreset);
+  const applyP = useServerFn(applyBrandingPreset);
+  const deleteP = useServerFn(deleteBrandingPreset);
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+
+  const q = useQuery({
+    queryKey: ["branding-presets"],
+    queryFn: () => listP(),
+    refetchInterval: 4000,
+  });
+
+  const save = useMutation({
+    mutationFn: (n: string) => saveP({ data: { name: n } }),
+    onSuccess: (r) => {
+      toast.success(`Saved preset "${r.name}"`);
+      setName("");
+      qc.invalidateQueries({ queryKey: ["branding-presets"] });
+    },
+    onError: () => toast.error("Save failed"),
+  });
+
+  const apply = useMutation({
+    mutationFn: (id: string) => applyP({ data: { id } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["admin-branding"] });
+      qc.invalidateQueries({ queryKey: ["public-branding"] });
+      qc.invalidateQueries({ queryKey: ["branding-history-peek"] });
+      toast.success(`Applied "${r.name}"`);
+    },
+    onError: () => toast.error("Apply failed"),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => deleteP({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["branding-presets"] });
+      toast.success("Preset removed");
+    },
+  });
+
+  const presets = q.data?.presets ?? [];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Preset name (e.g. Midnight Ember, Neon Ice)"
+          className="bg-black/40 border-white/10"
+          maxLength={64}
+        />
+        <Button
+          onClick={() => {
+            const n = name.trim();
+            if (!n) return toast.error("Give the preset a name");
+            save.mutate(n);
+          }}
+          disabled={save.isPending}
+          className="whitespace-nowrap"
+        >
+          <BookmarkPlus className="w-4 h-4 mr-2" />
+          {save.isPending ? "Saving…" : "Save current as preset"}
+        </Button>
+      </div>
+
+      {presets.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-white/10 bg-black/30 p-8 text-center">
+          <p className="text-sm text-white/50">No presets yet.</p>
+          <p className="text-[11px] text-white/30 mt-1 uppercase tracking-widest">Save your first look above.</p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {presets.map((p: any) => {
+            const d = p.data as Record<string, string>;
+            const accent = d.accent_hex || "#ff2a3a";
+            const nameFull = `${d.name_prefix ?? ""}${d.name_suffix ?? ""}`;
+            return (
+              <div
+                key={p.id}
+                className="relative rounded-lg border border-white/10 bg-black/40 p-4 hover:border-white/25 transition group"
+              >
+                <div
+                  className="absolute inset-x-0 top-0 h-1 rounded-t-lg"
+                  style={{ background: `linear-gradient(90deg, ${accent}, transparent 80%)` }}
+                />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-display text-base truncate">{p.name}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-white/40">
+                      Saved {new Date(p.updated_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <span
+                    className="h-6 w-6 rounded-full border border-white/10 flex-shrink-0"
+                    style={{ background: accent, boxShadow: `0 0 12px ${accent}80` }}
+                  />
+                </div>
+
+                <div
+                  className="mt-3 rounded border border-white/5 bg-[#050505] p-3"
+                  style={{ fontFamily: `"${d.font_display ?? "Sora"}"` }}
+                >
+                  <div className="text-lg leading-tight tracking-tight">
+                    {(d.name_prefix ?? "EMBER") + (d.name_suffix ?? "LORD") || nameFull}
+                  </div>
+                  <div className="text-[11px] text-white/40 truncate" style={{ fontFamily: `"${d.font_body ?? "Inter"}"` }}>
+                    {d.tagline ?? BRANDING_DEFAULTS.tagline}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => apply.mutate(p.id)}
+                    disabled={apply.isPending}
+                    className="flex-1"
+                  >
+                    <Save className="w-3.5 h-3.5 mr-1.5" />
+                    Apply
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      if (confirm(`Delete preset "${p.name}"?`)) del.mutate(p.id);
+                    }}
+                    aria-label={`Delete preset ${p.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[11px] text-white/40">
+        Tip: use presets for seasonal launches (Halloween, Summer, Launch Day). Undo in the header reverts the very last change if a preset looks wrong.
+      </p>
+    </div>
+  );
+}
+
