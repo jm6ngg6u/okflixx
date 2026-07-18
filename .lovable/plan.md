@@ -1,44 +1,98 @@
-Goal: make Maintenance Mode unbypassable, instant on refresh, fully admin-controlled (copy/typography/effects/schedule/timezone), with high-fidelity previews. Ship each item; no filler features.
+## Goal
 
-## 1. Backend enforcement (unbypassable)
-- Add `src/lib/maintenance.server.ts`:
-  - `assertServiceAvailable()` — reads `app_settings` (maintenance_enabled + scheduled window) via `supabaseAdmin`. If active → throw `Response('Service temporarily unavailable', { status: 503, headers: { 'Retry-After': <seconds-until-end-or-300>, 'Cache-Control': 'no-store' } })`.
-- Call it at the top of every activation/renewal handler in `src/lib/activate.functions.ts` (activate, renew, status, key redemption) BEFORE cookie/proxy work, so no state is mutated.
-- Public routes under `src/routes/api/public/hooks/*` are cron-only (auto-checks) → leave alone. Public activation server fns are the enforcement surface.
-- Staff bypass: none. Admin routes are separate (`/admin/*`) and don't call these fns.
+Ship a single, coherent notification system across the admin panel and public site with consistent structure (title + description + icon + action), consistent tone/colors/typography, and admin-controllable toasts for scheduled/manual job completion with Quiet Hours.
 
-## 2. Kill cached UI flash on refresh
-- `getGateConfig` server fn: `setResponseHeaders({ 'Cache-Control': 'no-store, must-revalidate' })` inside handler.
-- `src/routes/__root.tsx`: SSR loader already prefetches gate (done last turn). Ensure `staleTime: 0` for `public-gate` query and pass `initialData` from loader so first paint is authoritative. Add `<meta http-equiv="Cache-Control" content="no-store">` to `__root` head for maintenance-affected pages.
-- `MaintenanceGate`: render decision uses SSR-primed data synchronously; no `useEffect` gate.
+Keep it focused — no useless additions. Only what the website actually needs.
 
-## 3. Countdown w/ timezone + formatted window
-- Extend branding keys: `maint_timezone` (IANA, default `UTC`), `maint_time_format` (`24h`|`12h`).
-- Admin Branding → Maintenance tab: timezone select (common IANA list) + format toggle.
-- `MaintenanceView`: show formatted "Ends: <date, time TZ>" line above/below the live countdown, using `Intl.DateTimeFormat` with the configured tz.
-- Admin Settings scheduler already sets start/end (UTC). Display converts to configured tz.
+---
 
-## 4. Per-word font-size control
-- Branding schema: add `maint_size_status`, `maint_size_wordmark`, `maint_size_headline`, `maint_size_message`, `maint_size_countdown`, `maint_size_contacts`, `maint_size_footer` (percent 60–160, default 100).
-- `MaintenanceView`: multiply each element's base px by the per-element scale × global `maint_font_scale`.
-- Admin Branding: one slider per element under "Maintenance → Typography sizes".
+## 1. Global toast contract (shared)
 
-## 5. Preview toggles in Admin → Branding
-- Identity toggle: Guest vs Signed-in Google user (mock chip: avatar placeholder + `you@gmail.com`).
-- Viewport toggle: Mobile (390px) vs Desktop (1280px) frame with scaled iframe-like container using CSS transform + fixed width wrapper.
-- Both toggles state-local to Branding page; feed props into `MaintenanceView`.
+Formalize the branded shape all toasts already partially follow:
 
-## 6. Confirm cleanup items already done
-- "Staff bypass · open admin" link removed — verify no residual copy.
-- Logo shine/flash + wordmark glow: keyframes always-on, toggles in admin already exist — verify defaults ON.
-- Admin can edit all maintenance copy — already in `MAINT_MESSAGES`; add the 2 new keys (timezone, format) and 7 size keys.
+- Title: `font-display`, sentence case, ≤ 48 chars, one line.
+- Description: `font-body`, ≤ 120 chars, secondary color, wrapped.
+- Variant → color + icon:
+  - `success` (emerald), `error` (red), `warning` (amber), `info` (sky), `loading` (neutral).
+- Optional `action` (single button, brand red) — used for "View job", "Retry", "Undo".
+- Duration: success 4s, info 5s, warning 6s, error 8s, loading = until resolved.
+- Position: admin = `top-right`; public site = `top-center` (keep current).
 
-## 7. Verification
-- Typecheck (`tsgo --noEmit`) — must pass.
-- Manual: enable maintenance → refresh public route → confirm no flash → confirm `/api/`-adjacent server fn calls throw 503 with the standard message → disable → recovers within poll.
+Implementation: extend `src/lib/toast-format.ts` — it already normalizes capitalization and splits `Title · detail`. Add:
+- `notify.success/error/warning/info/loading/promise` helpers with the contract above.
+- Auto-dedup within 2s for identical `(variant,title,description)` pairs (prevents spam from realtime).
+- Read a `quiet_hours` flag from a lightweight client store; when muted, drop `job:*` category toasts silently but still show user-triggered ones.
 
-## Technical notes
-- Timezone list kept small (~30 common IANAs) to avoid a huge dropdown; free-text fallback allowed.
-- 503 body is a stable JSON `{ error: 'service_unavailable', message: 'Service temporarily unavailable' }` so the client can render a consistent toast if a request slips through mid-flip.
-- All new branding keys default sensibly so existing installs render unchanged.
-- No new dependencies.
+`Toaster` in `src/routes/__root.tsx` gains a second instance mounted only inside `/admin/*` at `top-right`, so admin/user toasts don't collide.
+
+---
+
+## 2. Audit & normalize every existing toast
+
+Sweep all `toast.*` call sites listed below and rewrite them to `notify.*` with proper title + description + variant. No behavior changes — only structure/copy.
+
+Files touched (already using sonner):
+- Public: `routes/index.tsx`, `routes/login.tsx`, `routes/auth.tsx`, `routes/auth.mfa.tsx`, `components/BackgroundSong.tsx`.
+- Admin: `routes/admin.index.tsx`, `admin.settings.tsx`, `admin.cookies.tsx`, `admin.proxies.tsx`, `admin.rotation.tsx`, `admin.access.tsx`, `admin.attempts.tsx`, `admin.staff.tsx`, `admin.security.tsx`, `admin.branding.tsx`, `admin.contact.tsx`, `admin.background-song.tsx`, `components/LiveJobsPanel.tsx`, `components/ActivationPipelines.tsx`.
+
+For each: pick correct variant, add description where missing, tag with a category (`job`, `save`, `auth`, `activation`, `pool`, `system`) so Quiet Hours can filter.
+
+---
+
+## 3. Admin notification preferences (new)
+
+New section in `admin.settings.tsx` → "Admin notifications":
+
+Settings persisted in `app_settings`:
+- `notify_cookie_check` (bool, default ON) — toast when cookie auto-check finishes.
+- `notify_proxy_check` (bool, default ON) — toast when proxy auto-check finishes.
+- `notify_nightly_cleanup` (bool, default ON) — toast when nightly cleanup finishes.
+- `notify_quiet_start` / `notify_quiet_end` (HH:MM, local time, may wrap midnight; blank = always notify).
+
+UI: three toggle rows + two time inputs with helper text "Leave blank to always notify. Window may wrap midnight." Optimistic save, same pattern as other settings.
+
+---
+
+## 4. Job completion toasts (wired end-to-end)
+
+`src/components/LiveJobsPanel.tsx` already subscribes to `job_runs` realtime. Add a completion detector:
+
+- Detect transition to a terminal state (`success`, `failed`, `cancelled`, `stopped`) for jobs `cookies-autocheck`, `proxies-autocheck`, `auto-cleanup`.
+- Respect per-job admin toggle + Quiet Hours (client-side, using saved settings).
+- Toast content:
+  - Cookie check → title "Cookie auto-check finished", description "Checked N · Active A · Removed R · Took Ts".
+  - Proxy check → title "Proxy auto-check finished", description "Checked N · Healthy H · Removed R".
+  - Nightly cleanup → title "Nightly cleanup finished", description "Removed R rows".
+  - Cancelled → warning variant "Cancelled — changes rolled back".
+  - Stopped → info variant "Stopped — partial progress saved".
+  - Failed → error variant + first error line + action "View job" (scrolls to job row).
+- Dedup key = `job_run.id` so a single completion never fires twice across realtime + poll.
+
+Manual runs go through the same path (they also produce `job_runs` rows), so no separate code path.
+
+---
+
+## 5. Quiet Hours logic
+
+Small pure helper `src/lib/quiet-hours.ts`:
+- `isQuiet(now, start, end)` — handles wrap-past-midnight (e.g. 22:00 → 07:00).
+- Blank start or end = never quiet.
+- Consumed by the notify helper for `category: "job"` toasts only. User actions (save, error, sign-in) always show.
+
+---
+
+## 6. Technical details
+
+- No new tables — three toggles + two time strings in `app_settings`.
+- No server changes required for delivery; toasts are client-driven off realtime `job_runs`.
+- Types: extend `BrandingMap`/settings types if needed; otherwise plain `app_settings` reads.
+- Fonts already global (`--brand-font-display`, `--brand-font-body`); toasts inherit.
+- Colors already tokenized in `styles.css`; no new tokens.
+
+---
+
+## Out of scope (intentionally)
+
+- Push/email/webhook notifications — website doesn't need them.
+- Per-user notification prefs (single admin surface).
+- Notification history/inbox page — realtime + audit logs already cover this.
