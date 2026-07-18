@@ -156,9 +156,9 @@ function BrandingStudio() {
       );
       return { prev };
     },
-    onError: (_e, _v, ctx) => {
+    onError: (_e, v, ctx) => {
       if (ctx?.prev) qc.setQueryData(["admin-branding"], ctx.prev);
-      toast.error("Save failed", { description: "Reverted." });
+      toast.error(`Couldn't save ${labelFor(v.key)}`, { description: "Change reverted." });
     },
     onSuccess: (r) => {
       setDirty((prev) => {
@@ -167,14 +167,14 @@ function BrandingStudio() {
         return next;
       });
       qc.invalidateQueries({ queryKey: ["public-branding"] });
-      toast.success("Saved", { description: r.key });
+      toast.success(`${labelFor(r.key)} updated`, { description: "Live on the site." });
     },
   });
 
   const resetOne = useMutation({
     mutationFn: (key: BrandingKey) => reset({ data: { key } }),
-    onSuccess: () => {
-      toast.success("Reset to default");
+    onSuccess: (_r, key) => {
+      toast.success(`${labelFor(key)} reset to default`);
       qc.invalidateQueries({ queryKey: ["admin-branding"] });
       qc.invalidateQueries({ queryKey: ["public-branding"] });
     },
