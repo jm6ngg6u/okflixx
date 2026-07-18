@@ -210,8 +210,11 @@ export function MaintenanceView({
             style={{ marginTop: fx(28), padding: `${fx(12)} ${fx(20)}` }}
           >
             {remainingLabel && (
-              <div className="flex items-center gap-3">
-                <span className="font-mono uppercase tracking-[0.25em] text-white/50" style={{ fontSize: fx(10.5, "countdown") }}>
+              <div className="flex items-baseline gap-2">
+                <span
+                  className="text-white/70"
+                  style={{ fontSize: fx(compact ? 12 : 14, "countdown"), fontFamily: "var(--brand-font-body)" }}
+                >
                   {b.maint_countdown_label}
                 </span>
                 <span
