@@ -107,7 +107,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
+  // Prefetch the gate on SSR so the maintenance takeover renders on the very
+  // first paint — no flash of the activation UI before the client swap.
+  loader: async ({ context }) => {
+    try {
+      const gate = await context.queryClient.ensureQueryData({
+        queryKey: ["public-gate"],
+        queryFn: () => getGateConfig(),
+        staleTime: 2000,
+      });
+      return { gate };
+    } catch {
+      return { gate: null as null };
+    }
+  },
 });
+
+
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
@@ -204,11 +220,14 @@ function MaintenanceGate({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const qc = useQueryClient();
   const fetchGate = useServerFn(getGateConfig);
+  // Loader-primed gate — present on the very first server-rendered paint.
+  const { gate: initialGate } = Route.useLoaderData();
 
   // Match the landing page's query key/shape so cache is shared.
   const gate = useQuery({
     queryKey: ["public-gate"],
     queryFn: () => fetchGate(),
+    initialData: initialGate ?? undefined,
     staleTime: 2000,
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
@@ -232,3 +251,4 @@ function MaintenanceGate({ children }: { children: ReactNode }) {
   }
   return <>{children}</>;
 }
+
