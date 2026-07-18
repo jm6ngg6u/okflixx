@@ -1,15 +1,16 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { listRecentJobRuns, listSettings, requestJobControl } from "@/lib/settings.functions";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { listRecentJobRuns, listSettings, listCronSchedules, requestJobControl } from "@/lib/settings.functions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw, Square, Ban, OctagonAlert } from "lucide-react";
+import { Activity, CheckCircle2, XCircle, Loader2, Cookie, Globe2, Sparkles, RefreshCw, Square, Ban, OctagonAlert, CalendarClock, Timer } from "lucide-react";
 import { toast } from "sonner";
+
 
 type JobRow = {
   id: string;
