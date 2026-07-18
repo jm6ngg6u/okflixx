@@ -94,6 +94,17 @@ export const BRANDING_DEFAULTS = {
   maint_size_countdown: "100",
   maint_size_contacts: "100",
   maint_size_footer: "100",
+  // Global site-wide typography size overrides (percent, 60..160).
+  // Consumed by CSS variables `--brand-size-*` and utility classes in
+  // styles.css. Change once → propagates to every branded surface.
+  size_wordmark_nav: "100",
+  size_hero_kicker: "100",
+  size_hero_title: "100",
+  size_hero_sub: "100",
+  size_section_kicker: "100",
+  size_section_title: "100",
+  size_card_title: "100",
+  size_body: "100",
 };
 
 
