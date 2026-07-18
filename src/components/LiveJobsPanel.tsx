@@ -175,6 +175,7 @@ const JOBNAME_TO_JOB: Record<string, string> = {
 export function LiveJobsPanel() {
   const fetchRuns = useServerFn(listRecentJobRuns);
   const fetchSettings = useServerFn(listSettings);
+  const fetchSchedules = useServerFn(listCronSchedules);
   const qc = useQueryClient();
   const anyRunning = (rows: JobRow[]) => rows.some((r) => !r.finished_at);
 
@@ -188,7 +189,14 @@ export function LiveJobsPanel() {
     queryFn: () => fetchSettings(),
     staleTime: 30_000,
   });
+  const schedulesQ = useQuery({
+    queryKey: ["cron-schedules"],
+    queryFn: () => fetchSchedules(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
   const settings = settingsQ.data?.settings ?? {};
+
 
   // Toast notifications on completion (respect notify_* + quiet hours).
   const seen = useRef<Set<string>>(new Set());
