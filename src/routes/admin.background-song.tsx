@@ -663,22 +663,56 @@ function BackgroundSongPage() {
         <div className="flex items-start gap-3 mb-4">
           <Upload className="w-4 h-4 text-[#ff2a3a] mt-1" />
           <div>
-            <div className="font-display text-lg leading-tight">Upload new track</div>
+            <div className="font-display text-lg leading-tight uppercase tracking-wide">Upload new track</div>
             <div className="text-xs text-white/50 mt-1">Max 15 MB · mp3 / wav / ogg / m4a / aac / flac. The new file replaces the current track and is added to version history.</div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" className="hidden" onChange={onFileChange} />
-          <Button className="btn-red" disabled={uploadStatus === "uploading" || uploadStatus === "reading"}
-            onClick={() => fileRef.current?.click()}>
-            {uploadStatus === "uploading" || uploadStatus === "reading" ? (
+        {/* Drag-and-drop zone */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => { if (!isUploadBusy) fileRef.current?.click(); }}
+          onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isUploadBusy) { e.preventDefault(); fileRef.current?.click(); } }}
+          onDragOver={(e) => { e.preventDefault(); if (!isUploadBusy) setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={onDrop}
+          className={`rounded-md border border-dashed p-6 text-center transition-colors cursor-pointer select-none ${
+            isDragging ? "border-[#ff2a3a] bg-[#ff2a3a]/[0.08]"
+            : isUploadBusy ? "border-white/10 bg-white/[0.02] cursor-not-allowed opacity-70"
+            : "border-white/15 bg-white/[0.02] hover:border-[#ff2a3a]/50 hover:bg-white/[0.04]"
+          }`}
+          aria-disabled={isUploadBusy}
+        >
+          <Upload className={`w-6 h-6 mx-auto mb-2 ${isDragging ? "text-[#ff2a3a]" : "text-white/60"}`} />
+          <div className="font-display text-sm uppercase tracking-wide">
+            {isDragging ? "Drop to upload" : "Drag & drop or click to choose"}
+          </div>
+          <div className="mt-1 text-[10px] font-mono uppercase tracking-widest text-white/40">
+            mp3 · wav · ogg · m4a · aac · flac · max 15&nbsp;MB
+          </div>
+        </div>
+
+        <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" className="hidden" onChange={onFileChange} />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button className="btn-red" disabled={isUploadBusy} onClick={() => fileRef.current?.click()}>
+            {isUploadBusy ? (
               <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Uploading…</>
             ) : (
               <><Upload className="w-3.5 h-3.5 mr-1.5" /> Choose audio file</>
             )}
           </Button>
-          {d?.path && (
+          {isUploadBusy && (
+            <Button
+              variant="outline"
+              className="border-white/15 bg-white/5 text-red-200 hover:text-red-100"
+              onClick={cancelUpload}
+            >
+              Cancel upload
+            </Button>
+          )}
+          {d?.path && !isUploadBusy && (
             <Button variant="outline" className="border-white/15 bg-white/5 text-red-200 hover:text-red-100"
               disabled={removeMut.isPending}
               onClick={() => { if (confirm("Remove the current background song? The public site will go silent (previous versions kept in history).")) removeMut.mutate(); }}>
@@ -697,7 +731,7 @@ function BackgroundSongPage() {
             <div className="flex items-center gap-2 text-sm">
               {uploadStatus === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-300" />}
               {uploadStatus === "error" && <AlertCircle className="w-4 h-4 text-red-300" />}
-              {(uploadStatus === "uploading" || uploadStatus === "reading") && <Loader2 className="w-4 h-4 animate-spin text-[#ff2a3a]" />}
+              {isUploadBusy && <Loader2 className="w-4 h-4 animate-spin text-[#ff2a3a]" />}
               <span className={
                 uploadStatus === "success" ? "text-emerald-200"
                 : uploadStatus === "error" ? "text-red-200"
@@ -709,7 +743,7 @@ function BackgroundSongPage() {
             {uploadName && (
               <div className="mt-1 text-[11px] text-white/50 font-mono">{uploadName} · {fmtSize(uploadSize)}</div>
             )}
-            {(uploadStatus === "uploading" || uploadStatus === "reading" || uploadStatus === "success") && (
+            {(isUploadBusy || uploadStatus === "success") && (
               <div className="mt-2">
                 <Progress value={uploadStatus === "success" ? 100 : uploadPct} className="h-1.5" />
                 <div className="mt-1 text-[10px] font-mono text-white/40 uppercase tracking-widest">
@@ -720,6 +754,7 @@ function BackgroundSongPage() {
           </div>
         )}
       </div>
+
 
       {/* Version history */}
       <div className="glass p-5">
