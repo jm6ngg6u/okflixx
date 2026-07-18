@@ -15,6 +15,7 @@ import {
   listBackgroundSongHistory,
   restoreBackgroundSong,
   deleteBackgroundSongVersion,
+  getBackgroundSongVersionUrl,
   getBackgroundSongAnalytics,
   getPlaybackTelemetry,
 } from "@/lib/background-song.functions";
@@ -30,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import {
   Music4, Upload, Trash2, Play, Pause, CheckCircle2, AlertCircle, Loader2, Activity,
   Clock, Sliders, History as HistoryIcon, BarChart3, RotateCcw, Signal, Type, Zap,
+  Search, Download, Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -66,10 +68,11 @@ function BackgroundSongPage() {
   const doTitle = useServerFn(setBackgroundSongTrackTitle);
   const doRestore = useServerFn(restoreBackgroundSong);
   const doDelete = useServerFn(deleteBackgroundSongVersion);
+  const fetchVersionUrl = useServerFn(getBackgroundSongVersionUrl);
   const qc = useQueryClient();
 
   const info = useQuery({ queryKey: ["bg-song-admin"], queryFn: () => fetchInfo(), refetchInterval: 15_000 });
-  const history = useQuery({ queryKey: ["bg-song-history"], queryFn: () => fetchHistory() });
+  const history = useQuery({ queryKey: ["bg-song-history"], queryFn: () => fetchHistory(), refetchInterval: 10_000 });
   const analytics = useQuery({ queryKey: ["bg-song-analytics"], queryFn: () => fetchAnalytics(), refetchInterval: 30_000 });
   const telemetry = useQuery({
     queryKey: ["bg-song-telemetry"],
@@ -757,50 +760,16 @@ function BackgroundSongPage() {
 
 
       {/* Version history */}
-      <div className="glass p-5">
-        <div className="flex items-start gap-3 mb-4">
-          <HistoryIcon className="w-4 h-4 text-[#ff2a3a] mt-1" />
-          <div>
-            <div className="font-display text-lg leading-tight">Version history</div>
-            <div className="text-xs text-white/50 mt-1 max-w-xl">
-              Every upload is kept so you can roll back or clean up. The current track is highlighted and can't be deleted directly — restore another version first.
-            </div>
-          </div>
-        </div>
-        {history.isLoading ? (
-          <div className="text-xs text-white/40 font-mono">Loading history…</div>
-        ) : (history.data?.length ?? 0) === 0 ? (
-          <div className="text-xs text-white/40 font-mono">No previous uploads yet.</div>
-        ) : (
-          <div className="divide-y divide-white/5 border border-white/5 rounded-md overflow-hidden">
-            {history.data!.map((row) => (
-              <div key={row.id} className={`flex flex-wrap items-center gap-3 p-3 ${row.isCurrent ? "bg-[#ff2a3a]/[0.06]" : "bg-white/[0.02]"}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm text-white/90 truncate">{row.name}</span>
-                    {row.isCurrent && <Badge variant="outline" className="bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30 text-[10px]">CURRENT</Badge>}
-                  </div>
-                  <div className="mt-1 text-[11px] font-mono text-white/40 truncate">
-                    {fmtSize(row.sizeBytes)} · {fmtDate(row.uploadedAt)} · {row.uploaderLabel}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" className="border-white/15 bg-white/5"
-                    disabled={row.isCurrent || restoreMut.isPending}
-                    onClick={() => restoreMut.mutate(row.id)}>
-                    <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Restore
-                  </Button>
-                  <Button size="sm" variant="outline" className="border-white/15 bg-white/5 text-red-200 hover:text-red-100"
-                    disabled={row.isCurrent || deleteVerMut.isPending}
-                    onClick={() => { if (confirm(`Delete ${row.name}? This removes the file from storage permanently.`)) deleteVerMut.mutate(row.id); }}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <VersionHistoryCard
+        rows={history.data ?? []}
+        isLoading={history.isLoading}
+        isFetching={history.isFetching}
+        onRestore={(id) => restoreMut.mutate(id)}
+        onDelete={(id) => deleteVerMut.mutate(id)}
+        restorePending={restoreMut.isPending}
+        deletePending={deleteVerMut.isPending}
+        fetchVersionUrl={fetchVersionUrl}
+      />
 
       {/* Analytics */}
       <div className="glass p-5">
@@ -1329,6 +1298,261 @@ function Tile({ label, value, sub, tone }: { label: string; value: number; sub?:
       <div className="font-mono uppercase tracking-widest text-[9px] text-white/40">{label}</div>
       <div className={`font-display text-xl leading-tight mt-0.5 tabular-nums ${tone}`}>{value}</div>
       {sub ? <div className="font-mono text-[10px] text-white/40 mt-0.5">{sub}</div> : null}
+    </div>
+  );
+}
+
+// ============================================================================
+// Version history — search, preview, download, restore, delete
+// ============================================================================
+
+type VersionRow = {
+  id: string; path: string; name: string; sizeBytes: number;
+  uploaderLabel: string; uploadedAt: string; isCurrent: boolean; version: number;
+};
+
+function VersionHistoryCard({
+  rows, isLoading, isFetching, onRestore, onDelete,
+  restorePending, deletePending, fetchVersionUrl,
+}: {
+  rows: VersionRow[];
+  isLoading: boolean;
+  isFetching: boolean;
+  onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
+  restorePending: boolean;
+  deletePending: boolean;
+  fetchVersionUrl: (args: { data: { id: string } }) => Promise<{ url: string; name: string }>;
+}) {
+  const [q, setQ] = useState("");
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => () => {
+    // stop preview on unmount
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+  }, []);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter((r) =>
+      r.name.toLowerCase().includes(needle) ||
+      r.uploaderLabel.toLowerCase().includes(needle) ||
+      `v${r.version}`.includes(needle)
+    );
+  }, [rows, q]);
+
+  const totalBytes = useMemo(() => rows.reduce((s, r) => s + (r.sizeBytes || 0), 0), [rows]);
+  const currentRow = rows.find((r) => r.isCurrent);
+
+  const stopPreview = () => {
+    if (audioRef.current) { audioRef.current.pause(); }
+    setPlayingId(null);
+  };
+
+  const togglePreview = async (row: VersionRow) => {
+    if (playingId === row.id) { stopPreview(); return; }
+    try {
+      setBusyId(row.id);
+      const { url } = await fetchVersionUrl({ data: { id: row.id } });
+      if (!audioRef.current) audioRef.current = new Audio();
+      audioRef.current.src = url;
+      audioRef.current.crossOrigin = "anonymous";
+      audioRef.current.onended = () => setPlayingId(null);
+      audioRef.current.onerror = () => { setPlayingId(null); toast.error("Preview failed to load"); };
+      await audioRef.current.play();
+      setPlayingId(row.id);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Preview failed");
+      setPlayingId(null);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const download = async (row: VersionRow) => {
+    try {
+      setBusyId(row.id);
+      const { url, name } = await fetchVersionUrl({ data: { id: row.id } });
+      const a = document.createElement("a");
+      a.href = url; a.download = name || row.name; a.rel = "noopener";
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Download failed");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="glass p-5">
+      <div className="flex items-start gap-3 mb-4">
+        <HistoryIcon className="w-4 h-4 text-[#ff2a3a] mt-1" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-display text-lg leading-tight uppercase tracking-wide">Version history</div>
+            <Badge variant="outline" className="bg-white/5 border-white/15 text-[10px] font-mono">
+              {rows.length} {rows.length === 1 ? "version" : "versions"}
+            </Badge>
+            <Badge variant="outline" className="bg-white/5 border-white/15 text-[10px] font-mono">
+              {fmtSize(totalBytes)} total
+            </Badge>
+            {isFetching && !isLoading ? (
+              <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 text-[10px] font-mono">
+                <Loader2 className="w-2.5 h-2.5 mr-1 animate-spin" /> live
+              </Badge>
+            ) : null}
+          </div>
+          <div className="text-xs text-white/50 mt-1 max-w-xl">
+            Every upload is kept so you can roll back or clean up. The current track is highlighted and can't be deleted directly — restore another version first.
+          </div>
+        </div>
+        <div className="relative w-full max-w-xs">
+          <Search className="w-3.5 h-3.5 text-white/40 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Input
+            value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, uploader, v#"
+            className="pl-8 h-9 bg-black/30 border-white/10 text-sm"
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-md border border-white/5 bg-white/[0.02] p-6 flex items-center gap-2 text-xs text-white/50 font-mono">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading history…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-md border border-white/5 bg-white/[0.02] p-8 flex flex-col items-center gap-2 text-center">
+          <Inbox className="w-6 h-6 text-white/30" />
+          <div className="font-display text-sm uppercase tracking-wider text-white/70">No versions yet</div>
+          <div className="text-xs text-white/40 font-mono max-w-sm">
+            Upload a track above — each upload is preserved here so you can roll back.
+          </div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-md border border-white/5 bg-white/[0.02] p-6 text-center text-xs text-white/40 font-mono">
+          No versions match “{q}”.
+        </div>
+      ) : (
+        <div className="divide-y divide-white/5 border border-white/10 rounded-md overflow-hidden">
+          {filtered.map((row) => {
+            const isPlaying = playingId === row.id;
+            const isBusy = busyId === row.id;
+            return (
+              <div
+                key={row.id}
+                className={`flex flex-wrap items-center gap-3 px-3.5 py-3 transition-colors ${
+                  row.isCurrent
+                    ? "bg-[#ff2a3a]/[0.08] hover:bg-[#ff2a3a]/[0.12]"
+                    : "bg-white/[0.02] hover:bg-white/[0.05]"
+                }`}
+              >
+                <div className="flex items-center justify-center w-9 h-9 rounded-md bg-black/40 border border-white/10 font-mono text-[10px] text-white/60 shrink-0">
+                  v{row.version || "?"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm text-white/90 truncate">{row.name}</span>
+                    {row.isCurrent && (
+                      <Badge variant="outline" className="bg-[#ff2a3a]/15 text-[#ff2a3a] border-[#ff2a3a]/30 text-[10px] font-mono uppercase tracking-wider">
+                        <Signal className="w-2.5 h-2.5 mr-1" /> Current
+                      </Badge>
+                    )}
+                    {isPlaying && (
+                      <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-[10px] font-mono uppercase tracking-wider">
+                        Auditioning
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-1 text-[11px] font-mono text-white/40 truncate">
+                    {fmtSize(row.sizeBytes)} · {fmtDate(row.uploadedAt)} · {row.uploaderLabel}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm" variant="outline"
+                    className="border-white/15 bg-white/5 h-8 px-2"
+                    disabled={isBusy}
+                    title={isPlaying ? "Stop preview" : "Preview (muted to visitors)"}
+                    onClick={() => togglePreview(row)}
+                  >
+                    {isBusy && !isPlaying ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : isPlaying ? (
+                      <Pause className="w-3.5 h-3.5" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm" variant="outline"
+                    className="border-white/15 bg-white/5 h-8 px-2"
+                    disabled={isBusy}
+                    title="Download"
+                    onClick={() => download(row)}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm" variant="outline"
+                    className="border-white/15 bg-white/5 h-8"
+                    disabled={row.isCurrent || restorePending}
+                    title={row.isCurrent ? "Already the active track" : "Restore this version"}
+                    onClick={() => setConfirmRestoreId(row.id)}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Restore
+                  </Button>
+                  <Button
+                    size="sm" variant="outline"
+                    className="border-white/15 bg-white/5 text-red-200 hover:text-red-100 h-8 px-2"
+                    disabled={row.isCurrent || deletePending}
+                    title={row.isCurrent ? "Restore another version before deleting" : "Delete permanently"}
+                    onClick={() => {
+                      if (confirm(`Delete ${row.name}? This removes the file from storage permanently.`)) {
+                        if (isPlaying) stopPreview();
+                        onDelete(row.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Restore confirmation */}
+      {confirmRestoreId ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 backdrop-blur-sm p-4"
+             onClick={() => setConfirmRestoreId(null)}>
+          <div className="glass max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-2">
+              <RotateCcw className="w-4 h-4 text-[#ff2a3a]" />
+              <div className="font-display uppercase tracking-wide text-sm">Restore this version?</div>
+            </div>
+            <div className="text-xs text-white/60 leading-relaxed">
+              The current track “<span className="text-white/90">{currentRow?.name ?? "—"}</span>” will be replaced on the public site within seconds. Playback will resume automatically.
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button size="sm" variant="outline" className="border-white/15 bg-white/5"
+                      onClick={() => setConfirmRestoreId(null)}>
+                Cancel
+              </Button>
+              <Button size="sm" className="bg-[#ff2a3a] hover:bg-[#ff4a58] text-white"
+                      disabled={restorePending}
+                      onClick={() => { const id = confirmRestoreId; setConfirmRestoreId(null); if (id) { stopPreview(); onRestore(id); } }}>
+                {restorePending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5 mr-1.5" />}
+                Restore
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

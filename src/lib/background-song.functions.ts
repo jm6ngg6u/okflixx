@@ -156,7 +156,7 @@ export const listBackgroundSongHistory = createServerFn({ method: "GET" })
       .from("background_song_history")
       .select("id, path, name, size_bytes, uploaded_by, uploaded_at, is_current")
       .order("uploaded_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     // Resolve uploader labels (email or shortened id).
     const ids = Array.from(new Set((rows ?? []).map((r) => r.uploaded_by).filter(Boolean))) as string[];
@@ -169,6 +169,13 @@ export const listBackgroundSongHistory = createServerFn({ method: "GET" })
       for (const p of profiles ?? []) labels.set(p.user_id as string, p.display_name || "");
     }
 
+    // Version numbering — oldest = v1, newest = vN.
+    const asc = [...(rows ?? [])].sort((a, b) =>
+      String(a.uploaded_at).localeCompare(String(b.uploaded_at))
+    );
+    const versionById = new Map<string, number>();
+    asc.forEach((r, i) => versionById.set(r.id as string, i + 1));
+
     return (rows ?? []).map((r) => ({
       id: r.id as string,
       path: r.path as string,
@@ -178,7 +185,26 @@ export const listBackgroundSongHistory = createServerFn({ method: "GET" })
       uploaderLabel: r.uploaded_by ? labels.get(r.uploaded_by as string) || "admin" : "system",
       uploadedAt: r.uploaded_at as string,
       isCurrent: !!r.is_current,
+      version: versionById.get(r.id as string) ?? 0,
     }));
+  });
+
+/** Admin: signed URL for auditioning/downloading a specific historical version. */
+export const getBackgroundSongVersionUrl = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("background_song_history")
+      .select("path, name")
+      .eq("id", data.id).maybeSingle();
+    if (!row?.path) throw new Error("Version not found");
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from(BUCKET).createSignedUrl(row.path as string, 60 * 15);
+    if (error || !signed?.signedUrl) throw new Error("File missing from storage");
+    return { url: signed.signedUrl, name: row.name as string };
   });
 
 /** Admin: rolling analytics window. */
@@ -442,9 +468,10 @@ export const restoreBackgroundSong = createServerFn({ method: "POST" })
       .eq("id", data.id).maybeSingle();
     if (error || !row) throw new Error("Version not found");
 
-    // Verify storage object still exists.
-    const { data: list } = await supabaseAdmin.storage.from(BUCKET).list("", { limit: 200 });
-    if (!list?.find((o) => o.name === row.path)) throw new Error("File missing from storage");
+    // Verify storage object still exists (targeted lookup, not paginated list).
+    const { data: signed } = await supabaseAdmin.storage
+      .from(BUCKET).createSignedUrl(row.path as string, 30);
+    if (!signed?.signedUrl) throw new Error("File missing from storage");
 
     await supabaseAdmin.from("background_song_history").update({ is_current: false }).eq("is_current", true);
     await supabaseAdmin.from("background_song_history").update({ is_current: true }).eq("id", row.id);
