@@ -209,6 +209,84 @@ export const getBackgroundSongAnalytics = createServerFn({ method: "GET" })
     return { total7d: bucket, total24h: bucket24, sampleSize: events.length };
   });
 
+// Aggregated live playback health across all visitors (last 5 min).
+export const getPlaybackTelemetry = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: rows } = await supabaseAdmin
+      .from("background_song_events")
+      .select("status, muted, needs_gesture, silent, error, session_hash, created_at")
+      .eq("event_type", "heartbeat")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(5000);
+
+    type Row = {
+      status: string | null;
+      muted: boolean | null;
+      needs_gesture: boolean | null;
+      silent: boolean | null;
+      error: string | null;
+      session_hash: string | null;
+      created_at: string;
+    };
+    const events = (rows ?? []) as Row[];
+
+    // Latest snapshot per session (last 90s only counts as "active").
+    const active = new Map<string, Row>();
+    const cutoffActive = Date.now() - 90_000;
+    for (const r of events) {
+      const key = r.session_hash || `${r.created_at}-${Math.random()}`;
+      if (!active.has(key) && new Date(r.created_at).getTime() >= cutoffActive) {
+        active.set(key, r);
+      }
+    }
+    const snapshot = Array.from(active.values());
+
+    let audible = 0, mutedCnt = 0, gesture = 0, oos = 0, errored = 0, silentCnt = 0;
+    for (const s of snapshot) {
+      if (s.status === "out_of_schedule") oos++;
+      else if (s.status === "blocked" || s.needs_gesture) gesture++;
+      else if (s.status === "playing" && !s.muted) audible++;
+      else if (s.status === "playing" && s.muted) mutedCnt++;
+      else if (s.status === "error" || s.status === "stalled" || s.status === "retrying") errored++;
+      if (s.silent) silentCnt++;
+    }
+
+    // Top 3 errors across the 5-min window.
+    const errCounts = new Map<string, { n: number; last: string }>();
+    for (const r of events) {
+      if (!r.error) continue;
+      const cur = errCounts.get(r.error);
+      if (cur) { cur.n++; if (r.created_at > cur.last) cur.last = r.created_at; }
+      else errCounts.set(r.error, { n: 1, last: r.created_at });
+    }
+    const topErrors = Array.from(errCounts.entries())
+      .sort((a, b) => b[1].n - a[1].n)
+      .slice(0, 3)
+      .map(([message, v]) => ({ message, count: v.n, lastAt: v.last }));
+
+    const total = snapshot.length;
+    return {
+      active: total,
+      audible,
+      muted: mutedCnt,
+      gestureWait: gesture,
+      outOfSchedule: oos,
+      errored,
+      silent: silentCnt,
+      audiblePct: total ? Math.round((audible / total) * 100) : 0,
+      gesturePct: total ? Math.round((gesture / total) * 100) : 0,
+      errorPct: total ? Math.round((errored / total) * 100) : 0,
+      totalEvents5m: events.length,
+      topErrors,
+      generatedAt: new Date().toISOString(),
+    };
+  });
+
 // ============================================================================
 // ADMIN — writers
 // ============================================================================
