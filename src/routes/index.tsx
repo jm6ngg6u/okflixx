@@ -593,7 +593,7 @@ function HomePage() {
                   {/* Header strip removed per request */}
 
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 sm:p-4 space-y-3 backdrop-blur-md">
+                  <div className="glow-border rounded-2xl border border-white/10 bg-white/[0.035] p-3 sm:p-4 space-y-3 backdrop-blur-md">
 
                   {/* Login gate */}
                   {gate.data?.loginRequired && (
