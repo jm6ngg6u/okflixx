@@ -15,6 +15,7 @@ import {
   listBackgroundSongHistory,
   restoreBackgroundSong,
   deleteBackgroundSongVersion,
+  getBackgroundSongVersionUrl,
   getBackgroundSongAnalytics,
   getPlaybackTelemetry,
 } from "@/lib/background-song.functions";
