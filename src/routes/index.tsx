@@ -898,23 +898,25 @@ function HomePage() {
       {/* LIVE ACTIVATIONS — system-owned realtime count. Not editable in Branding Studio. */}
       <section id="reviews" className="relative py-20 sm:py-24 md:py-28 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 md:mb-16 reveal">
-            <div className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.28em] sm:tracking-[0.3em] text-[#ff2a3a] mb-4 break-words">
-              // Live activations
+          <div className="mb-12 md:mb-16 reveal flex justify-center">
+            <div className="activation-panel live-count-panel relative w-full max-w-3xl text-center px-6 sm:px-10 py-10 sm:py-14">
+              <div className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.28em] sm:tracking-[0.3em] text-[#ff2a3a] mb-4 break-words">
+                // Live activations
+              </div>
+              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight">
+                <span className="text-live tabular-nums inline-flex items-center gap-2 align-baseline">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
+                  </span>
+                  <span className="break-normal">{(successCount.data?.count ?? 0).toLocaleString()}</span>
+                </span>{" "}
+                <span className="block sm:inline text-white/90">successful TV activations</span>
+              </h2>
+              <p className="mt-4 text-sm sm:text-base text-white/55 leading-relaxed max-w-2xl mx-auto">
+                This number is automatic and updates from completed activations only.
+              </p>
             </div>
-            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight">
-              <span className="text-live tabular-nums inline-flex items-center gap-2 align-baseline">
-                <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
-                </span>
-                <span className="break-normal">{(successCount.data?.count ?? 0).toLocaleString()}</span>
-              </span>{" "}
-              <span className="block sm:inline text-white/90">successful TV activations</span>
-            </h2>
-            <p className="mt-4 text-sm sm:text-base text-white/55 leading-relaxed max-w-2xl mx-auto">
-              This number is automatic and updates from completed activations only.
-            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {[
