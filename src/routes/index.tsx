@@ -488,10 +488,10 @@ function HomePage() {
 
       {/* HERO — CENTERED */}
       <section id="activate" className="relative">
-        <div className="relative z-10 max-w-4xl mx-auto px-6 md:px-12 pt-16 pb-24 text-center flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-xs text-white/75 mb-8 reveal">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse" />
-            <span className="font-mono uppercase tracking-widest brand-hero-kicker">{b.hero_kicker}</span>
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-12 pt-10 sm:pt-14 md:pt-16 pb-16 sm:pb-20 md:pb-24 text-center flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-[11px] sm:text-xs text-white/75 mb-6 sm:mb-8 reveal max-w-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse shrink-0" />
+            <span className="font-mono uppercase tracking-widest brand-hero-kicker truncate">{b.hero_kicker}</span>
           </div>
 
           <h1 className="font-display brand-hero-title leading-[0.98] tracking-tight reveal">
@@ -499,13 +499,14 @@ function HomePage() {
             <span className="text-shine">{b.hero_headline_2}</span>
           </h1>
 
-          <p className="mt-6 max-w-lg text-white/65 md:text-lg leading-relaxed reveal brand-hero-sub">
+          <p className="mt-5 sm:mt-6 max-w-lg text-white/65 text-[15px] sm:text-base md:text-lg leading-relaxed reveal brand-hero-sub px-1">
             {b.hero_sub}
           </p>
 
           {/* CODE PANEL — CENTER (system-owned copy, not editable via Branding Studio) */}
-          <div id="code-panel" className="reveal mt-10 w-full max-w-xl">
-            <div className="relative glass glow-ring-anim p-8 md:p-10 overflow-hidden rounded-2xl">
+          <div id="code-panel" className="reveal mt-8 sm:mt-10 w-full max-w-xl">
+            <div className="relative glass glow-ring-anim p-5 sm:p-8 md:p-10 overflow-hidden rounded-2xl">
+
               {/* Refined background — layered radial + fine grid, no harsh scanlines */}
               <div
                 aria-hidden
