@@ -679,11 +679,11 @@ html, body {
    Utility classes below multiply the default size so any
    surface (home, login, admin) scales in real time.
    ============================================================= */
-.brand-wordmark-nav   { font-size: calc(1.25rem  * var(--brand-size-wordmark-nav, 1)); }
-.brand-hero-kicker    { font-size: calc(0.75rem  * var(--brand-size-hero-kicker, 1)); }
-.brand-hero-title     { font-size: calc(clamp(2.6rem, 6.5vw, 5.4rem) * var(--brand-size-hero-title, 1)); }
-.brand-hero-sub       { font-size: calc(1rem     * var(--brand-size-hero-sub, 1)); }
-.brand-section-kicker { font-size: calc(0.75rem  * var(--brand-size-section-kicker, 1)); }
-.brand-section-title  { font-size: calc(clamp(2rem, 5vw, 3.75rem) * var(--brand-size-section-title, 1)); }
-.brand-card-title     { font-size: calc(1.5rem   * var(--brand-size-card-title, 1)); }
-.brand-body           { font-size: calc(1rem     * var(--brand-size-body, 1)); }
+.brand-wordmark-nav   { font-size: calc(1.25rem  * var(--brand-size-wordmark-nav, 1)   * var(--brand-surface-scale, 1)); }
+.brand-hero-kicker    { font-size: calc(0.75rem  * var(--brand-size-hero-kicker, 1)    * var(--brand-surface-scale, 1)); }
+.brand-hero-title     { font-size: calc(clamp(2.6rem, 6.5vw, 5.4rem) * var(--brand-size-hero-title, 1) * var(--brand-surface-scale, 1)); }
+.brand-hero-sub       { font-size: calc(1rem     * var(--brand-size-hero-sub, 1)       * var(--brand-surface-scale, 1)); }
+.brand-section-kicker { font-size: calc(0.75rem  * var(--brand-size-section-kicker, 1) * var(--brand-surface-scale, 1)); }
+.brand-section-title  { font-size: calc(clamp(2rem, 5vw, 3.75rem) * var(--brand-size-section-title, 1) * var(--brand-surface-scale, 1)); }
+.brand-card-title     { font-size: calc(1.5rem   * var(--brand-size-card-title, 1)     * var(--brand-surface-scale, 1)); }
+.brand-body           { font-size: calc(1rem     * var(--brand-size-body, 1)           * var(--brand-surface-scale, 1)); }

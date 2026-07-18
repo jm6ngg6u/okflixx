@@ -365,6 +365,29 @@ function BrandingStudio() {
                 Real-time — every branded surface (home, login, admin) scales instantly.
               </p>
             </div>
+
+            <div className="mt-6 rounded-xl border border-white/10 p-4">
+              <div className="text-[11px] font-mono uppercase tracking-widest text-white/50 mb-3">
+                Per-surface master scale (%) — multiplies every element on that page
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {([
+                  ["home_scale", "Home page"],
+                  ["login_scale", "Login page"],
+                ] as const).map(([k, label]) => (
+                  <div key={k}>
+                    <Label>{label} — {values[k] || "100"}%</Label>
+                    <Slider className="mt-3" min={60} max={160} step={2}
+                      value={[parseInt(values[k] || "100", 10) || 100]}
+                      onValueChange={(v) => stage(k, String(v[0]))}
+                      onValueCommit={(v) => commit(k, String(v[0]))} />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-white/40 mt-3">
+                Stacks with per-element sizes above. Maintenance page has its own scale in the Maintenance tab.
+              </p>
+            </div>
           </Section>
         </TabsContent>
 

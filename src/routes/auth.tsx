@@ -285,10 +285,11 @@ function AuthPage() {
         ? "Enter the 6-digit code from your authenticator app."
         : "Enter a one-time recovery code to reset your authenticator.";
 
+  const loginScale = Math.max(60, Math.min(160, parseInt((brand as any).login_scale || "100", 10) || 100)) / 100;
   return (
     <div
       className="relative min-h-dvh overflow-hidden bg-[#050505] text-white"
-      style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+      style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif", ["--brand-surface-scale" as any]: loginScale }}
     >
       {/* Background beams — same visual language as /login */}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">

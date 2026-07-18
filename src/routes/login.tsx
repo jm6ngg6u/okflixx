@@ -207,8 +207,9 @@ function LoginPage() {
     !!expectedOrigin && !!currentOrigin && expectedOrigin !== currentOrigin;
 
 
+  const loginScale = Math.max(60, Math.min(160, parseInt((brand as any).login_scale || "100", 10) || 100)) / 100;
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-[#050505] text-white">
+    <div className="relative min-h-dvh overflow-hidden bg-[#050505] text-white" style={{ ["--brand-surface-scale" as any]: loginScale }}>
       {/* ============ BACKGROUND: sweeping ember beams ============ */}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         {/* Blurred glows */}

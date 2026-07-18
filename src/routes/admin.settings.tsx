@@ -697,8 +697,17 @@ function MaintenanceControls(props: {
   const endsLocal = toLocalInputValue(endsIso);
   const startsMs = startsIso ? Date.parse(startsIso) : NaN;
   const endsMs = endsIso ? Date.parse(endsIso) : NaN;
+  const scheduleHalfFilled = (!!startsIso && !endsIso) || (!startsIso && !!endsIso);
   const scheduleInvalid =
-    !isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs;
+    scheduleHalfFilled ||
+    (!isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs);
+  const scheduleError = scheduleHalfFilled
+    ? (startsIso
+        ? "Set an end time — without it the “Estimated back in” countdown won't render."
+        : "Set a start time — a maintenance window needs both start and end.")
+    : (!isNaN(startsMs) && !isNaN(endsMs) && endsMs <= startsMs)
+      ? "End time must be after start time."
+      : null;
   const scheduleDirty =
     dirtyRef.current.has("maintenance_starts_at") ||
     dirtyRef.current.has("maintenance_ends_at");
@@ -739,7 +748,11 @@ function MaintenanceControls(props: {
   }
 
   async function saveSchedule() {
-    if (scheduleInvalid || busy["maintenance_schedule"]) return;
+    if (scheduleInvalid) {
+      toast.error("Can't save maintenance window", { description: scheduleError ?? "Fix the highlighted fields." });
+      return;
+    }
+    if (busy["maintenance_schedule"]) return;
     setBusy((b) => ({ ...b, maintenance_schedule: true }));
     try {
       await doMaint({ data: { starts_at: startsIso || "", ends_at: endsIso || "" } });
@@ -970,9 +983,9 @@ function MaintenanceControls(props: {
             />
           </div>
         </div>
-        {scheduleInvalid && (
+        {scheduleError && (
           <div className="text-[11px] text-rose-300 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" /> End time must be after start time.
+            <AlertTriangle className="w-3.5 h-3.5" /> {scheduleError}
           </div>
         )}
         <div className="flex flex-wrap justify-end gap-2 pt-1">
