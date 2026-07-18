@@ -41,7 +41,18 @@ export const BRANDING_DEFAULTS = {
   success_title: "You're in.",
   success_kicker: "// Activation complete",
   error_generic: "We couldn't activate your TV right now. Please try again in a moment.",
-  // Reviews / social proof — the live activation count is system-driven and NOT editable.
+  // Reviews / social proof — fully editable from the Branding Studio.
+  // These are static, admin-authored numbers — NOT a live counter.
+  reviews_kicker: "// Reviews",
+  reviews_rating: "4.9 / 5",
+  reviews_count: "82,431",
+  reviews_activations_label: "successful activations",
+  reviews_q1: "Activated in under 20 seconds. Genuinely smooth.",
+  reviews_n1: "M. Ortega",
+  reviews_q2: "The code flow just works. No hoops, no spam.",
+  reviews_n2: "J. Chen",
+  reviews_q3: "Fastest TV setup I've ever done. Support was instant.",
+  reviews_n3: "S. Nakamura",
   // Login page (Google-only)
   login_kicker: "Wield the trident",
   login_title: "Create Account",

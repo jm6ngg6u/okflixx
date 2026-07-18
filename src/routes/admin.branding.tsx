@@ -68,7 +68,17 @@ const HOME_MESSAGES: Row[] = [
   { key: "section_cta_title_2", label: "Bottom CTA — line B (accent)" },
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
-  
+  // Reviews / Live TV Activations — fully admin-editable, no real-time counter.
+  { key: "reviews_kicker", label: "Reviews — kicker" },
+  { key: "reviews_rating", label: "Reviews — rating (e.g. 4.9 / 5)" },
+  { key: "reviews_count", label: "Activations count (display only)" },
+  { key: "reviews_activations_label", label: "Activations — label after count" },
+  { key: "reviews_q1", label: "Testimonial 1 — quote", multiline: true },
+  { key: "reviews_n1", label: "Testimonial 1 — name" },
+  { key: "reviews_q2", label: "Testimonial 2 — quote", multiline: true },
+  { key: "reviews_n2", label: "Testimonial 2 — name" },
+  { key: "reviews_q3", label: "Testimonial 3 — quote", multiline: true },
+  { key: "reviews_n3", label: "Testimonial 3 — name" },
 ];
 
 const LOGIN_MESSAGES: Row[] = [

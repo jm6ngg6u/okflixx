@@ -6,7 +6,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import { CodeInput, type CodeInputHandle } from "@/components/CodeInput";
 import { BackgroundSong } from "@/components/BackgroundSong";
-import { submitActivation, getSuccessActivationCount } from "@/lib/activate.functions";
+import { submitActivation } from "@/lib/activate.functions";
 import { getGateConfig, redeemAccessKey } from "@/lib/access-keys.functions";
 import { getPublicContacts } from "@/lib/settings.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,18 +118,11 @@ function HomePage() {
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
-  const fetchSuccessCount = useServerFn(getSuccessActivationCount);
+  // Note: the "Live TV activations" number in the Reviews section is now fully
+  // admin-editable from the Branding Studio (reviews_count) and is NOT a live
+  // counter. The realtime broadcast + server-side counter are intentionally
+  // removed from the public UI to keep the display stable and admin-controlled.
 
-  // Live successful-activation counter — realtime broadcast + short-interval safety poll.
-  // Counts ONLY result='success'. No invalid / error / rate-limited rows.
-  const successCount = useQuery({
-    queryKey: ["public-activation-success-count"],
-    queryFn: () => fetchSuccessCount(),
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
-  });
 
 
   // Realtime push on app_settings — banner flips within ~200ms.
@@ -166,17 +159,9 @@ function HomePage() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
-  // Realtime broadcast: every successful TV activation across the site pushes a
-  // "tick" here so the live counter increments with zero visible delay.
-  useEffect(() => {
-    const ch = supabase
-      .channel("activation-success")
-      .on("broadcast", { event: "tick" }, () => {
-        qc.invalidateQueries({ queryKey: ["public-activation-success-count"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [qc]);
+  // (Removed) Realtime broadcast for "live activation counter" — the number in
+  // the Reviews section is now static/admin-editable via Branding Studio.
+
   // Auto-tick every 30s so a scheduled window flips on/off in-place without user action.
   useEffect(() => {
     if (!gate.data?.maintenanceStartsAt && !gate.data?.maintenanceEndsAt) return;
@@ -354,8 +339,8 @@ function HomePage() {
           redirectUrl: result.redirectUrl,
           account: result.account,
         });
-        // Instant bump of the live counter — no waiting for the 2s poll.
-        qc.invalidateQueries({ queryKey: ["public-activation-success-count"] });
+        // Live counter removed — the Reviews number is admin-editable, not derived from activations.
+
       } else if (result.error === "invalid_code") {
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
       } else if (result.error === "maintenance") {
@@ -503,10 +488,10 @@ function HomePage() {
 
       {/* HERO — CENTERED */}
       <section id="activate" className="relative">
-        <div className="relative z-10 max-w-4xl mx-auto px-6 md:px-12 pt-16 pb-24 text-center flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-xs text-white/75 mb-8 reveal">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse" />
-            <span className="font-mono uppercase tracking-widest brand-hero-kicker">{b.hero_kicker}</span>
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-12 pt-10 sm:pt-14 md:pt-16 pb-16 sm:pb-20 md:pb-24 text-center flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur text-[11px] sm:text-xs text-white/75 mb-6 sm:mb-8 reveal max-w-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff2a3a] animate-pulse shrink-0" />
+            <span className="font-mono uppercase tracking-widest brand-hero-kicker truncate">{b.hero_kicker}</span>
           </div>
 
           <h1 className="font-display brand-hero-title leading-[0.98] tracking-tight reveal">
@@ -514,13 +499,14 @@ function HomePage() {
             <span className="text-shine">{b.hero_headline_2}</span>
           </h1>
 
-          <p className="mt-6 max-w-lg text-white/65 md:text-lg leading-relaxed reveal brand-hero-sub">
+          <p className="mt-5 sm:mt-6 max-w-lg text-white/65 text-[15px] sm:text-base md:text-lg leading-relaxed reveal brand-hero-sub px-1">
             {b.hero_sub}
           </p>
 
           {/* CODE PANEL — CENTER (system-owned copy, not editable via Branding Studio) */}
-          <div id="code-panel" className="reveal mt-10 w-full max-w-xl">
-            <div className="relative glass glow-ring-anim p-8 md:p-10 overflow-hidden rounded-2xl">
+          <div id="code-panel" className="reveal mt-8 sm:mt-10 w-full max-w-xl">
+            <div className="relative glass glow-ring-anim p-5 sm:p-8 md:p-10 overflow-hidden rounded-2xl">
+
               {/* Refined background — layered radial + fine grid, no harsh scanlines */}
               <div
                 aria-hidden
@@ -897,41 +883,45 @@ function HomePage() {
         </div>
       </section>
 
-      {/* REVIEWS */}
-      <section id="reviews" className="relative py-28 px-6 md:px-12">
+      {/* REVIEWS — fully admin-editable via Branding Studio. Not a live counter. */}
+      <section id="reviews" className="relative py-20 sm:py-24 md:py-28 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Reviews</div>
-            <h2 className="font-display text-4xl md:text-6xl">
-              4.9 / 5 ·{" "}
-              <span className="text-live tabular-nums inline-flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
+          <div className="text-center mb-12 md:mb-16 reveal">
+            <div className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.28em] sm:tracking-[0.3em] text-[#ff2a3a] mb-4 break-words">
+              {b.reviews_kicker}
+            </div>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight">
+              <span className="whitespace-nowrap">{b.reviews_rating}</span>
+              <span className="text-white/40 mx-2 sm:mx-3">·</span>
+              <span className="text-live tabular-nums inline-flex items-center gap-2 align-baseline">
+                <span className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
                 </span>
-                {(successCount.data?.count ?? 0).toLocaleString()}
+                <span className="break-normal">{b.reviews_count}</span>
               </span>{" "}
-              successful activations
+              <span className="block sm:inline text-white/90">{b.reviews_activations_label}</span>
             </h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {[
-              { q: "Activated in under 20 seconds. Genuinely smooth.", n: "M. Ortega" },
-              { q: "The code flow just works. No hoops, no spam.", n: "J. Chen" },
-              { q: "Fastest TV setup I've ever done. Support was instant.", n: "S. Nakamura" },
-            ].map((t) => (
-              <div key={t.n} className="glass glass-hover p-8 reveal">
+              { q: b.reviews_q1, n: b.reviews_n1 },
+              { q: b.reviews_q2, n: b.reviews_n2 },
+              { q: b.reviews_q3, n: b.reviews_n3 },
+            ].map((t, i) => (
+              <div key={`${t.n}-${i}`} className="glass glass-hover p-6 sm:p-8 reveal">
                 <div className="text-[#ff2a3a] text-sm mb-4">★ ★ ★ ★ ★</div>
-                <p className="text-white/85 leading-relaxed">"{t.q}"</p>
-                <div className="mt-6 pt-4 border-t border-white/10 flex justify-between text-xs font-mono uppercase tracking-widest text-white/50">
-                  <span>{t.n}</span>
-                  <span className="text-[#ff2a3a]">Verified</span>
+                <p className="text-white/85 leading-relaxed text-[15px] sm:text-base">"{t.q}"</p>
+                <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center gap-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest text-white/50">
+                  <span className="truncate">{t.n}</span>
+                  <span className="text-[#ff2a3a] shrink-0">Verified</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
 
       {/* CTA */}
       <section className="relative py-32 px-6 md:px-12">
