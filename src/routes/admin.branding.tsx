@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Palette, Type, Sparkles, MessageSquareText, RotateCcw, CheckCircle2, Save, Trash2, Undo2, ImageIcon, BookmarkPlus, Wand2 } from "lucide-react";
+import { Palette, Type, Sparkles, MessageSquareText, RotateCcw, CheckCircle2, Save, Trash2, Undo2, ImageIcon, BookmarkPlus, Wand2, Upload, LogIn } from "lucide-react";
+import { useRef } from "react";
 import {
   listBranding,
   setBranding,
@@ -27,7 +28,7 @@ import {
   peekBrandingHistory,
   type BrandingKey,
 } from "@/lib/branding.functions";
-import { useBrand } from "@/lib/branding-context";
+import { useBrand, type BrandingMap } from "@/lib/branding-context";
 
 export const Route = createFileRoute("/admin/branding")({
   ssr: false,
@@ -419,30 +420,152 @@ function FontPicker({
   );
 }
 
-/** Live mini-preview of the public hero using the current branding state. */
+/** Live mini-preview of the public hero AND login card using current branding.
+ *  Toggle switches between "Home hero" and "Login card" so admins can see
+ *  every font/color/glow/shine change on the login page BEFORE it goes live —
+ *  no round-trip to /login needed. */
 function LivePreview() {
   const b = useBrand();
+  const [view, setView] = useState<"home" | "login">("home");
   return (
-    <div className="glass p-8 relative overflow-hidden">
-      <div className="absolute top-3 right-3 flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-300">
-        <CheckCircle2 className="w-3 h-3" /> Live
+    <div className="glass p-6 md:p-8 relative overflow-hidden">
+      <div className="absolute top-3 right-3 flex items-center gap-3 text-[10px] uppercase tracking-widest">
+        <span className="flex items-center gap-1.5 text-emerald-300">
+          <CheckCircle2 className="w-3 h-3" /> Live
+        </span>
       </div>
-      <div className="text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-xs text-white/75 mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse" />
-          <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
-        </div>
-        <div className="font-display text-4xl md:text-5xl leading-[0.98] tracking-tight wordmark-pulse">
-          {b.name_prefix}<span className="text-brand-accent">{b.name_suffix}</span>
-        </div>
-        <div className="mt-3 font-display text-xl md:text-2xl text-white/85">
-          {b.hero_headline_1} <span className="text-brand-accent">{b.hero_headline_2}</span>
-        </div>
-        <p className="mt-3 text-white/60 text-sm max-w-md mx-auto">{b.hero_sub}</p>
-        <button className="mt-5 px-6 py-2.5 rounded-md text-sm font-medium text-white"
-          style={{ background: `linear-gradient(135deg, var(--brand-accent), color-mix(in oklab, var(--brand-accent) 60%, black))` }}>
-          {b.activate_cta}
+
+      <div className="mb-5 inline-flex rounded-lg border border-white/10 bg-black/40 p-1">
+        <button
+          onClick={() => setView("home")}
+          className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-widest transition ${
+            view === "home" ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
+          }`}
+        >
+          <Palette className="w-3 h-3 inline mr-1.5" />Home hero
         </button>
+        <button
+          onClick={() => setView("login")}
+          className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-widest transition ${
+            view === "login" ? "bg-white/10 text-white" : "text-white/50 hover:text-white"
+          }`}
+        >
+          <LogIn className="w-3 h-3 inline mr-1.5" />Login card
+        </button>
+      </div>
+
+      {view === "home" ? (
+        <div className="text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-xs text-white/75 mb-4"
+            style={{ fontFamily: "var(--brand-font-body)" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-accent animate-pulse" />
+            <span className="font-mono uppercase tracking-widest">{b.hero_kicker}</span>
+          </div>
+          <div className="font-display text-4xl md:text-5xl leading-[0.98] tracking-tight wordmark-pulse"
+            style={{ fontFamily: "var(--brand-font-display)", fontWeight: b.font_display_weight }}>
+            {b.name_prefix}<span className="text-brand-accent">{b.name_suffix}</span>
+          </div>
+          <div className="mt-3 font-display text-xl md:text-2xl text-white/85"
+            style={{ fontFamily: "var(--brand-font-display)" }}>
+            {b.hero_headline_1} <span className="text-brand-accent">{b.hero_headline_2}</span>
+          </div>
+          <p className="mt-3 text-white/60 text-sm max-w-md mx-auto"
+            style={{ fontFamily: "var(--brand-font-body)" }}>{b.hero_sub}</p>
+          <button className="mt-5 px-6 py-2.5 rounded-md text-sm font-medium text-white"
+            style={{
+              background: `linear-gradient(135deg, var(--brand-accent), color-mix(in oklab, var(--brand-accent) 60%, black))`,
+              boxShadow: `0 0 ${20 + parseInt(b.glow) / 2}px color-mix(in oklab, var(--brand-accent) ${b.glow}%, transparent)`,
+              fontFamily: "var(--brand-font-body)",
+            }}>
+            {b.activate_cta}
+          </button>
+        </div>
+      ) : (
+        <LoginPreview b={b} />
+      )}
+    </div>
+  );
+}
+
+/** Miniature of the /login card + hero — reflects font/color/glow/shine
+ *  in real time from the branding CSS variables. */
+function LoginPreview({ b }: { b: BrandingMap }) {
+  const glowPx = 12 + parseInt(b.glow || "0") / 2;
+  const shineOn = b.shine_speed !== "off";
+  const logo = b.logo_url;
+  return (
+    <div className="grid md:grid-cols-[1.1fr_1fr] gap-6 items-center">
+      {/* Hero side */}
+      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-black to-[#120608] p-6 min-h-[280px] flex flex-col items-center justify-center text-center relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: `radial-gradient(circle at 50% 40%, color-mix(in oklab, var(--brand-accent) 22%, transparent), transparent 65%)` }} />
+        {logo ? (
+          <div className="relative w-20 h-20 mb-3">
+            <img src={logo} alt="" className="w-full h-full object-contain"
+              style={{ filter: `drop-shadow(0 0 ${glowPx}px color-mix(in oklab, var(--brand-accent) 80%, transparent))` }}
+              onError={(e) => ((e.currentTarget as HTMLImageElement).style.opacity = "0.15")} />
+            {shineOn && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  WebkitMaskImage: `url(${JSON.stringify(logo)})`,
+                  maskImage: `url(${JSON.stringify(logo)})`,
+                  WebkitMaskRepeat: "no-repeat",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskSize: "contain",
+                  maskSize: "contain",
+                  background: `linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.85) 50%, transparent 70%)`,
+                  backgroundSize: "300% 100%",
+                  animation: `preview-shine var(--brand-shine-duration, 4.8s) linear infinite`,
+                }}
+              />
+            )}
+          </div>
+        ) : null}
+        <div className="text-2xl leading-tight tracking-tight"
+          style={{ fontFamily: "var(--brand-font-display)", fontWeight: b.font_display_weight }}>
+          {b.login_tagline_1} <span style={{ color: "var(--brand-accent)" }}>{b.login_tagline_2}</span>
+        </div>
+        <p className="mt-2 text-white/60 text-xs max-w-xs" style={{ fontFamily: "var(--brand-font-body)" }}>
+          {b.login_description}
+        </p>
+        <style>{`@keyframes preview-shine { 0% { background-position: 200% 0 } 100% { background-position: -100% 0 } }`}</style>
+      </div>
+      {/* Login card side */}
+      <div className="rounded-xl border border-white/10 bg-[#0b0b0d]/95 p-5"
+        style={{ boxShadow: `0 20px 60px -20px color-mix(in oklab, var(--brand-accent) 35%, transparent)` }}>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.28em]"
+          style={{ color: "var(--brand-accent)", fontFamily: "var(--brand-font-display)" }}>
+          {b.login_kicker}
+        </div>
+        <h3 className="mt-2 text-xl font-bold tracking-tight"
+          style={{ fontFamily: "var(--brand-font-display)", fontWeight: b.font_display_weight }}>
+          {b.login_title}
+        </h3>
+        <p className="mt-1 text-xs text-white/60" style={{ fontFamily: "var(--brand-font-body)" }}>
+          {b.login_subtitle}
+        </p>
+        <button className="mt-4 w-full py-2.5 rounded-lg text-sm font-medium text-white relative overflow-hidden"
+          style={{
+            background: `linear-gradient(180deg, var(--brand-accent), color-mix(in oklab, var(--brand-accent) 55%, black))`,
+            boxShadow: `0 0 ${glowPx}px color-mix(in oklab, var(--brand-accent) ${b.glow}%, transparent)`,
+            fontFamily: "var(--brand-font-body)",
+          }}>
+          {b.login_button}
+        </button>
+        <p className="mt-3 text-center text-[10px] uppercase tracking-widest text-white/40"
+          style={{ fontFamily: "var(--brand-font-body)" }}>
+          Encrypted · One-tap · No password
+        </p>
+        <p className="mt-3 text-center text-[11px] text-white/50" style={{ fontFamily: "var(--brand-font-body)" }}>
+          {b.login_footer_prompt}{" "}
+          <span style={{ color: "var(--brand-accent)" }}>{b.login_footer_cta}</span>
+        </p>
+        <div className="mt-3 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest text-white/45"
+          style={{ fontFamily: "var(--brand-font-body)" }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          {b.login_status}
+        </div>
       </div>
     </div>
   );
@@ -489,6 +612,18 @@ function UndoButton() {
   );
 }
 
+/** File → data URL uploader with strict client-side validation.
+ *  Data URLs are stored directly in branding — the server sanitizer allows
+ *  data:image/* up to 200KB, so no bucket / no CORS / no signed URLs required. */
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result ?? ""));
+    r.onerror = () => reject(r.error ?? new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+}
+
 function AssetsPanel({
   values, stage, commit, resetOne,
 }: {
@@ -497,55 +632,153 @@ function AssetsPanel({
   commit: (k: BrandingKey, v: string) => void;
   resetOne: (k: BrandingKey) => void;
 }) {
-  const fields: { key: BrandingKey; label: string; help: string }[] = [
-    { key: "logo_url", label: "Main logo URL", help: "Shown in the header, footer, and login screen. Recommended: transparent PNG, 512×512." },
-    { key: "favicon_url", label: "Favicon URL", help: "Browser tab icon. If empty, the main logo is used. Recommended: 96×96 PNG or SVG." },
+  const fields: {
+    key: BrandingKey;
+    label: string;
+    help: string;
+    maxKb: number;
+    accept: string;
+  }[] = [
+    {
+      key: "logo_url",
+      label: "Main logo",
+      help: "Header · footer · login screen. Transparent PNG or SVG, 512×512 recommended.",
+      maxKb: 180,
+      accept: "image/png,image/jpeg,image/webp,image/svg+xml",
+    },
+    {
+      key: "favicon_url",
+      label: "Favicon",
+      help: "Browser tab icon. Empty = uses main logo. PNG, SVG, or ICO, 96×96 recommended.",
+      maxKb: 60,
+      accept: "image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon",
+    },
   ];
   return (
     <div className="grid md:grid-cols-2 gap-6">
-      {fields.map((f) => {
-        const v = values[f.key] ?? "";
-        return (
-          <div key={f.key}>
-            <div className="flex items-center justify-between mb-2">
-              <Label htmlFor={f.key}>{f.label}</Label>
-              {v && (
-                <button onClick={() => resetOne(f.key)} className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white">clear</button>
-              )}
-            </div>
-            <Input
-              id={f.key}
-              value={v}
-              onChange={(e) => stage(f.key, e.target.value)}
-              onBlur={(e) => commit(f.key, e.target.value)}
-              placeholder="https://... or /favicon.png"
-              className="bg-black/40 border-white/10 font-mono text-sm"
+      {fields.map((f) => (
+        <AssetField key={f.key} field={f} value={values[f.key] ?? ""} stage={stage} commit={commit} resetOne={resetOne} />
+      ))}
+    </div>
+  );
+}
+
+function AssetField({
+  field, value, stage, commit, resetOne,
+}: {
+  field: { key: BrandingKey; label: string; help: string; maxKb: number; accept: string };
+  value: string;
+  stage: (k: BrandingKey, v: string) => void;
+  commit: (k: BrandingKey, v: string) => void;
+  resetOne: (k: BrandingKey) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!field.accept.split(",").some((t) => file.type === t.trim())) {
+      toast.error("Unsupported file", { description: `Use ${field.accept.replace(/image\//g, "").toUpperCase()}` });
+      return;
+    }
+    if (file.size > field.maxKb * 1024) {
+      toast.error("File too large", { description: `Max ${field.maxKb} KB (was ${Math.round(file.size / 1024)} KB)` });
+      return;
+    }
+    setUploading(true);
+    try {
+      const dataUrl = await readAsDataURL(file);
+      // Sanity — sanitizer will reject anything else, but bail early with a clearer message.
+      if (!dataUrl.startsWith("data:image/")) throw new Error("not an image");
+      commit(field.key, dataUrl);
+      toast.success("Uploaded", { description: `${file.name} · ${Math.round(file.size / 1024)} KB` });
+    } catch (err: any) {
+      toast.error("Upload failed", { description: err?.message ?? "Try a smaller image" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <Label htmlFor={field.key}>{field.label}</Label>
+        {value && (
+          <button onClick={() => resetOne(field.key)} className="text-[10px] uppercase tracking-widest text-white/40 hover:text-white">
+            clear
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          id={field.key}
+          value={value}
+          onChange={(e) => stage(field.key, e.target.value)}
+          onBlur={(e) => commit(field.key, e.target.value)}
+          placeholder="Paste URL or upload →"
+          className="bg-black/40 border-white/10 font-mono text-xs flex-1"
+        />
+        <input ref={fileRef} type="file" accept={field.accept} onChange={handleFile} className="hidden" />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="whitespace-nowrap"
+        >
+          <Upload className="w-3.5 h-3.5 mr-1.5" />
+          {uploading ? "Reading…" : "Upload"}
+        </Button>
+      </div>
+      <p className="text-[11px] text-white/40 mt-1">{field.help} · Max {field.maxKb} KB.</p>
+
+      {/* Masked glow / shine preview — matches the /login header exactly. */}
+      <div className="mt-3 aspect-[3/1] rounded border border-white/10 bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--brand-accent)_18%,transparent),transparent_70%)] bg-black/40 flex items-center justify-center overflow-hidden relative">
+        {value ? (
+          <div className="relative h-24 w-24">
+            <img
+              src={value}
+              alt={field.label + " preview"}
+              className="h-full w-full object-contain"
+              style={{
+                filter: `drop-shadow(0 0 18px color-mix(in oklab, var(--brand-accent) 80%, transparent))`,
+              }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+                const parent = (e.currentTarget as HTMLImageElement).parentElement;
+                if (parent && !parent.querySelector(".asset-err")) {
+                  const s = document.createElement("span");
+                  s.className = "asset-err text-[11px] text-rose-300 uppercase tracking-widest";
+                  s.textContent = "Image failed to load";
+                  parent.appendChild(s);
+                }
+              }}
             />
-            <p className="text-[11px] text-white/40 mt-1">{f.help}</p>
-            <div className="mt-3 aspect-[3/1] rounded border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,42,58,0.12),transparent_70%)] bg-black/40 flex items-center justify-center overflow-hidden">
-              {v ? (
-                <img
-                  src={v}
-                  alt={f.label + " preview"}
-                  className="max-h-24 max-w-[70%] object-contain drop-shadow-[0_0_18px_rgba(255,42,58,0.4)]"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                    const parent = (e.currentTarget as HTMLImageElement).parentElement;
-                    if (parent && !parent.querySelector(".asset-err")) {
-                      const s = document.createElement("span");
-                      s.className = "asset-err text-[11px] text-rose-300 uppercase tracking-widest";
-                      s.textContent = "Image failed to load";
-                      parent.appendChild(s);
-                    }
-                  }}
-                />
-              ) : (
-                <span className="text-[11px] text-white/40 uppercase tracking-widest">No image · using default</span>
-              )}
-            </div>
+            {/* Shine mask — clipped to the alpha of the uploaded logo. */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                WebkitMaskImage: `url(${JSON.stringify(value)})`,
+                maskImage: `url(${JSON.stringify(value)})`,
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+                WebkitMaskSize: "contain",
+                maskSize: "contain",
+                background: `linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.85) 50%, transparent 70%)`,
+                backgroundSize: "300% 100%",
+                animation: `assets-shine var(--brand-shine-duration, 4.8s) linear infinite`,
+              }}
+            />
           </div>
-        );
-      })}
+        ) : (
+          <span className="text-[11px] text-white/40 uppercase tracking-widest">No image · using default</span>
+        )}
+        <style>{`@keyframes assets-shine { 0% { background-position: 200% 0 } 100% { background-position: -100% 0 } }`}</style>
+      </div>
     </div>
   );
 }
