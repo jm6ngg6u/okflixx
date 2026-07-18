@@ -882,41 +882,45 @@ function HomePage() {
         </div>
       </section>
 
-      {/* REVIEWS */}
-      <section id="reviews" className="relative py-28 px-6 md:px-12">
+      {/* REVIEWS — fully admin-editable via Branding Studio. Not a live counter. */}
+      <section id="reviews" className="relative py-20 sm:py-24 md:py-28 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Reviews</div>
-            <h2 className="font-display text-4xl md:text-6xl">
-              4.9 / 5 ·{" "}
-              <span className="text-live tabular-nums inline-flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
+          <div className="text-center mb-12 md:mb-16 reveal">
+            <div className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.28em] sm:tracking-[0.3em] text-[#ff2a3a] mb-4 break-words">
+              {b.reviews_kicker}
+            </div>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight">
+              <span className="whitespace-nowrap">{b.reviews_rating}</span>
+              <span className="text-white/40 mx-2 sm:mx-3">·</span>
+              <span className="text-live tabular-nums inline-flex items-center gap-2 align-baseline">
+                <span className="relative flex h-2 w-2 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
                 </span>
-                {(successCount.data?.count ?? 0).toLocaleString()}
+                <span className="break-normal">{b.reviews_count}</span>
               </span>{" "}
-              successful activations
+              <span className="block sm:inline text-white/90">{b.reviews_activations_label}</span>
             </h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {[
-              { q: "Activated in under 20 seconds. Genuinely smooth.", n: "M. Ortega" },
-              { q: "The code flow just works. No hoops, no spam.", n: "J. Chen" },
-              { q: "Fastest TV setup I've ever done. Support was instant.", n: "S. Nakamura" },
-            ].map((t) => (
-              <div key={t.n} className="glass glass-hover p-8 reveal">
+              { q: b.reviews_q1, n: b.reviews_n1 },
+              { q: b.reviews_q2, n: b.reviews_n2 },
+              { q: b.reviews_q3, n: b.reviews_n3 },
+            ].map((t, i) => (
+              <div key={`${t.n}-${i}`} className="glass glass-hover p-6 sm:p-8 reveal">
                 <div className="text-[#ff2a3a] text-sm mb-4">★ ★ ★ ★ ★</div>
-                <p className="text-white/85 leading-relaxed">"{t.q}"</p>
-                <div className="mt-6 pt-4 border-t border-white/10 flex justify-between text-xs font-mono uppercase tracking-widest text-white/50">
-                  <span>{t.n}</span>
-                  <span className="text-[#ff2a3a]">Verified</span>
+                <p className="text-white/85 leading-relaxed text-[15px] sm:text-base">"{t.q}"</p>
+                <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center gap-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest text-white/50">
+                  <span className="truncate">{t.n}</span>
+                  <span className="text-[#ff2a3a] shrink-0">Verified</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
 
       {/* CTA */}
       <section className="relative py-32 px-6 md:px-12">
