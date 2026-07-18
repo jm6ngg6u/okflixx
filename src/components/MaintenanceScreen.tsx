@@ -39,6 +39,7 @@ export function MaintenanceView({
   b,
   message,
   remainingLabel,
+  endsAt,
   channels,
   user,
   signingOut,
@@ -48,12 +49,46 @@ export function MaintenanceView({
   b: BrandingMap;
   message: string;
   remainingLabel: string | null;
+  endsAt?: string | null;
   channels: Contact[];
   user: UserChip | null;
   signingOut?: boolean;
   onSignOut?: () => void;
   compact?: boolean;
 }) {
+  const brandName = `${b.name_prefix}${b.name_suffix}`;
+  const scale = Math.max(60, Math.min(140, parseInt(b.maint_font_scale, 10) || 100)) / 100;
+  const intensity = Math.max(0, Math.min(100, parseInt(b.maint_intensity, 10) || 0)) / 100;
+  const flash = b.maint_flash === "1";
+  const shine = b.maint_shine === "1";
+  const wordmarkGlow = b.maint_wordmark_glow === "1";
+  const perScale = (k: keyof BrandingMap, fallback = "100") =>
+    Math.max(60, Math.min(160, parseInt((b as any)[k] ?? fallback, 10) || 100)) / 100;
+  const sz = {
+    status: perScale("maint_size_status" as keyof BrandingMap),
+    wordmark: perScale("maint_size_wordmark" as keyof BrandingMap),
+    headline: perScale("maint_size_headline" as keyof BrandingMap),
+    message: perScale("maint_size_message" as keyof BrandingMap),
+    countdown: perScale("maint_size_countdown" as keyof BrandingMap),
+    contacts: perScale("maint_size_contacts" as keyof BrandingMap),
+    footer: perScale("maint_size_footer" as keyof BrandingMap),
+  };
+
+  const fx = (px: number, elem: keyof typeof sz = "message") => `${px * scale * sz[elem]}px`;
+
+  // Formatted ends-at line (timezone aware).
+  let endsFormatted: string | null = null;
+  if (endsAt) {
+    try {
+      const tz = (b as any).maint_timezone || "UTC";
+      const hour12 = ((b as any).maint_time_format || "24h") === "12h";
+      endsFormatted = new Intl.DateTimeFormat(undefined, {
+        timeZone: tz, hour12,
+        weekday: "short", month: "short", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", timeZoneName: "short",
+      }).format(new Date(endsAt));
+    } catch { endsFormatted = null; }
+  }
   const brandName = `${b.name_prefix}${b.name_suffix}`;
   const scale = Math.max(60, Math.min(140, parseInt(b.maint_font_scale, 10) || 100)) / 100;
   const intensity = Math.max(0, Math.min(100, parseInt(b.maint_intensity, 10) || 0)) / 100;
