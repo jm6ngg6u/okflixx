@@ -37,7 +37,6 @@ type ActivateResult =
         name: string | null;
       };
       policy: string;
-      captchaPass?: { token: string; exp: number } | null;
     }
   | {
       ok: false;
@@ -51,13 +50,11 @@ type ActivateResult =
         | "server_error"
         | "access_key_required"
         | "access_key_invalid"
-        | "captcha_required"
-        | "captcha_invalid"
         | "login_required";
       attempts?: number;
       message?: string;
-      captchaPass?: { token: string; exp: number } | null;
     };
+
 
 
 function hashIp(ip: string): string {
