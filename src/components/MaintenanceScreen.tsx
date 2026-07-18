@@ -346,6 +346,7 @@ export function MaintenanceScreen({ message, startsAt, endsAt, onCleared }: Prop
         b={b}
         message={message}
         remainingLabel={remainingLabel}
+        startsAt={startsAt}
         endsAt={endsAt}
         channels={channels}
         user={user}
