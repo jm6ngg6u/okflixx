@@ -381,13 +381,14 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
 }
 
 function FieldGrid({
-  rows, values, stage, commit, resetOne,
+  rows, values, stage, commit, resetOne, autosave = true,
 }: {
   rows: Row[];
   values: Record<BrandingKey, string>;
   stage: (k: BrandingKey, v: string) => void;
   commit: (k: BrandingKey, v: string) => void;
   resetOne: (k: BrandingKey) => void;
+  autosave?: boolean;
 }) {
   return (
     <div className="grid md:grid-cols-2 gap-5">
@@ -408,7 +409,7 @@ function FieldGrid({
               <Textarea id={r.key}
                 value={values[r.key] ?? ""}
                 onChange={(e) => stage(r.key, e.target.value)}
-                onBlur={(e) => commit(r.key, e.target.value)}
+                onBlur={autosave ? (e) => commit(r.key, e.target.value) : undefined}
                 placeholder={r.placeholder ?? BRANDING_DEFAULTS[r.key]}
                 rows={3}
                 className="bg-black/40 border-white/10" />
@@ -416,13 +417,65 @@ function FieldGrid({
               <Input id={r.key}
                 value={values[r.key] ?? ""}
                 onChange={(e) => stage(r.key, e.target.value)}
-                onBlur={(e) => commit(r.key, e.target.value)}
+                onBlur={autosave ? (e) => commit(r.key, e.target.value) : undefined}
                 placeholder={r.placeholder ?? BRANDING_DEFAULTS[r.key]}
                 className="bg-black/40 border-white/10" />
             )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function SurfaceActionBar({
+  label, rows, dirty, values, commit, resetOne,
+}: {
+  label: string;
+  rows: Row[];
+  dirty: Partial<Record<BrandingKey, string>>;
+  values: Record<BrandingKey, string>;
+  commit: (k: BrandingKey, v: string) => void;
+  resetOne: (k: BrandingKey) => void;
+}) {
+  const pendingKeys = rows.filter((r) => dirty[r.key] !== undefined).map((r) => r.key);
+  const resettableKeys = rows.filter((r) => values[r.key] !== BRANDING_DEFAULTS[r.key]).map((r) => r.key);
+  const pending = pendingKeys.length;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/40 px-4 py-3">
+      <div className="flex items-center gap-2 text-xs">
+        <span className="font-mono uppercase tracking-[0.25em] text-white/40">{label}</span>
+        <Badge
+          variant="outline"
+          className={`border-none ${pending ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}
+        >
+          {pending ? `${pending} unsaved` : "All synced"}
+        </Badge>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={resettableKeys.length === 0}
+          onClick={() => {
+            if (!confirm(`Reset all ${label.toLowerCase()} fields to defaults?`)) return;
+            resettableKeys.forEach((k) => resetOne(k));
+          }}
+        >
+          <RotateCcw className="w-3.5 h-3.5 mr-2" /> Reset section
+        </Button>
+        <Button
+          size="sm"
+          disabled={pending === 0}
+          onClick={() => {
+            pendingKeys.forEach((k) => commit(k, dirty[k] as string));
+          }}
+          className="bg-[#ff2a3a] hover:bg-[#ff2a3a]/90 text-white"
+        >
+          Save {pending ? `(${pending})` : ""}
+        </Button>
+      </div>
     </div>
   );
 }
