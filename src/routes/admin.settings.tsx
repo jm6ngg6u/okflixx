@@ -304,16 +304,8 @@ function SettingsPage() {
 
       {/* Activation flow */}
 
-      <Section
-        icon={Timer}
-        title="Activation flow"
-        subtitle="Attempt limits and rate limiting for the public activation endpoint."
-      >
-        <div className="grid sm:grid-cols-2 gap-4">
-          <NumField k="max_activation_attempts" label="Max cookies tried per activation" hint="How many cookies to try before giving up" local={local} set={set} onSave={save} busy={busy} min={1} max={10} />
-          <NumField k="rate_limit_per_10min" label="Rate limit (per IP, 10 min)" hint="Attempts allowed per IP within 10 minutes" local={local} set={set} onSave={save} busy={busy} min={1} max={200} />
-        </div>
-      </Section>
+      <ActivationFlowSection local={local} set={set} save={save} busy={busy} />
+
 
 
       <LiveJobsPanel />
