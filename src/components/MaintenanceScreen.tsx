@@ -228,7 +228,7 @@ export function MaintenanceView({
         {/* Contact channels */}
         {channels.length > 0 && (
           <div className="w-full max-w-xl" style={{ marginTop: fx(compact ? 20 : 36) }}>
-            <div className="font-mono uppercase tracking-[0.25em] text-white/40" style={{ fontSize: fx(10.5) }}>
+            <div className="font-mono uppercase tracking-[0.25em] text-white/40" style={{ fontSize: fx(10.5, "contacts") }}>
               {b.maint_contacts_label}
             </div>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
