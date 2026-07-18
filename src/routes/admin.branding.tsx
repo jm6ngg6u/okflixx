@@ -28,7 +28,7 @@ import {
   peekBrandingHistory,
   type BrandingKey,
 } from "@/lib/branding.functions";
-import { useBrand } from "@/lib/branding-context";
+import { useBrand, type BrandingMap } from "@/lib/branding-context";
 
 export const Route = createFileRoute("/admin/branding")({
   ssr: false,
