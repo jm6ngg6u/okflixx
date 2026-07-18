@@ -187,21 +187,22 @@ function RootComponent() {
         richColors
         closeButton
         expand
-        duration={5000}
         toastOptions={{
           classNames: {
             toast:
-              "!bg-[#0b0b0d]/95 !backdrop-blur-xl !border !border-white/10 !shadow-[0_20px_60px_-20px_rgba(255,42,58,0.35)] !rounded-xl !px-4 !py-3.5",
-            title: "!font-display !text-[15px] !tracking-tight !text-white",
-            description: "!text-[12.5px] !text-white/60 !leading-relaxed !mt-0.5",
-            success: "!border-emerald-500/30 [&_[data-icon]]:!text-emerald-400",
-            error: "!border-red-500/40 [&_[data-icon]]:!text-red-400",
-            info: "!border-sky-500/30 [&_[data-icon]]:!text-sky-300",
-            warning: "!border-amber-500/30 [&_[data-icon]]:!text-amber-300",
+              "!bg-[var(--toast-bg)] !backdrop-blur-xl !border !border-[var(--toast-border)] !shadow-[var(--toast-shadow)] !rounded-[var(--toast-radius)] !px-[var(--toast-pad-x)] !py-[var(--toast-pad-y)]",
+            title: "!font-display !text-[length:var(--toast-title-size)] !tracking-tight !text-white",
+            description: "!font-body !text-[length:var(--toast-desc-size)] !text-white/60 !leading-relaxed !mt-0.5",
+            success: "!border-[color:var(--toast-success)]/30 [&_[data-icon]]:!text-[color:var(--toast-success)]",
+            error: "!border-[color:var(--toast-error)]/40 [&_[data-icon]]:!text-[color:var(--toast-error)]",
+            info: "!border-[color:var(--toast-info)]/30 [&_[data-icon]]:!text-[color:var(--toast-info)]",
+            warning: "!border-[color:var(--toast-warning)]/30 [&_[data-icon]]:!text-[color:var(--toast-warning)]",
+            loading: "!border-white/10 [&_[data-icon]]:!text-[color:var(--toast-loading)]",
             closeButton: "!bg-white/5 !border-white/10 !text-white/60 hover:!text-white",
           },
         }}
       />
+
 
       </BrandingProvider>
     </QueryClientProvider>
