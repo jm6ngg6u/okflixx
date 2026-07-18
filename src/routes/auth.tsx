@@ -1,14 +1,14 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Shield, KeyRound, Loader2, AlertTriangle } from "lucide-react";
 import { logMfaEvent } from "@/lib/mfa.functions";
+import { useBrand } from "@/lib/branding-context";
+import logo from "@/assets/brand-logo.png";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
