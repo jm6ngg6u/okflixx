@@ -255,7 +255,7 @@ export function MaintenanceView({
 
         <div
           className="font-mono uppercase tracking-[0.25em] text-white/30"
-          style={{ marginTop: fx(compact ? 24 : 48), fontSize: fx(10) }}
+          style={{ marginTop: fx(compact ? 24 : 48), fontSize: fx(10, "footer") }}
         >
           {b.footer_legal || "© Emberlord"}
         </div>
