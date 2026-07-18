@@ -229,16 +229,15 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
           </div>
         )}
 
-        {/* Admin bypass */}
-        {isStaff && (
-          <a
-            href="/admin"
-            className="mt-10 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-[11px] font-mono uppercase tracking-[0.25em] text-emerald-300 hover:bg-emerald-400/20 transition"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Staff bypass · open admin
-          </a>
-        )}
+        {/* Footer */}
+        <div className="mt-12 text-[10px] font-mono uppercase tracking-[0.25em] text-white/30">
+          {b.footer_legal || "© Emberlord"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
         {/* Footer */}
         <div className="mt-12 text-[10px] font-mono uppercase tracking-[0.25em] text-white/30">
