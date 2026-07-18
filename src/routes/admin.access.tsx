@@ -314,7 +314,7 @@ function AccessAdminPage() {
               <div className="font-mono uppercase tracking-widest text-white/80 mb-1">How the gates stack</div>
               <ul className="space-y-1 list-disc list-inside">
                 <li><b className="text-white/80">Login gate</b> — quota is per user, not per IP.</li>
-                <li><b className="text-white/80">Captcha gate</b> — a passed challenge waives the IP rate limit (unlimited for that solved session).</li>
+                <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session.</li>
                 <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session. No bypass path.</li>
               </ul>
             </div>
