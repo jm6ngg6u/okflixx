@@ -200,8 +200,14 @@ function BrandingStudio() {
 
 
         <TabsContent value="identity" className="mt-4">
-          <Section title="Site identity" desc="Wordmark, tab title, and legal footer.">
+          <Section title="Site identity" desc="Wordmark, tab title, and legal footer. Tab title updates instantly in every open browser tab.">
             <FieldGrid rows={IDENTITY} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="assets" className="mt-4">
+          <Section title="Logo & favicon" desc="Paste an https URL, a same-origin path (/favicon.png), or a data URL. Changes appear across the site and browser tab within 2 seconds.">
+            <AssetsPanel values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
@@ -210,6 +216,7 @@ function BrandingStudio() {
             <FieldGrid rows={MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
+
 
         <TabsContent value="typography" className="mt-4">
           <Section title="Typography" desc="Curated Google Fonts — display for headlines, body for copy, mono for tickers/codes.">
