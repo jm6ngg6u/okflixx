@@ -143,6 +143,21 @@ function sanitize(key: BrandingKey, raw: string): string {
     const n = Math.max(60, Math.min(140, parseInt(v, 10)));
     return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.maint_font_scale;
   }
+  if (
+    key === "maint_size_status" || key === "maint_size_wordmark" ||
+    key === "maint_size_headline" || key === "maint_size_message" ||
+    key === "maint_size_countdown" || key === "maint_size_contacts" ||
+    key === "maint_size_footer"
+  ) {
+    const n = Math.max(60, Math.min(160, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : "100";
+  }
+  if (key === "maint_time_format") return v === "12h" ? "12h" : "24h";
+  if (key === "maint_timezone") {
+    const s = (v || "").trim();
+    if (!s) return BRANDING_DEFAULTS.maint_timezone;
+    try { new Intl.DateTimeFormat("en", { timeZone: s }); return s; } catch { return BRANDING_DEFAULTS.maint_timezone; }
+  }
   if (key === "font_display" || key === "font_body" || key === "font_mono") {
     return (FONT_WHITELIST as readonly string[]).includes(v) ? v : BRANDING_DEFAULTS[key];
   }
