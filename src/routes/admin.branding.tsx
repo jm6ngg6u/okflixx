@@ -50,7 +50,7 @@ const IDENTITY: Row[] = [
 
 
 const HOME_MESSAGES: Row[] = [
-  { key: "hero_kicker", label: "Hero kicker (live badge)" },
+  { key: "hero_kicker", label: "Hero kicker" },
   { key: "hero_headline_1", label: "Hero headline — line 1" },
   { key: "hero_headline_2", label: "Hero headline — line 2 (accent)" },
   { key: "hero_sub", label: "Hero sub-copy", multiline: true },

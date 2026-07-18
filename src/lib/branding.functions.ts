@@ -19,7 +19,7 @@ export const BRANDING_DEFAULTS = {
     "Enter your 8-digit code and stream Netflix instantly on any Smart TV, Apple TV, Roku, PS5 or Xbox. Encrypted, always-on, 2026-ready.",
   footer_legal: "© 2026 · Encrypted · Everywhere",
   // Messages
-  hero_kicker: "Live · 82,431 TVs activated",
+  hero_kicker: "Secure TV activation",
   hero_headline_1: "Stream Netflix",
   hero_headline_2: "on any TV instantly.",
   hero_sub:
