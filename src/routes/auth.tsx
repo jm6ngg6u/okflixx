@@ -37,6 +37,7 @@ function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 15000): 
 
 function AuthPage() {
   const navigate = useNavigate();
+  const brand = useBrand();
   const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
