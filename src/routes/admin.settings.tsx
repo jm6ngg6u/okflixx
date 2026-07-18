@@ -539,7 +539,7 @@ function JobScheduleCard({
           <Badge variant="outline" className={enabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-white/10 text-white/60 border-white/15"}>
             {enabled ? "ON" : "OFF"}
           </Badge>
-          <Switch checked={enabled} onCheckedChange={(v) => { set(enabledKey, v ? "1" : "0"); setTimeout(() => onSave(enabledKey), 0); }} />
+          <Switch checked={enabled} onCheckedChange={(v) => { const nv = v ? "1" : "0"; set(enabledKey, nv); onSave(enabledKey, nv); }} />
         </div>
       </div>
 
