@@ -1,17 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
-  runCookiesAutocheckNow, runProxiesAutocheckNow,
+  runCookiesAutocheckNow, runProxiesAutocheckNow, testPoolAlertWebhook,
 } from "@/lib/settings.functions";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download } from "lucide-react";
+import { Settings as SettingsIcon, Zap, ShieldAlert, Bell, RefreshCw, Timer, Save, Play, Loader2, Download, Search, Send, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
 
 import { toast } from "sonner";
 import { LiveJobsPanel } from "@/components/LiveJobsPanel";
