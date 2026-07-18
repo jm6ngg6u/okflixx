@@ -260,13 +260,8 @@ function HomePage() {
       toast.error("Access key required");
       return;
     }
-    if (gateBlocks.needsCaptcha) {
-      setCaptchaError("Please complete the verification below.");
-      toast.error("Verification required");
-      return;
-    }
 
-    setLoginError(null); setKeyError(null); setCaptchaError(null); setServiceError(null); setRetryCountdown(0);
+    setLoginError(null); setKeyError(null); setServiceError(null); setRetryCountdown(0);
     setSubmitting(true);
     setStage("working");
 
@@ -278,19 +273,10 @@ function HomePage() {
           elapsedMs: now - mountedAtRef.current,
           accessKey: accessKey || null,
           accessSessionToken: sessionToken,
-          captchaToken: captchaToken || null,
-          captchaWidgetProvider: captchaWidgetProviderRef.current,
-          captchaPassToken: captchaPassToken || null,
           fingerprint: fingerprint || null,
           authUserId,
         },
       });
-      // Cache the server-issued verification pass (internal — not shown to user).
-      const cp = (result as any).captchaPass as { token: string; exp: number } | null | undefined;
-      if (cp && cp.token) {
-        setCaptchaPassToken(cp.token);
-        try { sessionStorage.setItem(CAPTCHA_PASS_KEY, JSON.stringify(cp)); } catch { /* noop */ }
-      }
       if (result.ok) {
         setSuccess({
           code,
@@ -304,17 +290,6 @@ function HomePage() {
       } else if (result.error === "login_required") {
         setLoginError("Please sign in to continue.");
         toast.error("Sign in required");
-      } else if (result.error === "captcha_required" || result.error === "captcha_invalid") {
-        setCaptchaError("Verification failed. Please try again.");
-        setCaptchaToken("");
-        setCaptchaPassToken(null);
-        try { sessionStorage.removeItem(CAPTCHA_PASS_KEY); } catch { /* noop */ }
-        try {
-          const api: any = captchaWidgetProviderRef.current === "hcaptcha"
-            ? (window as any).hcaptcha : (window as any).turnstile;
-          api?.reset?.();
-        } catch { /* noop */ }
-        toast.error("Verification failed", { description: "Please complete the check below and try again." });
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
         if (result.error === "access_key_invalid" && sessionToken) {
           localStorage.removeItem(SESSION_KEY);
@@ -333,7 +308,6 @@ function HomePage() {
         setAutoRetry(true);
         toast.error("Activation failed", { description: "Please try again in a moment." });
       } else {
-        // Generic bucket: rate_limited, bot_detected, unknown → same message.
         toast.error("Activation failed", { description: "Please try again in a moment." });
       }
     } catch (err) {
@@ -348,21 +322,19 @@ function HomePage() {
 
 
 
-  const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.captchaRequired || gate.data.loginRequired));
+  const anyGate = !!(gate.data && (gate.data.accessKeyRequired || gate.data.loginRequired));
 
-  // Ordered list of enabled gates with satisfaction state → drives the header,
-  // progress bar, and numbered badges. Only reads gate.data; never invents gates.
   const gateItems = useMemo(() => {
     const g = gate.data;
-    if (!g) return [] as { key: "login" | "key" | "captcha"; label: string; done: boolean }[];
-    const out: { key: "login" | "key" | "captcha"; label: string; done: boolean }[] = [];
+    if (!g) return [] as { key: "login" | "key"; label: string; done: boolean }[];
+    const out: { key: "login" | "key"; label: string; done: boolean }[] = [];
     if (g.loginRequired) out.push({ key: "login", label: "Sign in", done: !!authUserId });
     if (g.accessKeyRequired) out.push({ key: "key", label: "Access key", done: !!sessionToken });
-    if (g.captchaRequired) out.push({ key: "captcha", label: "Human check", done: !!(captchaToken || captchaPassToken) });
     return out;
-  }, [gate.data, authUserId, sessionToken, captchaToken, captchaPassToken]);
+  }, [gate.data, authUserId, sessionToken]);
   const doneCount = gateItems.filter((g) => g.done).length;
   const allSatisfied = gateItems.length > 0 && doneCount === gateItems.length;
+
 
 
 
