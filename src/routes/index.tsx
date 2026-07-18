@@ -685,7 +685,7 @@ function HomePage() {
               )}
               {/* SYSTEM progress — three stages, always in sync with the pipeline. Not editable. */}
               {submitting && (
-                <div className="mt-6 rounded-2xl border border-brand-accent/30 bg-white/[0.04] backdrop-blur-md p-4">
+                <div className="mt-6 rounded-2xl border border-[rgba(var(--brand-accent-rgb),0.30)] bg-white/[0.04] backdrop-blur-md p-4">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.28em] text-[#ff8a90] mb-3">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Activating — please keep this tab open
