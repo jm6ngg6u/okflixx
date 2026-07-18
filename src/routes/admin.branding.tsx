@@ -236,34 +236,52 @@ function BrandingStudio() {
         </div>
       </header>
 
-      <LivePreview />
-
-      <Tabs defaultValue="identity" className="w-full">
+      <Tabs defaultValue="home" className="w-full">
         <TabsList className="bg-black/40 border border-white/10 flex-wrap">
-          <TabsTrigger value="identity"><Palette className="w-3.5 h-3.5 mr-2" />Identity</TabsTrigger>
+          <TabsTrigger value="home"><Palette className="w-3.5 h-3.5 mr-2" />Home page</TabsTrigger>
+          <TabsTrigger value="login"><LogIn className="w-3.5 h-3.5 mr-2" />Login page</TabsTrigger>
+          <TabsTrigger value="identity"><MessageSquareText className="w-3.5 h-3.5 mr-2" />Identity & SEO</TabsTrigger>
           <TabsTrigger value="assets"><ImageIcon className="w-3.5 h-3.5 mr-2" />Assets</TabsTrigger>
-          <TabsTrigger value="messages"><MessageSquareText className="w-3.5 h-3.5 mr-2" />Messages</TabsTrigger>
           <TabsTrigger value="typography"><Type className="w-3.5 h-3.5 mr-2" />Typography</TabsTrigger>
           <TabsTrigger value="effects"><Sparkles className="w-3.5 h-3.5 mr-2" />Effects</TabsTrigger>
           <TabsTrigger value="presets"><Wand2 className="w-3.5 h-3.5 mr-2" />Presets</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="home" className="mt-4 space-y-4">
+          <PreviewFrame
+            title="Home hero — live preview"
+            subtitle="Kicker, wordmark, headline, CTA."
+            icon={<Palette className="w-3.5 h-3.5" />}
+          >
+            <HomeHeroPreview b={values as unknown as BrandingMap} />
+          </PreviewFrame>
+          <Section title="Home page copy" desc="Every headline, kicker, CTA and receipt shown on the landing page.">
+            <FieldGrid rows={HOME_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="login" className="mt-4 space-y-4">
+          <PreviewFrame
+            title="Login card — live preview"
+            subtitle="Mascot glow, shine sweep, Google button, status pill."
+            icon={<LogIn className="w-3.5 h-3.5" />}
+          >
+            <LoginPreview b={values as unknown as BrandingMap} />
+          </PreviewFrame>
+          <Section title="Login page copy" desc="Every string shown on /login — hero side and card side.">
+            <FieldGrid rows={LOGIN_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+        </TabsContent>
 
         <TabsContent value="identity" className="mt-4">
-          <Section title="Site identity" desc="Wordmark, tab title, and legal footer. Tab title updates instantly in every open browser tab.">
+          <Section title="Site identity" desc="Wordmark parts, browser tab title, SEO description and footer. Tab title updates in every open browser tab.">
             <FieldGrid rows={IDENTITY} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
         <TabsContent value="assets" className="mt-4">
-          <Section title="Logo & favicon" desc="Paste an https URL, a same-origin path (/favicon.png), or a data URL. Changes appear across the site and browser tab within 2 seconds.">
+          <Section title="Logo & favicon" desc="Upload a file or paste an https / same-origin / data URL. Changes appear across the site and browser tab within 2 seconds.">
             <AssetsPanel values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
-          </Section>
-        </TabsContent>
-
-        <TabsContent value="messages" className="mt-4">
-          <Section title="Site copy" desc="Every visible headline, section kicker, CTA and receipt message.">
-            <FieldGrid rows={MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
