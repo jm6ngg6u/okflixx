@@ -497,7 +497,7 @@ function HomePage() {
                   <span className="w-2 h-2 rounded-full bg-white/20" />
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-1">{b.code_card_title}</h3>
+              <h3 className="font-display brand-card-title mb-1">{b.code_card_title}</h3>
               <p className="text-white/50 text-sm mb-6">{b.code_card_help}</p>
 
               <CodeInput ref={codeRef} />
