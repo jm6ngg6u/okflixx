@@ -71,6 +71,9 @@ const HOME_MESSAGES: Row[] = [
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
   { key: "error_generic", label: "Generic activation error", multiline: true },
+  { key: "reviews_kicker", label: "Reviews — kicker" },
+  { key: "reviews_rating", label: "Reviews — rating (e.g. 4.9 / 5)" },
+  { key: "reviews_activations_label", label: "Reviews — label after live count" },
 ];
 
 const LOGIN_MESSAGES: Row[] = [

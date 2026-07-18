@@ -41,6 +41,10 @@ export const BRANDING_DEFAULTS = {
   success_title: "You're in.",
   success_kicker: "// Activation complete",
   error_generic: "We couldn't activate your TV right now. Please try again in a moment.",
+  // Reviews / social proof
+  reviews_kicker: "// Reviews",
+  reviews_rating: "4.9 / 5",
+  reviews_activations_label: "successful activations",
   // Login page (Google-only)
   login_kicker: "Wield the trident",
   login_title: "Create Account",

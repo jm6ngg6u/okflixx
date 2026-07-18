@@ -117,13 +117,15 @@ function HomePage() {
   const redeemFn = useServerFn(redeemAccessKey);
   const fetchSuccessCount = useServerFn(getSuccessActivationCount);
 
-  // Live successful-activation counter — polled every 2s. Counts ONLY result='success'.
+  // Live successful-activation counter — realtime broadcast + short-interval safety poll.
+  // Counts ONLY result='success'. No invalid / error / rate-limited rows.
   const successCount = useQuery({
     queryKey: ["public-activation-success-count"],
     queryFn: () => fetchSuccessCount(),
-    refetchInterval: 2_000,
+    refetchInterval: 5_000,
     refetchIntervalInBackground: false,
-    staleTime: 1_000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
 
@@ -158,6 +160,17 @@ function HomePage() {
           }
         },
       )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+  // Realtime broadcast: every successful TV activation across the site pushes a
+  // "tick" here so the live counter increments with zero visible delay.
+  useEffect(() => {
+    const ch = supabase
+      .channel("activation-success")
+      .on("broadcast", { event: "tick" }, () => {
+        qc.invalidateQueries({ queryKey: ["public-activation-success-count"] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
@@ -806,9 +819,9 @@ function HomePage() {
       <section id="reviews" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Reviews</div>
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">{b.reviews_kicker}</div>
             <h2 className="font-display text-4xl md:text-6xl">
-              4.9 / 5 ·{" "}
+              {b.reviews_rating} ·{" "}
               <span className="text-live tabular-nums inline-flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
@@ -816,7 +829,7 @@ function HomePage() {
                 </span>
                 {(successCount.data?.count ?? 0).toLocaleString()}
               </span>{" "}
-              successful activations
+              {b.reviews_activations_label}
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">

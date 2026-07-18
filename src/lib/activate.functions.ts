@@ -481,6 +481,12 @@ export const submitActivation = createServerFn({ method: "POST" })
 
       // 5f. Terminal decisions.
       if (success) {
+        // Broadcast a realtime tick so all live homepages bump the counter instantly.
+        try {
+          const ch = supabaseAdmin.channel("activation-success");
+          await ch.send({ type: "broadcast", event: "tick", payload: { at: Date.now() } });
+          supabaseAdmin.removeChannel(ch);
+        } catch {}
         // Fetch stored account metadata for the success screen.
         const { data: meta } = await supabaseAdmin
           .from("cookie_pool")
