@@ -105,6 +105,10 @@ export const BRANDING_DEFAULTS = {
   size_section_title: "100",
   size_card_title: "100",
   size_body: "100",
+  // Per-surface master scale (percent, 60..160). Multiplies every
+  // --brand-size-* utility on that surface via --brand-surface-scale.
+  home_scale: "100",
+  login_scale: "100",
 };
 
 
