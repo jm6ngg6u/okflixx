@@ -118,14 +118,14 @@ export async function activateTVViaWorker(args: {
   }
 }
 
-export async function checkProxyViaWorker(args: { proxy: ProxyPayload }): Promise<{
+export async function checkProxyViaWorker(args: { proxy: ProxyPayload; signal?: AbortSignal }): Promise<{
   ok: boolean;
   latency_ms?: number | null;
   country?: string | null;
   error?: string | null;
 }> {
   try {
-    return await callWorker("/check-proxy", args, 15_000);
+    return await callWorker("/check-proxy", { proxy: args.proxy }, 15_000, args.signal);
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };
   }
