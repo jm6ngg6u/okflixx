@@ -66,9 +66,22 @@ function LoginPage() {
   }
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
+  const namePrefix = brand?.name_prefix ?? "EMBER";
+  const nameSuffix = brand?.name_suffix ?? "LORD";
   const heroLogo = brand?.logo_url || logo;
-  const tagline1 = "JOIN THE";
-  const tagline2 = "ELITE";
+  const tagline1 = brand?.login_tagline_1 || "JOIN THE";
+  const tagline2 = brand?.login_tagline_2 || "ELITE";
+  const loginKicker = brand?.login_kicker || "Wield the trident";
+  const loginTitle = brand?.login_title || "Create Account";
+  const loginSubtitle = brand?.login_subtitle || "Join thousands of other operatives today.";
+  const loginDescription =
+    brand?.login_description ||
+    "Create your account to access our private gateway and start activating Netflix on any Smart TV, Apple TV, Roku, or console.";
+  const loginButton = brand?.login_button || "Continue with Google";
+  const loginButtonBusy = brand?.login_button_busy || "Opening Google…";
+  const loginFooterPrompt = brand?.login_footer_prompt || "Already have security clearance?";
+  const loginFooterCta = brand?.login_footer_cta || "Login";
+  const loginStatus = brand?.login_status || "Gateway online";
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-[#050505] text-white">
