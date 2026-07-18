@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import "../lib/toast-format";
 import { BrandingProvider } from "../lib/branding-context";
+import { supabase } from "../integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
