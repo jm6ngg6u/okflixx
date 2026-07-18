@@ -728,7 +728,7 @@ function HomePage() {
             ].map((f) => (
               <div key={f.t} className="glass glass-hover p-8 reveal">
                 <div className="font-mono text-xs text-[#ff2a3a] mb-6">/{f.i}</div>
-                <div className="font-display text-2xl mb-3">{f.t}</div>
+                <div className="font-display brand-card-title mb-3">{f.t}</div>
                 <p className="text-white/60 text-sm leading-relaxed">{f.d}</p>
               </div>
             ))}
