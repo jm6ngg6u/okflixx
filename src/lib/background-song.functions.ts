@@ -207,33 +207,37 @@ export const getBackgroundSongVersionUrl = createServerFn({ method: "GET" })
     return { url: signed.signedUrl, name: row.name as string };
   });
 
-/** Admin: rolling analytics window. */
+/** Admin: rolling analytics window powered by a SQL aggregator. */
 export const getBackgroundSongAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const since24 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: rows } = await supabaseAdmin
-      .from("background_song_events")
-      .select("event_type, created_at")
-      .gte("created_at", since7d)
-      .limit(10000);
-
-    const events = rows ?? [];
-    const bucket = { impression: 0, autoplay: 0, unmute: 0, tap_play: 0, out_of_schedule: 0, silence_detected: 0 } as Record<string, number>;
-    const bucket24 = { ...bucket };
-    for (const e of events) {
-      const t = e.event_type as string;
-      if (t in bucket) {
-        bucket[t]++;
-        if ((e.created_at as string) >= since24) bucket24[t]++;
-      }
+    const empty = { impression: 0, autoplay: 0, unmute: 0, tap_play: 0, out_of_schedule: 0, silence_detected: 0 };
+    const { data, error } = await supabaseAdmin.rpc("get_bg_song_analytics");
+    if (error) {
+      return {
+        total24h: { ...empty },
+        total7d: { ...empty },
+        prev24h: { ...empty },
+        unique24h: 0,
+        unique7d: 0,
+        lastEventAt: null as string | null,
+        generatedAt: new Date().toISOString(),
+      };
     }
-    return { total7d: bucket, total24h: bucket24, sampleSize: events.length };
+    const d = (data ?? {}) as Record<string, unknown>;
+    return {
+      total24h: { ...empty, ...((d.total24h as Record<string, number>) ?? {}) },
+      total7d: { ...empty, ...((d.total7d as Record<string, number>) ?? {}) },
+      prev24h: { ...empty, ...((d.prev24h as Record<string, number>) ?? {}) },
+      unique24h: Number(d.unique24h ?? 0),
+      unique7d: Number(d.unique7d ?? 0),
+      lastEventAt: (d.lastEventAt as string) ?? null,
+      generatedAt: (d.generatedAt as string) ?? new Date().toISOString(),
+    };
   });
+
 
 // Aggregated live playback health across all visitors (last 5 min).
 export const getPlaybackTelemetry = createServerFn({ method: "GET" })
