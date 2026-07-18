@@ -84,6 +84,14 @@ const MaintenanceInput = z.object({
   return clean.length === 0 || clean.length >= 8;
 }, { message: "Message must be either empty (use default) or at least 8 characters.", path: ["message"] })
   .refine((d) => {
+    // Both start and end must be provided together (or both cleared).
+    const sSet = !!(d.starts_at && d.starts_at.length);
+    const eSet = !!(d.ends_at && d.ends_at.length);
+    if (sSet && !eSet) return false;
+    if (eSet && !sSet) return false;
+    return true;
+  }, { message: "Set both start and end — the countdown needs both to render.", path: ["starts_at"] })
+  .refine((d) => {
     if (!d.starts_at || !d.ends_at) return true;
     const a = Date.parse(d.starts_at); const b = Date.parse(d.ends_at);
     if (isNaN(a) || isNaN(b)) return true;
