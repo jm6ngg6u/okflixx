@@ -481,48 +481,103 @@ html, body {
 .btn-ghost:active { transform: scale(0.98); }
 
 /* ==== CODE INPUT BOXES ==== */
+@property --live-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .activation-panel {
   border-radius: 28px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
     rgba(5,5,5,0.10);
-  border: 1px solid rgba(255,255,255,0.105);
+  border: 1px solid rgba(var(--brand-accent-rgb), 0.66);
   backdrop-filter: blur(18px) saturate(145%);
   box-shadow:
     0 28px 90px -48px rgba(0,0,0,0.92),
-    0 18px 60px -50px rgba(var(--brand-accent-rgb),0.76),
+    0 0 0 1px rgba(var(--brand-accent-rgb),0.30),
+    0 0 28px rgba(var(--brand-accent-rgb),0.42),
+    0 0 82px rgba(var(--brand-accent-rgb),0.28),
     inset 0 1px 0 rgba(255,255,255,0.09);
 }
-.activation-panel { position: relative; isolation: isolate; }
-.activation-panel::before {
+
+/* One shared glow system for every public live box: TV code, live counter,
+   and gate/sign-in wrapper. The full border stays red; the white/red comet
+   rotates on top so the effect is always visible instead of disappearing. */
+.activation-panel,
+.live-count-panel,
+.glow-border {
+  position: relative;
+  isolation: isolate;
+  border-color: rgba(var(--brand-accent-rgb), 0.74) !important;
+  box-shadow:
+    0 0 0 1px rgba(var(--brand-accent-rgb), 0.42),
+    0 0 26px rgba(var(--brand-accent-rgb), 0.56),
+    0 0 78px rgba(var(--brand-accent-rgb), 0.34),
+    0 16px 42px -22px rgba(0,0,0,0.82),
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 0 34px rgba(var(--brand-accent-rgb), 0.08) !important;
+  animation: liveBorderPulse 2.8s ease-in-out infinite;
+}
+
+.activation-panel::after,
+.live-count-panel::after,
+.glow-border::after,
+.activation-panel::before,
+.live-count-panel::before,
+.glow-border::before {
   content: "";
   position: absolute;
   inset: -2px;
   border-radius: inherit;
   padding: 2px;
-  background: conic-gradient(
-    from var(--live-border-angle, 0deg),
-    transparent 0deg,
-    rgba(var(--brand-accent-rgb), 0.15) 40deg,
-    rgba(var(--brand-accent-rgb), 1) 90deg,
-    #ffffff 110deg,
-    rgba(var(--brand-accent-rgb), 1) 130deg,
-    rgba(var(--brand-accent-rgb), 0.15) 180deg,
-    transparent 220deg,
-    transparent 360deg
-  );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
-  filter: drop-shadow(0 0 8px rgba(var(--brand-accent-rgb), 0.85))
-          drop-shadow(0 0 22px rgba(var(--brand-accent-rgb), 0.5));
-  animation: liveBorderSpin 3.6s linear infinite;
   pointer-events: none;
+}
+
+.activation-panel::after,
+.live-count-panel::after,
+.glow-border::after {
+  background:
+    linear-gradient(135deg,
+      rgba(var(--brand-accent-rgb), 1) 0%,
+      rgba(255,255,255,0.56) 28%,
+      rgba(var(--brand-accent-rgb), 0.95) 52%,
+      rgba(var(--brand-accent-rgb), 0.64) 100%);
+  filter:
+    drop-shadow(0 0 10px rgba(var(--brand-accent-rgb), 0.88))
+    drop-shadow(0 0 28px rgba(var(--brand-accent-rgb), 0.58));
+  opacity: 0.78;
   z-index: 1;
 }
-.activation-panel > * { position: relative; z-index: 2; }
+
+.activation-panel::before,
+.live-count-panel::before,
+.glow-border::before {
+  background: conic-gradient(
+    from var(--live-border-angle),
+    rgba(var(--brand-accent-rgb), 0.22) 0deg,
+    rgba(var(--brand-accent-rgb), 0.22) 230deg,
+    rgba(var(--brand-accent-rgb), 1) 266deg,
+    #ffffff 286deg,
+    rgba(var(--brand-accent-rgb), 1) 306deg,
+    rgba(var(--brand-accent-rgb), 0.28) 338deg,
+    rgba(var(--brand-accent-rgb), 0.22) 360deg
+  );
+  filter: drop-shadow(0 0 8px rgba(var(--brand-accent-rgb), 0.85))
+          drop-shadow(0 0 28px rgba(var(--brand-accent-rgb), 0.75));
+  animation: liveBorderSpin 3.2s linear infinite;
+  z-index: 1;
+}
+
+.activation-panel > *,
+.live-count-panel > *,
+.glow-border > * { position: relative; z-index: 2; }
 .activation-panel-ambient {
   position: absolute;
   inset: -35%;
@@ -787,95 +842,20 @@ html, body {
   background:
     linear-gradient(180deg, rgba(255,42,58,0.14), rgba(255,42,58,0.05)),
     rgba(12,0,3,0.42) !important;
-  border: 1.5px solid rgba(var(--brand-accent-rgb), 0.9) !important;
-  box-shadow:
-    0 0 0 1px rgba(var(--brand-accent-rgb), 0.6),
-    0 0 24px rgba(var(--brand-accent-rgb), 0.7),
-    0 0 60px rgba(var(--brand-accent-rgb), 0.5),
-    0 0 120px -10px rgba(var(--brand-accent-rgb), 0.8),
-    0 10px 30px -12px rgba(0,0,0,0.55),
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    inset 0 0 40px rgba(var(--brand-accent-rgb), 0.12) !important;
-  animation: liveBorderPulse 2.4s ease-in-out infinite;
   backdrop-filter: blur(14px) saturate(140%);
 }
-.live-count-panel { position: relative; isolation: isolate; }
-
-/* Rotating conic-gradient "running light" border chasing the full box edge. */
-@property --live-border-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-.live-count-panel::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  padding: 2px;
-  background: conic-gradient(
-    from var(--live-border-angle),
-    transparent 0deg,
-    rgba(var(--brand-accent-rgb), 0.15) 40deg,
-    rgba(var(--brand-accent-rgb), 1) 90deg,
-    #ffffff 110deg,
-    rgba(var(--brand-accent-rgb), 1) 130deg,
-    rgba(var(--brand-accent-rgb), 0.15) 180deg,
-    transparent 220deg,
-    transparent 360deg
-  ) !important;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  filter: drop-shadow(0 0 8px rgba(var(--brand-accent-rgb), 0.9))
-          drop-shadow(0 0 22px rgba(var(--brand-accent-rgb), 0.55));
-  animation: liveBorderSpin 3.6s linear infinite;
-  pointer-events: none;
-  z-index: 1;
-}
-.live-count-panel > * { position: relative; z-index: 2; }
 
 @keyframes liveBorderSpin {
   to { --live-border-angle: 360deg; }
 }
-/* Reusable rotating red-glow border — apply to any full-box panel. */
-.glow-border { position: relative; isolation: isolate; }
-.glow-border::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  padding: 2px;
-  background: conic-gradient(
-    from var(--live-border-angle, 0deg),
-    transparent 0deg,
-    rgba(var(--brand-accent-rgb), 0.15) 40deg,
-    rgba(var(--brand-accent-rgb), 1) 90deg,
-    #ffffff 110deg,
-    rgba(var(--brand-accent-rgb), 1) 130deg,
-    rgba(var(--brand-accent-rgb), 0.15) 180deg,
-    transparent 220deg,
-    transparent 360deg
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  filter: drop-shadow(0 0 8px rgba(var(--brand-accent-rgb), 0.85))
-          drop-shadow(0 0 22px rgba(var(--brand-accent-rgb), 0.5));
-  animation: liveBorderSpin 3.6s linear infinite;
-  pointer-events: none;
-  z-index: 1;
-}
-.glow-border > * { position: relative; z-index: 2; }
 
 @media (prefers-reduced-motion: reduce) {
   .live-count-panel::before,
+  .live-count-panel::after,
   .activation-panel::before,
-  .glow-border::before { animation: none; }
+  .activation-panel::after,
+  .glow-border::before,
+  .glow-border::after { animation: none; }
 }
 @keyframes liveBorderPulse {
   0%, 100% {

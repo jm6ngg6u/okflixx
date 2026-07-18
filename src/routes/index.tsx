@@ -597,9 +597,9 @@ function HomePage() {
 
                   {/* Login gate */}
                   {gate.data?.loginRequired && (
-                    <div className={`rounded-xl border p-3 ${authUserId ? "border-emerald-500/30 bg-emerald-500/5" : loginError ? "border-red-500/40 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+                    <div className={`rounded-xl border p-3 ${authUserId ? "border-[rgba(var(--brand-accent-rgb),0.42)] bg-[rgba(var(--brand-accent-rgb),0.08)]" : loginError ? "border-[rgba(var(--brand-accent-rgb),0.56)] bg-[rgba(var(--brand-accent-rgb),0.10)]" : "border-[rgba(var(--brand-accent-rgb),0.38)] bg-[rgba(var(--brand-accent-rgb),0.06)]"}`}>
                       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                        <UserCheck className={`w-4 h-4 ${authUserId ? "text-emerald-400" : "text-amber-400"}`} />
+                        <UserCheck className="w-4 h-4 text-[#ff8a90] drop-shadow-[0_0_10px_rgba(var(--brand-accent-rgb),0.75)]" />
                         <div className="min-w-0 text-xs text-white/78">
                           {authUserId ? (
                             <>Signed in as <span className="text-white font-mono break-all">{authEmail}</span></>
@@ -628,12 +628,12 @@ function HomePage() {
 
                   {/* Access key gate */}
                   {gate.data?.accessKeyRequired && (
-                    <div className={`rounded-xl border p-3 ${sessionToken ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-white/[0.03]"}`}>
+                    <div className={`rounded-xl border p-3 ${sessionToken ? "border-[rgba(var(--brand-accent-rgb),0.44)] bg-[rgba(var(--brand-accent-rgb),0.08)]" : "border-[rgba(var(--brand-accent-rgb),0.26)] bg-white/[0.03]"}`}>
                       <div className="grid grid-cols-[auto_minmax(0,1fr)] sm:flex sm:items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-white/50 mb-2">
                         <KeyRound className="w-3.5 h-3.5 text-[#ff8a90]" />
                         <span>Access key required</span>
                         {sessionToken && (
-                          <span className="ml-auto inline-flex items-center gap-1 text-violet-300 text-[10px]">
+                          <span className="ml-auto inline-flex items-center gap-1 text-[#ffb0b5] text-[10px]">
                             <CheckCircle2 className="w-3 h-3" /> 24h unlock active
                           </span>
                         )}
