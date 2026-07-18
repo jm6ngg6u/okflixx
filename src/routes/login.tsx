@@ -379,6 +379,29 @@ function LoginPage() {
                 {loginSubtitle}
               </p>
 
+              {/* Inline error — shows the exact Google/OAuth failure so users
+                  can act on it instead of a disappearing toast. */}
+              {errorMessage && (
+                <div
+                  role="alert"
+                  className="mt-5 flex items-start gap-2.5 rounded-xl border border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.08] px-3.5 py-3 text-sm text-red-100"
+                  style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ff5a68]" aria-hidden="true" />
+                  <div className="flex-1 space-y-2">
+                    <p className="leading-snug text-red-50/95">{errorMessage}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleGoogle({ forceRedirect: true })}
+                      disabled={busy}
+                      className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
+                    >
+                      Try full-page sign-in instead
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Google button — the ONLY sign-in method */}
               <button
                 onClick={() => handleGoogle()}
