@@ -19,6 +19,7 @@ import {
   getPlaybackTelemetry,
 } from "@/lib/background-song.functions";
 import { isQuietHours } from "@/lib/quiet-hours";
+import { setIntensity as setEngineIntensity, setSensitivity as setEngineSensitivity } from "@/lib/audio-reactive";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
