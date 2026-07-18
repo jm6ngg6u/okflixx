@@ -54,9 +54,7 @@ const HOME_MESSAGES: Row[] = [
   { key: "hero_headline_1", label: "Hero headline — line 1" },
   { key: "hero_headline_2", label: "Hero headline — line 2 (accent)" },
   { key: "hero_sub", label: "Hero sub-copy", multiline: true },
-  { key: "code_card_title", label: "Code card title" },
-  { key: "code_card_help", label: "Code card helper" },
-  { key: "activate_cta", label: "Activate button" },
+  // Code card title, helper, CTA + progress/error messages are system-owned. Not editable here.
   { key: "section_features_kicker", label: "Features — kicker" },
   { key: "section_features_title_1", label: "Features — title A" },
   { key: "section_features_title_2", label: "Features — title B (accent)" },
@@ -70,7 +68,7 @@ const HOME_MESSAGES: Row[] = [
   { key: "section_cta_title_2", label: "Bottom CTA — line B (accent)" },
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
-  { key: "error_generic", label: "Generic activation error", multiline: true },
+  
 ];
 
 const LOGIN_MESSAGES: Row[] = [

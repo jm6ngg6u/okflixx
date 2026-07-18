@@ -647,6 +647,13 @@ html, body {
   animation: activationSweep 1.6s ease-in-out infinite;
 }
 
+/* Per-stage fill for the code-card progress tiles (system-owned) */
+@keyframes stage-fill {
+  0%   { width: 0%; }
+  100% { width: 100%; }
+}
+
+
 /* Maintenance screen — logo flash halo + shine sweep + wordmark auto glow.
    Modulated by --maint-intensity (0..1) set on a parent by MaintenanceView. */
 @keyframes maintenanceFlash {
