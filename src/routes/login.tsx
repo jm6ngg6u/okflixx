@@ -25,16 +25,46 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+type DiagLine = { ts: number; label: string; status: "ok" | "warn" | "fail" | "info"; detail?: string };
+
 function LoginPage() {
   const navigate = useNavigate();
   const brand = useBrand();
   const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [diagOpen, setDiagOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).has("diag");
+  });
+  const [diag, setDiag] = useState<DiagLine[]>([]);
+  const diagRef = useRef<DiagLine[]>([]);
+
+  function logDiag(label: string, status: DiagLine["status"], detail?: string) {
+    const line: DiagLine = { ts: Date.now(), label, status, detail };
+    diagRef.current = [...diagRef.current, line].slice(-40);
+    setDiag(diagRef.current);
+  }
 
   useEffect(() => {
     if (search.redirect) stashRedirect(search.redirect);
   }, [search.redirect]);
+
+  // Initial diagnostics snapshot — origin, browser hints, session probe.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    logDiag("Loaded /login", "info", window.location.origin);
+    // Session callback check: if we already have a session, this is a callback.
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        logDiag("Session probe", "fail", error.message);
+      } else if (data.session) {
+        logDiag("Session callback detected", "ok", data.session.user.email ?? "signed in");
+      } else {
+        logDiag("Session probe", "ok", "no active session");
+      }
+    });
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
