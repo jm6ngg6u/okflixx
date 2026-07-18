@@ -819,9 +819,9 @@ function HomePage() {
       <section id="reviews" className="relative py-28 px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16 reveal">
-            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">{b.reviews_kicker}</div>
+            <div className="font-mono text-xs uppercase tracking-[0.3em] text-[#ff2a3a] mb-4">// Reviews</div>
             <h2 className="font-display text-4xl md:text-6xl">
-              {b.reviews_rating} ·{" "}
+              4.9 / 5 ·{" "}
               <span className="text-live tabular-nums inline-flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
@@ -829,7 +829,7 @@ function HomePage() {
                 </span>
                 {(successCount.data?.count ?? 0).toLocaleString()}
               </span>{" "}
-              {b.reviews_activations_label}
+              successful activations
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
