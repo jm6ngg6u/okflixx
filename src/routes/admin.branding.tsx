@@ -255,8 +255,16 @@ function BrandingStudio() {
           >
             <HomeHeroPreview b={values as unknown as BrandingMap} />
           </PreviewFrame>
-          <Section title="Home page copy" desc="Every headline, kicker, CTA and receipt shown on the landing page.">
-            <FieldGrid rows={HOME_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          <SurfaceActionBar
+            label="Home page"
+            rows={HOME_MESSAGES}
+            dirty={dirty}
+            values={values}
+            commit={commit}
+            resetOne={resetOne.mutate}
+          />
+          <Section title="Home page copy" desc="Edit freely — nothing goes live until you press Save.">
+            <FieldGrid rows={HOME_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} autosave={false} />
           </Section>
         </TabsContent>
 
@@ -268,10 +276,19 @@ function BrandingStudio() {
           >
             <LoginPreview b={values as unknown as BrandingMap} />
           </PreviewFrame>
-          <Section title="Login page copy" desc="Every string shown on /login — hero side and card side.">
-            <FieldGrid rows={LOGIN_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          <SurfaceActionBar
+            label="Login page"
+            rows={LOGIN_MESSAGES}
+            dirty={dirty}
+            values={values}
+            commit={commit}
+            resetOne={resetOne.mutate}
+          />
+          <Section title="Login page copy" desc="Edit freely — nothing goes live until you press Save.">
+            <FieldGrid rows={LOGIN_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} autosave={false} />
           </Section>
         </TabsContent>
+
 
         <TabsContent value="identity" className="mt-4">
           <Section title="Site identity" desc="Wordmark parts, browser tab title, SEO description and footer. Tab title updates in every open browser tab.">
