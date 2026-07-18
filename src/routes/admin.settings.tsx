@@ -250,13 +250,16 @@ function SettingsPage() {
       >
         <div className="space-y-3">
           <div className="flex items-center gap-4">
-            <Switch checked={maintOn} onCheckedChange={async (v) => {
+            <Switch checked={maintOn} disabled={!!busy["maintenance_enabled"]} onCheckedChange={async (v) => {
+              setBusy((b) => ({ ...b, maintenance_enabled: true }));
               try {
                 await doMaint({ data: { enabled: v, message: local.maintenance_message ?? "" } });
-                set("maintenance_enabled", v ? "1" : "0");
+                setLocal((s) => ({ ...s, maintenance_enabled: v ? "1" : "0" }));
+                dirtyRef.current.delete("maintenance_enabled");
                 toast.success(`Maintenance ${v ? "enabled" : "disabled"}`);
                 qc.invalidateQueries({ queryKey: ["admin-settings"] });
               } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+              finally { setBusy((b) => { const n = { ...b }; delete n.maintenance_enabled; return n; }); }
             }} />
             <span className="text-sm text-white/60">{maintOn ? "Public site is in maintenance" : "Public site is live"}</span>
           </div>
