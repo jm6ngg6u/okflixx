@@ -138,7 +138,7 @@ export function MaintenanceView({
         {/* Status pill */}
         <div
           className="inline-flex items-center gap-2 rounded-full border border-[color:var(--brand-accent)]/40 bg-[color:var(--brand-accent)]/10 px-3 py-1.5 font-mono uppercase tracking-[0.25em] text-[color:var(--brand-accent)]"
-          style={{ fontSize: fx(10.5) }}
+          style={{ fontSize: fx(10.5, "status") }}
         >
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[color:var(--brand-accent)] opacity-75" />
