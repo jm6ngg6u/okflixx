@@ -879,6 +879,7 @@ export type Database = {
         Args: { _minutes: number; _user_id: string }
         Returns: number
       }
+      get_bg_song_analytics: { Args: never; Returns: Json }
       get_proxy_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
