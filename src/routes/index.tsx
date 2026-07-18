@@ -515,32 +515,55 @@ function HomePage() {
             {b.hero_sub}
           </p>
 
-          {/* CODE PANEL — CENTER */}
+          {/* CODE PANEL — CENTER (system-owned copy, not editable via Branding Studio) */}
           <div id="code-panel" className="reveal mt-10 w-full max-w-xl">
-            <div className="glass glow-ring-anim p-8 md:p-10">
-              <div className="flex items-center justify-between mb-6">
-                <div className="font-mono text-[10px] uppercase tracking-widest text-white/50">Step 01 / Activate</div>
-                <div className="flex gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#ff2a3a] animate-pulse" />
-                  <span className="w-2 h-2 rounded-full bg-white/20" />
-                  <span className="w-2 h-2 rounded-full bg-white/20" />
+            <div className="relative glass glow-ring-anim p-8 md:p-10 overflow-hidden">
+              {/* Ambient scanline sheen */}
+              <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background:repeating-linear-gradient(180deg,transparent_0_2px,#fff_2px_3px)]" />
+              <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[#ff2a3a]/20 blur-3xl" />
+
+              {/* Stage rail — SYSTEM stages, not brand text */}
+              <div className="relative flex items-center justify-between mb-6">
+                <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/60">
+                  <span className="text-[#ff8a90]">STEP 01</span>
+                  <span className="text-white/25 mx-2">/</span>
+                  <span>ACTIVATE</span>
+                </div>
+                <div className="flex items-center gap-1.5" aria-label="Activation stages">
+                  {["ENTER", "VERIFY", "LINK"].map((s, i) => {
+                    const active = submitting ? i <= Math.min(2, Math.floor(Date.now() / 1200) % 3) : i === 0;
+                    return (
+                      <span
+                        key={s}
+                        title={s}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${active ? "w-6 bg-[#ff2a3a] shadow-[0_0_10px_rgba(255,42,58,0.6)]" : "w-2 bg-white/15"}`}
+                      />
+                    );
+                  })}
                 </div>
               </div>
-              <h3 className="font-display brand-card-title mb-1">{b.code_card_title}</h3>
-              <p className="text-white/50 text-sm mb-6">{b.code_card_help}</p>
 
-              <CodeInput ref={codeRef} />
+              <div className="relative">
+                <h3 className="font-display brand-card-title mb-1 tracking-tight">
+                  Enter your <span className="text-shine">TV code</span>
+                </h3>
+                <p className="text-white/50 text-sm mb-6">
+                  Grab the 8-character code shown on your Netflix TV screen. Case doesn't matter.
+                </p>
 
-              {/* Honeypot — hidden from humans, bots fill it and get rejected */}
-              <input
-                ref={honeypotRef}
-                type="text"
-                name="website"
-                tabIndex={-1}
-                autoComplete="off"
-                aria-hidden="true"
-                style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
-              />
+                <CodeInput ref={codeRef} />
+
+                {/* Honeypot — hidden from humans, bots fill it and get rejected */}
+                <input
+                  ref={honeypotRef}
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+                />
+              </div>
 
               {/* ---- ACCESS GATES ---- only visible for gates admin enabled */}
               {anyGate && (
