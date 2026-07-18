@@ -19,7 +19,7 @@ export const BRANDING_DEFAULTS = {
     "Enter your 8-digit code and stream Netflix instantly on any Smart TV, Apple TV, Roku, PS5 or Xbox. Encrypted, always-on, 2026-ready.",
   footer_legal: "© 2026 · Encrypted · Everywhere",
   // Messages
-  hero_kicker: "Live · 82,431 TVs activated",
+  hero_kicker: "Secure TV activation",
   hero_headline_1: "Stream Netflix",
   hero_headline_2: "on any TV instantly.",
   hero_sub:
@@ -41,18 +41,6 @@ export const BRANDING_DEFAULTS = {
   success_title: "You're in.",
   success_kicker: "// Activation complete",
   error_generic: "We couldn't activate your TV right now. Please try again in a moment.",
-  // Reviews / social proof — fully editable from the Branding Studio.
-  // These are static, admin-authored numbers — NOT a live counter.
-  reviews_kicker: "// Reviews",
-  reviews_rating: "4.9 / 5",
-  reviews_count: "82,431",
-  reviews_activations_label: "successful activations",
-  reviews_q1: "Activated in under 20 seconds. Genuinely smooth.",
-  reviews_n1: "M. Ortega",
-  reviews_q2: "The code flow just works. No hoops, no spam.",
-  reviews_n2: "J. Chen",
-  reviews_q3: "Fastest TV setup I've ever done. Support was instant.",
-  reviews_n3: "S. Nakamura",
   // Login page (Google-only)
   login_kicker: "Wield the trident",
   login_title: "Create Account",
