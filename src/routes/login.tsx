@@ -173,18 +173,20 @@ function LoginPage() {
               <img
                 src={heroLogo}
                 alt=""
-                className="h-40 w-40 select-none object-contain drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:h-56 sm:w-56 lg:h-72 lg:w-72"
+                className="login-hero-logo h-40 w-40 select-none object-contain drop-shadow-[0_0_60px_rgba(255,42,58,0.55)] motion-safe:animate-[float_6s_ease-in-out_infinite] sm:h-56 sm:w-56 lg:h-72 lg:w-72"
                 draggable={false}
               />
               {/* Shine flash is masked by the logo alpha, so no square box can appear. */}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 motion-safe:animate-[logo-shine_5.5s_ease-in-out_infinite]"
+                className="logo-shine-sweep pointer-events-none absolute inset-0"
                 style={{
                   background:
-                    "linear-gradient(115deg, transparent 34%, rgba(255,255,255,0.72) 48%, rgba(255,170,110,0.9) 50%, rgba(255,255,255,0.68) 52%, transparent 66%)",
+                    "linear-gradient(115deg, transparent 0%, transparent 38%, rgba(255,255,255,0.95) 47%, rgba(255,42,58,0.95) 50%, rgba(255,255,255,0.9) 53%, transparent 62%, transparent 100%)",
+                  backgroundSize: "260% 100%",
+                  backgroundPosition: "180% 0",
                   mixBlendMode: "screen",
-                  transform: "translateX(-120%)",
+                  filter: "drop-shadow(0 0 18px rgba(255,42,58,0.95))",
                   WebkitMaskImage: `url(${heroLogo})`,
                   maskImage: `url(${heroLogo})`,
                   WebkitMaskRepeat: "no-repeat",
@@ -387,9 +389,28 @@ function LoginPage() {
           100% { background-position: -200% 0; }
         }
         @keyframes logo-shine {
-          0%, 60%   { transform: translateX(-120%); }
-          75%       { transform: translateX(120%); }
-          100%      { transform: translateX(120%); }
+          0%, 56%   { opacity: 0; background-position: 185% 0; }
+          61%       { opacity: 1; }
+          72%       { opacity: 1; background-position: -95% 0; }
+          78%, 100% { opacity: 0; background-position: -95% 0; }
+        }
+        @keyframes logo-flash {
+          0%, 56%, 80%, 100% {
+            filter: brightness(1) contrast(1) drop-shadow(0 0 60px rgba(255,42,58,0.55));
+          }
+          64% {
+            filter: brightness(1.45) contrast(1.12) drop-shadow(0 0 90px rgba(255,42,58,0.95));
+          }
+          70% {
+            filter: brightness(1.18) contrast(1.05) drop-shadow(0 0 76px rgba(255,255,255,0.42));
+          }
+        }
+        .logo-shine-sweep {
+          opacity: 0;
+          animation: logo-shine 3.8s ease-in-out infinite;
+        }
+        .login-hero-logo {
+          animation: float 6s ease-in-out infinite, logo-flash 3.8s ease-in-out infinite;
         }
         .beam-shimmer {
           animation: beam-drift 9s ease-in-out infinite alternate;
@@ -402,6 +423,7 @@ function LoginPage() {
         }
         @media (prefers-reduced-motion: reduce) {
           .beam-shimmer { animation: none !important; }
+          .logo-shine-sweep, .login-hero-logo { animation: none !important; }
         }
       `}</style>
     </div>
