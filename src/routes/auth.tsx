@@ -267,31 +267,101 @@ function AuthPage() {
     }
   }
 
+  const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
+  const namePrefix = brand?.name_prefix ?? "EMBER";
+  const nameSuffix = brand?.name_suffix ?? "LORD";
+  const heroLogo = brand?.logo_url || logo;
+
+  const stepTitle =
+    step === "credentials"
+      ? "Admin sign in"
+      : step === "totp"
+        ? "Two-factor verification"
+        : "Recover access";
+  const stepSubtitle =
+    step === "credentials"
+      ? "Restricted area. Sign in with your admin email and password."
+      : step === "totp"
+        ? "Enter the 6-digit code from your authenticator app."
+        : "Enter a one-time recovery code to reset your authenticator.";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b0b0d] px-4">
-      <Card className="w-full max-w-md border-white/10 bg-[#111114]">
-        <CardHeader className="text-center space-y-3">
-          <div className="mx-auto h-14 w-14 rounded-full bg-red-500/10 flex items-center justify-center">
-            <Shield className="h-7 w-7 text-red-400" />
-          </div>
-          <CardTitle className="text-white text-2xl">
-            {step === "credentials" ? "Admin sign in" : step === "totp" ? "Two-factor verification" : "Recover access"}
-          </CardTitle>
-          <p className="text-sm text-white/60">
-            {step === "credentials"
-              ? "Sign in with your admin email and password."
-              : step === "totp"
-                ? "Enter the 6-digit code from your authenticator app."
-                : "Enter a one-time recovery code to reset your authenticator."}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {errorMessage && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100 flex gap-2">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-300" />
-              <span>{errorMessage}</span>
+    <div
+      className="relative min-h-dvh overflow-hidden bg-[#050505] text-white"
+      style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+    >
+      {/* Background beams — same visual language as /login */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-[#ff2a3a] opacity-[0.12] blur-[150px]" />
+        <div className="absolute top-1/3 -right-52 h-[520px] w-[520px] rounded-full bg-[#7a0010] opacity-[0.24] blur-[170px]" />
+        <div className="absolute bottom-[-8rem] left-1/4 h-[400px] w-[400px] rounded-full bg-[#ff2a3a] opacity-[0.09] blur-[150px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#050505_92%)]" />
+      </div>
+
+      {/* Top bar — logo + wordmark, same as /login */}
+      <header className="relative z-10 mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-5 sm:px-6 sm:py-6">
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+          aria-label={`${brandName} home`}
+        >
+          <img src={heroLogo} alt="" className="header-logo-glow h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
+          <span
+            className="truncate text-base font-extrabold tracking-[0.14em] sm:text-lg"
+            style={{
+              fontFamily: "var(--brand-font-display, Sora), sans-serif",
+              textShadow: "0 0 18px rgba(255,42,58,0.55)",
+            }}
+          >
+            <span className="text-white">{namePrefix}</span>
+            <span className="bg-gradient-to-r from-[#ff2a3a] via-[#ff6b3d] to-[#ff2a3a] bg-clip-text text-transparent [background-size:200%_100%] motion-safe:animate-[shine_var(--brand-shine-duration,4.8s)_linear_infinite]">
+              {nameSuffix}
+            </span>
+          </span>
+        </Link>
+        <Link
+          to="/"
+          className="shrink-0 rounded-md px-1 text-[10px] uppercase tracking-[0.22em] text-white/50 transition hover:text-white sm:text-xs"
+          style={{ fontFamily: "var(--brand-font-body, Inter), sans-serif" }}
+        >
+          ← Back to site
+        </Link>
+      </header>
+
+      <main className="relative z-10 mx-auto flex max-w-md items-center justify-center px-4 pb-16 pt-4 sm:px-6 sm:pt-8">
+        <div className="relative w-full">
+          {/* Glow halo */}
+          <div
+            className="absolute -inset-px rounded-2xl bg-gradient-to-b from-[#ff2a3a]/40 via-white/5 to-transparent opacity-70 blur-[1px]"
+            aria-hidden="true"
+          />
+          <div className="relative rounded-2xl border border-white/10 bg-[#0b0b0d]/90 p-6 shadow-[0_40px_120px_-30px_rgba(255,42,58,0.35)] backdrop-blur-xl sm:p-8">
+            <div className="text-center space-y-3">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#ff2a3a]/10 ring-1 ring-[#ff2a3a]/30 shadow-[0_0_24px_-4px_rgba(255,42,58,0.55)]">
+                <Shield className="h-7 w-7 text-[#ff5a68]" aria-hidden="true" />
+              </div>
+              <div
+                className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ff5a68]"
+                style={{ fontFamily: "var(--brand-font-display, Sora), sans-serif" }}
+              >
+                Restricted · Admin only
+              </div>
+              <h1
+                className="text-2xl font-bold tracking-tight text-white sm:text-[1.75rem]"
+                style={{ fontFamily: "var(--brand-font-display, Sora), sans-serif" }}
+              >
+                {stepTitle}
+              </h1>
+              <p className="text-sm text-white/60">{stepSubtitle}</p>
             </div>
-          )}
+
+            <div className="mt-6 space-y-4">
+              {errorMessage && (
+                <div className="flex gap-2 rounded-lg border border-[#ff2a3a]/40 bg-[#ff2a3a]/[0.08] p-3 text-sm text-red-100" role="alert">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-[#ff5a68]" />
+                  <span className="leading-snug">{errorMessage}</span>
+                </div>
+              )}
           {status && (
             <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/60 flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-red-300" />
