@@ -223,6 +223,16 @@ export function resumeAudio() {
 /** Called every frame by the animation loop. Cheap when disabled. */
 export function getLevels(): Levels {
   if (!enabled || !analyser || !data) return ZERO;
+  // If the attached element is paused/muted, don't read the analyser at all —
+  // avoids spurious silence-detected events and saves the FFT cost.
+  if (attachedEl && (attachedEl.paused || attachedEl.muted || attachedEl.volume <= 0)) {
+    // Decay beat envelope so it doesn't stick at a peak.
+    beatEnv *= 0.88;
+    last = { ...ZERO, beat: Math.min(1, beatEnv) };
+    silenceStart = 0;
+    if (silent) setSilent(false);
+    return last;
+  }
   analyser.getByteFrequencyData(data);
   const bins = data.length;
   const bEnd = Math.max(1, Math.floor(bins * 0.08));
