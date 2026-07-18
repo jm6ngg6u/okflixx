@@ -303,6 +303,11 @@ export function BackgroundSong() {
         });
         setReactiveEnabled(false);
         attemptRecovery("silence");
+      } else if (!v && fired.current.silence) {
+        // Analyser recovered — allow a fresh warning on any future silence
+        // and let the play effect re-enable reactive automatically.
+        fired.current.silence = false;
+        sendEvent("silence_recovered");
       }
     });
     return off;
