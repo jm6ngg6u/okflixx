@@ -95,6 +95,83 @@ function cleanupSummaryLine(s: any) {
   return parts.length ? parts.join(" · ") + " pruned" : "Nothing to prune";
 }
 
+// ---- Minimal cron parser: supports *, */N, N, a,b,c, a-b in 5-field expressions.
+function parseField(field: string, min: number, max: number): Set<number> {
+  const out = new Set<number>();
+  for (const part of field.split(",")) {
+    const p = part.trim();
+    if (!p) continue;
+    const stepIdx = p.indexOf("/");
+    const step = stepIdx >= 0 ? Math.max(1, parseInt(p.slice(stepIdx + 1), 10) || 1) : 1;
+    const range = stepIdx >= 0 ? p.slice(0, stepIdx) : p;
+    let lo = min, hi = max;
+    if (range === "*" || range === "") { /* full range */ }
+    else if (range.includes("-")) {
+      const [a, b] = range.split("-").map((n) => parseInt(n, 10));
+      if (!Number.isNaN(a) && !Number.isNaN(b)) { lo = a; hi = b; }
+    } else {
+      const n = parseInt(range, 10);
+      if (!Number.isNaN(n)) { lo = n; hi = n; }
+    }
+    for (let v = lo; v <= hi; v += step) if (v >= min && v <= max) out.add(v);
+  }
+  return out;
+}
+function nextCronRun(expr: string, from: Date = new Date()): Date | null {
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+  const mM = parseField(parts[0], 0, 59);
+  const hM = parseField(parts[1], 0, 23);
+  const dM = parseField(parts[2], 1, 31);
+  const moM = parseField(parts[3], 1, 12);
+  const dwM = parseField(parts[4], 0, 6);
+  const d = new Date(from.getTime());
+  d.setSeconds(0, 0);
+  d.setMinutes(d.getMinutes() + 1);
+  const maxIter = 366 * 24 * 60;
+  for (let i = 0; i < maxIter; i++) {
+    if (
+      moM.has(d.getMonth() + 1) &&
+      dM.has(d.getDate()) &&
+      dwM.has(d.getDay()) &&
+      hM.has(d.getHours()) &&
+      mM.has(d.getMinutes())
+    ) return d;
+    d.setMinutes(d.getMinutes() + 1);
+  }
+  return null;
+}
+function fmtCountdown(target: Date | null, now: number): string {
+  if (!target) return "—";
+  let s = Math.max(0, Math.floor((target.getTime() - now) / 1000));
+  if (s <= 0) return "due now";
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); s -= m * 60;
+  if (d > 0) return `in ${d}d ${h}h ${m}m`;
+  if (h > 0) return `in ${h}h ${m}m ${s}s`;
+  if (m > 0) return `in ${m}m ${s}s`;
+  return `in ${s}s`;
+}
+function humanCron(expr: string): string {
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return expr;
+  const [mn, hr, dm, mo, dw] = parts;
+  if (mn.startsWith("*/") && hr === "*" && dm === "*" && mo === "*" && dw === "*") return `Every ${mn.slice(2)}m`;
+  if (hr.startsWith("*/") && mn === "0" && dm === "*" && mo === "*" && dw === "*") return `Every ${hr.slice(2)}h`;
+  if (dm === "*" && mo === "*" && dw === "*" && /^\d+$/.test(mn) && /^\d+$/.test(hr)) {
+    const H = hr.padStart(2, "0"), M = mn.padStart(2, "0");
+    return `Daily @ ${H}:${M} UTC`;
+  }
+  return expr;
+}
+
+const JOBNAME_TO_JOB: Record<string, string> = {
+  "emberlord-cookies-autocheck": "cookies-autocheck",
+  "emberlord-proxies-autocheck": "proxies-autocheck",
+  "emberlord-auto-cleanup": "auto-cleanup",
+};
+
 export function LiveJobsPanel() {
   const fetchRuns = useServerFn(listRecentJobRuns);
   const fetchSettings = useServerFn(listSettings);
