@@ -253,10 +253,17 @@ export function LiveJobsPanel() {
         desc = `Completed in ${dur}`;
       }
       const label = meta.label.charAt(0).toUpperCase() + meta.label.slice(1);
-      if (r.ok === false) {
-        toast.error(`${label} failed`, { description: r.error ?? desc, duration: 8000 });
+      const s = r.summary ?? {};
+      if (r.ok === false && String(r.error ?? "").toLowerCase().includes("cancel")) {
+        toast.warning(`${label} cancelled`, { description: "Changes were rolled back." });
+      } else if (r.ok === false) {
+        toast.error(`${label} failed`, { description: r.error ?? desc });
+      } else if (s.stopped) {
+        toast.info(`${label} stopped`, { description: `Partial progress saved · ${desc}` });
+      } else if (s.skipped) {
+        toast.info(`${label} skipped`, { description: String(s.skipped) });
       } else {
-        toast.success(`${label} complete`, { description: desc, duration: 6000 });
+        toast.success(`${label} complete`, { description: desc });
       }
 
     }
