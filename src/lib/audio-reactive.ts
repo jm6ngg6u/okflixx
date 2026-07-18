@@ -266,27 +266,15 @@ export function getLevels(): Levels {
 
   last = { bass, mid, treble, level, beat: Math.min(1, beatEnv) };
 
-  // Silence detection — only meaningful while audio is *actually* playing.
-  // Guards: not paused, not muted, volume > 0, and playhead advancing.
-  // Threshold is a weighted-band RMS; hysteresis requires ~6 valid frames
-  // (~100ms at 60fps) before clearing STATIC to avoid flapping on transients.
+  // Silence detection — delegated to pure evaluator for testability.
   const playing = !!attachedEl && !attachedEl.paused && !attachedEl.muted && attachedEl.volume > 0;
-  const now = performance.now();
-  const SILENCE_FLOOR = 0.0015;   // below → treat as silence (dither-tolerant)
-  const RECOVERY_FLOOR = 0.008;   // above → count toward recovery
-  const RECOVERY_FRAMES = 6;      // ~100ms sustained signal to flip back to REACTIVE
-
-  if (playing && level < SILENCE_FLOOR && bass < SILENCE_FLOOR) {
-    recoveryFrames = 0;
-    if (!silenceStart) silenceStart = now;
-    else if (now - silenceStart > 3000) setSilent(true);
-  } else if (level > RECOVERY_FLOOR || bass > RECOVERY_FLOOR) {
-    recoveryFrames++;
-    if (recoveryFrames >= RECOVERY_FRAMES) {
-      silenceStart = 0;
-      if (silent) setSilent(false);
-    }
-  }
+  const next = stepSilenceState(
+    { silenceStart, recoveryFrames, silent },
+    { level, bass, playing, now: performance.now() },
+  );
+  silenceStart = next.silenceStart;
+  recoveryFrames = next.recoveryFrames;
+  if (next.silent !== silent) setSilent(next.silent);
 
   return last;
 }
