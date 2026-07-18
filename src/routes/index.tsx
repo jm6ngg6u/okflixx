@@ -556,14 +556,17 @@ function HomePage() {
               <div className="relative text-left">
                 <div className="mb-5 flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                   <div className="min-w-0">
-                    <h3 className="font-display brand-card-title tracking-tight leading-tight">
-                      Enter your <span className="text-shine">TV code</span>
+                    <h3 className="font-display brand-card-title leading-tight">
+                      <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span>Enter your</span>
+                        <span className="text-shine">TV code</span>
+                      </span>
                     </h3>
                     <p className="mt-2 text-white/58 text-sm leading-relaxed">
                       Type the 8-character code from your TV screen. It updates instantly as you enter each character.
                     </p>
                   </div>
-                  <div className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                  <div className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/55">
                     <span className="h-1.5 w-1.5 rounded-full bg-brand-accent animate-pulse" />
                     8 characters
                   </div>
