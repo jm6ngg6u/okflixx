@@ -281,6 +281,36 @@ export function LiveJobsPanel() {
   const active = rows.filter((r) => !r.finished_at);
   const history = rows.filter((r) => r.finished_at).slice(0, 6);
 
+  // Live 1s tick for countdowns.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const scheduleRows = schedulesQ.data?.rows ?? [];
+  const scheduleItems = useMemo(() => {
+    const items = scheduleRows
+      .map((s) => {
+        const job = JOBNAME_TO_JOB[s.jobname];
+        if (!job) return null;
+        const meta = JOB_META[job] ?? { label: job, icon: Activity };
+        const next = s.active ? nextCronRun(s.schedule, new Date(now)) : null;
+        return { job, jobname: s.jobname, schedule: s.schedule, active: s.active, next, label: meta.label, Icon: meta.icon };
+      })
+      .filter(Boolean) as Array<{
+        job: string; jobname: string; schedule: string; active: boolean;
+        next: Date | null; label: string; Icon: any;
+      }>;
+    items.sort((a, b) => {
+      if (!a.next && !b.next) return 0;
+      if (!a.next) return 1;
+      if (!b.next) return -1;
+      return a.next.getTime() - b.next.getTime();
+    });
+    return items;
+  }, [scheduleRows, now]);
+
   return (
     <div className="glass p-5">
       <div className="flex items-start justify-between gap-4 mb-4">
@@ -296,6 +326,77 @@ export function LiveJobsPanel() {
           : "bg-white/10 text-white/60 border-white/15"}>
           {active.length ? `${active.length} running` : "Idle"}
         </Badge>
+      </div>
+
+      {/* Next scheduled runs — pulled live from pg_cron */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <CalendarClock className="w-3.5 h-3.5 text-white/50" />
+          <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
+            Next scheduled runs
+          </div>
+        </div>
+        {schedulesQ.isLoading && scheduleItems.length === 0 ? (
+          <div className="text-xs text-white/40 py-2 font-mono">Loading schedules…</div>
+        ) : scheduleItems.length === 0 ? (
+          <div className="text-xs text-white/40 py-2 font-mono">No scheduled jobs registered.</div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-2">
+            {scheduleItems.map((it) => {
+              const paused = !it.active;
+              const overdue = it.next && it.next.getTime() < now - 60_000;
+              return (
+                <div
+                  key={it.jobname}
+                  className={`rounded-md border p-3 flex items-start gap-3 ${
+                    paused
+                      ? "border-white/10 bg-white/[0.02] opacity-70"
+                      : overdue
+                        ? "border-amber-500/30 bg-amber-500/5"
+                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                  }`}
+                >
+                  <it.Icon className="w-3.5 h-3.5 text-white/60 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="text-sm font-medium truncate">{it.label}</div>
+                      {paused && (
+                        <Badge variant="outline" className="bg-white/5 border-white/15 text-white/60 text-[10px] uppercase">
+                          Paused
+                        </Badge>
+                      )}
+                      {overdue && !paused && (
+                        <Badge variant="outline" className="bg-amber-500/15 border-amber-500/40 text-amber-200 text-[10px] uppercase">
+                          Overdue
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/70 font-mono">
+                      <Timer className="w-3 h-3 text-emerald-300/80 shrink-0" />
+                      <span className={overdue ? "text-amber-200" : "text-emerald-300/90"}>
+                        {paused ? "—" : fmtCountdown(it.next, now)}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-white/50 font-mono truncate">
+                      {it.next
+                        ? it.next.toLocaleString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-white/40 font-mono truncate" title={it.schedule}>
+                      {humanCron(it.schedule)} · <span className="text-white/30">{it.schedule}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {active.length > 0 && (
@@ -314,6 +415,7 @@ export function LiveJobsPanel() {
     </div>
   );
 }
+
 
 function RunningRow({ row }: { row: JobRow }) {
   const meta = JOB_META[row.job] ?? { label: row.job, icon: Activity };
