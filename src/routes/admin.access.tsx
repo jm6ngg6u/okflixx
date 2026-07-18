@@ -315,7 +315,7 @@ function AccessAdminPage() {
               <ul className="space-y-1 list-disc list-inside">
                 <li><b className="text-white/80">Login gate</b> — quota is per user, not per IP.</li>
                 <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session.</li>
-                <li><b className="text-white/80">Access key</b> — atomic single-use / unlimited / 24h session. No bypass path.</li>
+                
               </ul>
             </div>
           </div>
