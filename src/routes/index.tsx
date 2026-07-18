@@ -118,18 +118,11 @@ function HomePage() {
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
-  const fetchSuccessCount = useServerFn(getSuccessActivationCount);
+  // Note: the "Live TV activations" number in the Reviews section is now fully
+  // admin-editable from the Branding Studio (reviews_count) and is NOT a live
+  // counter. The realtime broadcast + server-side counter are intentionally
+  // removed from the public UI to keep the display stable and admin-controlled.
 
-  // Live successful-activation counter — realtime broadcast + short-interval safety poll.
-  // Counts ONLY result='success'. No invalid / error / rate-limited rows.
-  const successCount = useQuery({
-    queryKey: ["public-activation-success-count"],
-    queryFn: () => fetchSuccessCount(),
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    staleTime: 0,
-  });
 
 
   // Realtime push on app_settings — banner flips within ~200ms.
