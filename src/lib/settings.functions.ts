@@ -70,41 +70,64 @@ export const toggleProxyMode = createServerFn({ method: "POST" })
     return { proxy_mode: next === "1" };
   });
 
+// Strip control chars, collapse runs of whitespace, and trim.
+const sanitizeMsg = (s: string) => s.replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim();
+
+const MaintenanceInput = z.object({
+  enabled: z.boolean().optional(),
+  message: z.string().max(500).optional(),
+  starts_at: z.string().max(64).nullable().optional(), // ISO-8601 or "" to clear
+  ends_at: z.string().max(64).nullable().optional(),
+}).refine((d) => {
+  if (d.message === undefined) return true;
+  const clean = sanitizeMsg(d.message);
+  return clean.length === 0 || clean.length >= 8;
+}, { message: "Message must be either empty (use default) or at least 8 characters.", path: ["message"] })
+  .refine((d) => {
+    if (!d.starts_at || !d.ends_at) return true;
+    const a = Date.parse(d.starts_at); const b = Date.parse(d.ends_at);
+    if (isNaN(a) || isNaN(b)) return true;
+    return b > a;
+  }, { message: "End time must be after start time.", path: ["ends_at"] });
+
 export const setMaintenance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z.object({ enabled: z.boolean(), message: z.string().max(2000).optional() }).parse(d),
-  )
+  .inputValidator((d: unknown) => MaintenanceInput.parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context as any;
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("app_settings")
-      .upsert({
-        key: "maintenance_enabled",
-        value: data.enabled ? "1" : "0",
-        updated_at: new Date().toISOString(),
-        updated_by: userId,
-      });
+    const nowIso = new Date().toISOString();
+    const rows: Array<{ key: string; value: string; updated_at: string; updated_by: string }> = [];
+    if (typeof data.enabled === "boolean") {
+      rows.push({ key: "maintenance_enabled", value: data.enabled ? "1" : "0", updated_at: nowIso, updated_by: userId });
+    }
     if (typeof data.message === "string") {
-      await supabaseAdmin
-        .from("app_settings")
-        .upsert({
-          key: "maintenance_message",
-          value: data.message,
-          updated_at: new Date().toISOString(),
-          updated_by: userId,
-        });
+      rows.push({ key: "maintenance_message", value: sanitizeMsg(data.message), updated_at: nowIso, updated_by: userId });
+    }
+    const normDate = (v: string | null | undefined): string | undefined => {
+      if (v === undefined) return undefined;
+      if (v === null || v === "") return "";
+      const t = Date.parse(v);
+      return isNaN(t) ? "" : new Date(t).toISOString();
+    };
+    const s = normDate(data.starts_at);
+    const e = normDate(data.ends_at);
+    if (s !== undefined) rows.push({ key: "maintenance_starts_at", value: s, updated_at: nowIso, updated_by: userId });
+    if (e !== undefined) rows.push({ key: "maintenance_ends_at", value: e, updated_at: nowIso, updated_by: userId });
+    if (rows.length) {
+      const { error } = await supabaseAdmin.from("app_settings").upsert(rows);
+      if (error) throw error;
     }
     await supabaseAdmin.from("admin_activity_log").insert({
       admin_id: userId,
       action: "settings.maintenance",
-      details: { enabled: data.enabled },
+      details: data,
     });
     return { ok: true };
   });
+
 
 /** Public getter for anon-safe subset (used by the landing page banner). */
 /** Public contact channels (Telegram / Instagram / WhatsApp). Anon-safe. Only
