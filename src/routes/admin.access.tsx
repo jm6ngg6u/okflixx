@@ -678,10 +678,8 @@ function AccessOpsPanels() {
               <label className="flex items-center gap-2 text-xs text-white/70">
                 <Switch checked={pvHasKey} onCheckedChange={setPvHasKey} /> Has access key
               </label>
-              <label className="flex items-center gap-2 text-xs text-white/70">
-                <Switch checked={pvHasCaptcha} onCheckedChange={setPvHasCaptcha} /> Captcha solved
-              </label>
             </div>
+
           </div>
           <Button onClick={() => preview.mutate()} disabled={preview.isPending}
             className="bg-[#ff2a3a] hover:bg-[#ff2a3a]/90">
