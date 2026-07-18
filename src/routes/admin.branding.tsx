@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Palette, Type, Sparkles, MessageSquareText, RotateCcw, CheckCircle2, Save, Trash2, Undo2, ImageIcon, BookmarkPlus, Wand2, Upload, LogIn } from "lucide-react";
+import { Palette, Type, Sparkles, MessageSquareText, RotateCcw, CheckCircle2, Save, Trash2, Undo2, ImageIcon, BookmarkPlus, Wand2, Upload, LogIn, Wrench } from "lucide-react";
+import { MaintenanceView } from "@/components/MaintenanceScreen";
 import { useRef } from "react";
 import {
   listBranding,
@@ -91,7 +92,15 @@ const LOGIN_MESSAGES: Row[] = [
   { key: "login_expected_origin", label: "Expected origin (env check)", placeholder: "https://your-site.lovable.app" },
 ];
 
-const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES];
+const MAINT_MESSAGES: Row[] = [
+  { key: "maint_status_pill", label: "Status pill" },
+  { key: "maint_headline", label: "Headline" },
+  { key: "maint_message", label: "Body message", multiline: true },
+  { key: "maint_countdown_label", label: "Countdown label" },
+  { key: "maint_contacts_label", label: "Contacts kicker" },
+];
+
+const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES, ...MAINT_MESSAGES];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
@@ -111,6 +120,11 @@ const KEY_LABELS: Partial<Record<BrandingKey, string>> = (() => {
   m.wordmark_pulse = "Wordmark pulse";
   m.logo_url = "Main logo";
   m.favicon_url = "Favicon";
+  m.maint_flash = "Logo flash halo";
+  m.maint_shine = "Logo shine loop";
+  m.maint_wordmark_glow = "Wordmark auto glow";
+  m.maint_intensity = "Animation intensity";
+  m.maint_font_scale = "Font size scale";
   return m;
 })();
 function labelFor(k: string) {
@@ -244,6 +258,7 @@ function BrandingStudio() {
           <TabsTrigger value="assets"><ImageIcon className="w-3.5 h-3.5 mr-2" />Assets</TabsTrigger>
           <TabsTrigger value="typography"><Type className="w-3.5 h-3.5 mr-2" />Typography</TabsTrigger>
           <TabsTrigger value="effects"><Sparkles className="w-3.5 h-3.5 mr-2" />Effects</TabsTrigger>
+          <TabsTrigger value="maintenance"><Wrench className="w-3.5 h-3.5 mr-2" />Maintenance</TabsTrigger>
           <TabsTrigger value="presets"><Wand2 className="w-3.5 h-3.5 mr-2" />Presets</TabsTrigger>
         </TabsList>
 
@@ -369,6 +384,85 @@ function BrandingStudio() {
                     onCheckedChange={(v) => commit("wordmark_pulse", v ? "1" : "0")} />
                   <span className="text-sm text-white/60">Animate the wordmark glow</span>
                 </div>
+              </div>
+            </div>
+          </Section>
+        </TabsContent>
+
+
+        <TabsContent value="maintenance" className="mt-4 space-y-4">
+          <PreviewFrame
+            title="Maintenance page — live preview"
+            subtitle="Halo, shine, wordmark glow, font scale and copy all live here."
+            icon={<Wrench className="w-3.5 h-3.5" />}
+          >
+            <div className="rounded-xl border border-white/10 bg-[#050505] overflow-hidden">
+              <MaintenanceView
+                b={values as unknown as BrandingMap}
+                message={values.maint_message}
+                remainingLabel="12m 34s"
+                channels={[
+                  { kind: "telegram", name: "Telegram", href: "#" },
+                  { kind: "instagram", name: "Instagram", href: "#" },
+                  { kind: "whatsapp", name: "WhatsApp", href: "#" },
+                ]}
+                user={null}
+                compact
+              />
+            </div>
+          </PreviewFrame>
+          <SurfaceActionBar
+            label="Maintenance page"
+            rows={MAINT_MESSAGES}
+            dirty={dirty}
+            values={values}
+            commit={commit}
+            resetOne={resetOne.mutate}
+          />
+          <Section title="Maintenance copy" desc="Every string shown on the full-screen takeover.">
+            <FieldGrid rows={MAINT_MESSAGES} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} autosave={false} />
+          </Section>
+          <Section title="Animation & size" desc="Toggle each effect independently, dial the intensity, and scale every message up or down for readability.">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <Label>Logo flash halo</Label>
+                <div className="flex items-center gap-3 mt-3">
+                  <Switch checked={values.maint_flash === "1"}
+                    onCheckedChange={(v) => commit("maint_flash", v ? "1" : "0")} />
+                  <span className="text-sm text-white/60">Pulsing accent halo behind the logo</span>
+                </div>
+              </div>
+              <div>
+                <Label>Logo shine loop</Label>
+                <div className="flex items-center gap-3 mt-3">
+                  <Switch checked={values.maint_shine === "1"}
+                    onCheckedChange={(v) => commit("maint_shine", v ? "1" : "0")} />
+                  <span className="text-sm text-white/60">Continuous drop-shadow shine on the logo</span>
+                </div>
+              </div>
+              <div>
+                <Label>Wordmark auto glow</Label>
+                <div className="flex items-center gap-3 mt-3">
+                  <Switch checked={values.maint_wordmark_glow === "1"}
+                    onCheckedChange={(v) => commit("maint_wordmark_glow", v ? "1" : "0")} />
+                  <span className="text-sm text-white/60">Breathing text-glow on the brand name</span>
+                </div>
+              </div>
+              <div>
+                <Label>Animation intensity — {values.maint_intensity}%</Label>
+                <Slider className="mt-3" min={0} max={100} step={1}
+                  value={[parseInt(values.maint_intensity, 10) || 0]}
+                  onValueChange={(v) => stage("maint_intensity", String(v[0]))}
+                  onValueCommit={(v) => commit("maint_intensity", String(v[0]))} />
+                <p className="text-[11px] text-white/40 mt-2">0 = subtle, 100 = maximum glow & speed.</p>
+              </div>
+              <div className="md:col-span-2">
+                <Label>Font size scale — {values.maint_font_scale}%</Label>
+                <Slider className="mt-3" min={60} max={140} step={2}
+                  value={[parseInt(values.maint_font_scale, 10) || 100]}
+                  onValueChange={(v) => stage("maint_font_scale", String(v[0]))}
+                  onValueCommit={(v) => commit("maint_font_scale", String(v[0]))} />
+                <p className="text-[11px] text-white/40 mt-2">Scales every heading, message and label on the maintenance page — 100% keeps defaults.</p>
               </div>
             </div>
           </Section>

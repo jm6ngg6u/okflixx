@@ -72,6 +72,17 @@ export const BRANDING_DEFAULTS = {
   shine_speed: "medium", // slow | medium | fast | off
   letter_spacing: "normal", // tight | normal | loose
   wordmark_pulse: "1", // "1" on / "0" off
+  // Maintenance page
+  maint_headline: "We'll be right back.",
+  maint_message: "The service is temporarily paused for maintenance. Your session is safe — you'll be returned to the app the moment we're live again.",
+  maint_countdown_label: "Estimated back in",
+  maint_contacts_label: "// Reach us during downtime",
+  maint_status_pill: "Maintenance in progress",
+  maint_flash: "1",         // "1" on / "0" off — halo pulse behind logo
+  maint_shine: "1",         // "1" on / "0" off — logo glow/shine loop
+  maint_wordmark_glow: "1", // "1" on / "0" off — wordmark auto glow
+  maint_intensity: "70",    // 0..100 — animation strength multiplier
+  maint_font_scale: "100",  // 60..140 — font size scale (%)
 };
 
 
@@ -112,7 +123,15 @@ function sanitize(key: BrandingKey, raw: string): string {
     const n = Math.max(0, Math.min(100, parseInt(v, 10)));
     return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.glow;
   }
-  if (key === "wordmark_pulse") return v === "0" ? "0" : "1";
+  if (key === "wordmark_pulse" || key === "maint_flash" || key === "maint_shine" || key === "maint_wordmark_glow") return v === "0" ? "0" : "1";
+  if (key === "maint_intensity") {
+    const n = Math.max(0, Math.min(100, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.maint_intensity;
+  }
+  if (key === "maint_font_scale") {
+    const n = Math.max(60, Math.min(140, parseInt(v, 10)));
+    return Number.isFinite(n) ? String(n) : BRANDING_DEFAULTS.maint_font_scale;
+  }
   if (key === "font_display" || key === "font_body" || key === "font_mono") {
     return (FONT_WHITELIST as readonly string[]).includes(v) ? v : BRANDING_DEFAULTS[key];
   }
