@@ -33,8 +33,19 @@ let last: Levels = { ...ZERO };
 // Silence detection state.
 let silenceStart = 0;
 let silent = false;
+let recoveryFrames = 0; // consecutive frames of valid signal before clearing STATIC (hysteresis).
 type BoolSub = (v: boolean) => void;
 const silentSubs = new Set<BoolSub>();
+
+/**
+ * Reset the silence window. Call when the tab becomes visible again so
+ * throttled rAF during a hidden tab can't trip a false 3s silence fallback
+ * the instant the user returns.
+ */
+export function resetSilenceWindow() {
+  silenceStart = 0;
+  recoveryFrames = 0;
+}
 
 // FPS meter.
 let fpsFrames = 0;
