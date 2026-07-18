@@ -25,7 +25,7 @@ import {
   getGateConfig, setGateSettings,
   createAccessKeys, listAccessKeys, disableAccessKey, deleteAccessKeys,
   listRedemptions, getAccessStats,
-  testCaptchaKeys,
+  
   listUserActivationOverrides, setUserActivationOverride, removeUserActivationOverride,
   getGateLastUpdated, listAccessAudit, previewActivationPolicy,
 } from "@/lib/access-keys.functions";
