@@ -869,6 +869,7 @@ function maskEmail(email: string | null): string {
 }
 
 function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose: () => void }) {
+  const b = useBrand();
   const [count, setCount] = useState(6);
   const [captured, setCaptured] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
