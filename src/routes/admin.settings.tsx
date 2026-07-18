@@ -222,13 +222,17 @@ function SettingsPage() {
           : "bg-white/10 text-white/60 border-white/15"}>{proxyOn ? "PROXIED" : "DIRECT"}</Badge>}
       >
         <div className="flex items-center gap-4">
-          <Switch checked={proxyOn} onCheckedChange={async () => {
+          <Switch checked={proxyOn} disabled={!!busy["proxy_mode"]} onCheckedChange={async () => {
+            setBusy((b) => ({ ...b, proxy_mode: true }));
             try {
               const r = await doToggle();
-              set("proxy_mode", r.proxy_mode ? "1" : "0");
+              const nv = r.proxy_mode ? "1" : "0";
+              setLocal((s) => ({ ...s, proxy_mode: nv }));
+              dirtyRef.current.delete("proxy_mode");
               toast.success(`Proxy mode ${r.proxy_mode ? "enabled" : "disabled"}`);
               qc.invalidateQueries({ queryKey: ["admin-settings"] });
             } catch (e: any) { toast.error(e?.message ?? "Toggle failed"); }
+            finally { setBusy((b) => { const n = { ...b }; delete n.proxy_mode; return n; }); }
           }} />
           <span className="text-sm text-white/60">{proxyOn ? "Traffic routed via proxy pool" : "Direct edge connections"}</span>
         </div>
