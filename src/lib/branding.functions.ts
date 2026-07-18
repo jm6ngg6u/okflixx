@@ -72,6 +72,17 @@ export const BRANDING_DEFAULTS = {
   shine_speed: "medium", // slow | medium | fast | off
   letter_spacing: "normal", // tight | normal | loose
   wordmark_pulse: "1", // "1" on / "0" off
+  // Maintenance page
+  maint_headline: "We'll be right back.",
+  maint_message: "The service is temporarily paused for maintenance. Your session is safe — you'll be returned to the app the moment we're live again.",
+  maint_countdown_label: "Estimated back in",
+  maint_contacts_label: "// Reach us during downtime",
+  maint_status_pill: "Maintenance in progress",
+  maint_flash: "1",         // "1" on / "0" off — halo pulse behind logo
+  maint_shine: "1",         // "1" on / "0" off — logo glow/shine loop
+  maint_wordmark_glow: "1", // "1" on / "0" off — wordmark auto glow
+  maint_intensity: "70",    // 0..100 — animation strength multiplier
+  maint_font_scale: "100",  // 60..140 — font size scale (%)
 };
 
 
