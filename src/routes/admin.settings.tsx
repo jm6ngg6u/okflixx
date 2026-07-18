@@ -511,7 +511,7 @@ function JobScheduleCard({
   defaultInterval: number;
   local: Record<string, string>;
   set: (k: string, v: string) => void;
-  onSave: (k: string) => void;
+  onSave: (k: string, valueOverride?: string) => void;
   onRun: () => void;
   running: boolean;
 }) {
