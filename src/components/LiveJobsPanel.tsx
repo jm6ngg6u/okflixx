@@ -269,20 +269,8 @@ export function LiveJobsPanel() {
     }
   }, [q.data, qc, settings.notify_cookies, settings.notify_proxies, settings.notify_cleanup, settings.notify_quiet_start, settings.notify_quiet_end]);
 
-  function isQuietHoursNow(start?: string, end?: string) {
-    if (!start || !end) return false;
-    const parse = (s: string) => {
-      const [h, m] = s.split(":").map((n) => parseInt(n, 10));
-      if (Number.isNaN(h)) return null;
-      return h * 60 + (Number.isNaN(m) ? 0 : m);
-    };
-    const s = parse(start), e = parse(end);
-    if (s == null || e == null || s === e) return false;
-    const now = new Date();
-    const cur = now.getHours() * 60 + now.getMinutes();
-    // wraps midnight when start > end
-    return s < e ? cur >= s && cur < e : cur >= s || cur < e;
-  }
+  // Quiet Hours — pure helper (see src/lib/quiet-hours.ts).
+
 
   const rows: JobRow[] = q.data?.rows ?? [];
   const active = rows.filter((r) => !r.finished_at);
