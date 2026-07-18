@@ -520,21 +520,41 @@ function HomePage() {
 
           {/* CODE PANEL — CENTER (system-owned copy, not editable via Branding Studio) */}
           <div id="code-panel" className="reveal mt-10 w-full max-w-xl">
-            <div className="relative glass glow-ring-anim p-8 md:p-10 overflow-hidden">
-              {/* Ambient scanline sheen */}
-              <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background:repeating-linear-gradient(180deg,transparent_0_2px,#fff_2px_3px)]" />
-              <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[#ff2a3a]/20 blur-3xl" />
+            <div className="relative glass glow-ring-anim p-8 md:p-10 overflow-hidden rounded-2xl">
+              {/* Refined background — layered radial + fine grid, no harsh scanlines */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-2xl"
+                style={{
+                  background:
+                    "radial-gradient(120% 80% at 0% 0%, rgba(255,42,58,0.10) 0%, transparent 55%), radial-gradient(90% 70% at 100% 100%, rgba(255,138,144,0.06) 0%, transparent 60%), linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.25) 100%)",
+                }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.04] [background-image:linear-gradient(rgba(255,255,255,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:28px_28px]"
+              />
+              <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 h-56 w-56 rounded-full bg-[#ff2a3a]/15 blur-3xl" />
+              <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 h-56 w-56 rounded-full bg-[#ff2a3a]/10 blur-3xl" />
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#ff2a3a]/50 to-transparent" />
 
-              {/* Stage rail — SYSTEM stages, not brand text */}
+              {/* Stage rail — SYSTEM stages, live-driven by input + pipeline state */}
               <div className="relative flex items-center justify-between mb-6">
                 <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/60">
                   <span className="text-[#ff8a90]">STEP 01</span>
                   <span className="text-white/25 mx-2">/</span>
-                  <span>ACTIVATE</span>
+                  <span>{codeLen === 0 ? "ACTIVATE" : codeLen < 8 ? `ENTERING · ${codeLen}/8` : submitting ? "LINKING" : "READY"}</span>
                 </div>
                 <div className="flex items-center gap-1.5" aria-label="Activation stages">
                   {["ENTER", "VERIFY", "LINK"].map((s, i) => {
-                    const active = submitting ? i <= Math.min(2, Math.floor(Date.now() / 1200) % 3) : i === 0;
+                    // Deterministic, instant progression:
+                    //  ENTER  active as soon as any digit typed
+                    //  VERIFY active once all 8 digits present OR submitting
+                    //  LINK   active while submitting
+                    const enterActive = codeLen > 0;
+                    const verifyActive = codeLen === 8 || submitting;
+                    const linkActive = submitting;
+                    const active = i === 0 ? enterActive : i === 1 ? verifyActive : linkActive;
                     return (
                       <span
                         key={s}
@@ -554,7 +574,8 @@ function HomePage() {
                   Grab the 8-character code shown on your Netflix TV screen. Case doesn't matter.
                 </p>
 
-                <CodeInput ref={codeRef} />
+                <CodeInput ref={codeRef} onChange={(filled) => setCodeLen(filled)} />
+
 
                 {/* Honeypot — hidden from humans, bots fill it and get rejected */}
                 <input
