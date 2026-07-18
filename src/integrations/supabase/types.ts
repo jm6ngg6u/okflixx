@@ -465,60 +465,6 @@ export type Database = {
         }
         Relationships: []
       }
-      captcha_verify_log: {
-        Row: {
-          challenge_ts: string | null
-          created_at: string
-          error_codes: string[]
-          hostname: string | null
-          http_status: number | null
-          id: string
-          ip_hash: string | null
-          latency_ms: number | null
-          provider: string
-          purpose: string
-          reason: string | null
-          success: boolean
-          token_length: number | null
-          token_prefix: string | null
-          user_agent: string | null
-        }
-        Insert: {
-          challenge_ts?: string | null
-          created_at?: string
-          error_codes?: string[]
-          hostname?: string | null
-          http_status?: number | null
-          id?: string
-          ip_hash?: string | null
-          latency_ms?: number | null
-          provider: string
-          purpose?: string
-          reason?: string | null
-          success: boolean
-          token_length?: number | null
-          token_prefix?: string | null
-          user_agent?: string | null
-        }
-        Update: {
-          challenge_ts?: string | null
-          created_at?: string
-          error_codes?: string[]
-          hostname?: string | null
-          http_status?: number | null
-          id?: string
-          ip_hash?: string | null
-          latency_ms?: number | null
-          provider?: string
-          purpose?: string
-          reason?: string | null
-          success?: boolean
-          token_length?: number | null
-          token_prefix?: string | null
-          user_agent?: string | null
-        }
-        Relationships: []
-      }
       cookie_pool: {
         Row: {
           cookies_json: Json
@@ -860,15 +806,10 @@ export type Database = {
         Args: { _ip_hash: string; _minutes: number }
         Returns: number
       }
-      count_recent_captcha_failures: {
-        Args: { _ip_hash: string; _minutes: number }
-        Returns: number
-      }
       count_user_recent_attempts: {
         Args: { _minutes: number; _user_id: string }
         Returns: number
       }
-      get_captcha_health: { Args: { _minutes?: number }; Returns: Json }
       get_proxy_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
@@ -928,7 +869,6 @@ export type Database = {
         }[]
       }
       purge_auth_audit_log: { Args: { _days?: number }; Returns: number }
-      purge_captcha_verify_log: { Args: { _days?: number }; Returns: number }
       purge_expired_access_sessions: { Args: never; Returns: number }
       record_otp_attempt: {
         Args: { _email: string; _ip_hash?: string; _kind?: string }
