@@ -37,8 +37,8 @@ export function MaintenanceScreen({ message, endsAt, onCleared }: Props) {
   const fetchContacts = useServerFn(getPublicContacts);
 
   const [user, setUser] = useState<{ email: string | null; avatar: string | null; name: string | null } | null>(null);
-  const [isStaff, setIsStaff] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
   const [now, setNow] = useState(() => Date.now());
 
   // Session identity + staff bypass check
