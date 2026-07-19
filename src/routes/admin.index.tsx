@@ -166,11 +166,13 @@ function DashboardPage() {
     }
   }, [initialAttempts.data]);
 
-  // Supabase Realtime — instant push on new attempts
+  // Supabase Realtime — instant push on new attempts, plus fast invalidation
+  // for admin-driven config (app_settings) and pool mutations (cookie_pool /
+  // proxy_pool) so config propagation and pool KPIs beat the 2s SLA.
   useEffect(() => {
     setRtStatus("connecting");
     const channel = supabase
-      .channel("dashboard-attempts")
+      .channel("dashboard-live")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activation_attempts" },
@@ -184,12 +186,28 @@ function DashboardPage() {
           setPulseKey((k) => k + 1);
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings" },
+        () => { qc.invalidateQueries({ queryKey: ["admin-settings"] }); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cookie_pool" },
+        () => { qc.invalidateQueries({ queryKey: ["pool-summary"] }); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "proxy_pool" },
+        () => { qc.invalidateQueries({ queryKey: ["pool-summary"] }); },
+      )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") setRtStatus("live");
         else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRtStatus("offline");
       });
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [qc]);
+
 
   const proxyOn = settingsQ.data?.settings?.proxy_mode === "1";
   const maintOn = settingsQ.data?.settings?.maintenance_enabled === "1";
