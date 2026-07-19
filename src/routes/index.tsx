@@ -973,21 +973,21 @@ function HomePage() {
 
 
       {/* HOW IT WORKS — STEP-BY-STEP GUIDE */}
-      <section id="how-it-works" className="relative py-24 sm:py-28 px-4 sm:px-6 md:px-12">
+      <section id="how-it-works" className="relative section-pad-y section-pad-x">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">
+          <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_howto_kicker}
             </div>
-            <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
-            <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
+            <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <p className="mt-4 sm:mt-5 text-white/60 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
-          <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+          <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {[1, 2, 3, 4, 5].map((n) => {
               const icon = b[`howto_step_${n}_icon` as keyof typeof b];
               const title = b[`howto_step_${n}_title` as keyof typeof b];
@@ -1001,17 +1001,18 @@ function HomePage() {
                     className="why-card reveal group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a]/60 rounded-2xl"
                   >
                     <div className="why-card-inner h-full flex flex-col">
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-3 mb-3 sm:mb-4">
                         <span
                           aria-hidden
-                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                          className="grid shrink-0 place-items-center rounded-full font-mono font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                          style={{ width: "clamp(2rem, 4.5vw, 2.4rem)", height: "clamp(2rem, 4.5vw, 2.4rem)", fontSize: "clamp(0.8rem, 1.4vw, 0.95rem)" }}
                         >
                           {n}
                         </span>
-                        <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
+                        <span aria-hidden className="leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 1.9rem)" }}>{icon}</span>
                       </div>
-                      <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
-                      <p className="text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
+                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-white" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
+                      <p className="text-[13px] sm:text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
                 </li>
