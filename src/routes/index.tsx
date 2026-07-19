@@ -893,7 +893,7 @@ function HomePage() {
               {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
             </h2>
             {b.section_features_sub ? (
-              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
+              <p className="mt-5 sm:mt-6 text-white/70 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_features_sub}
               </p>
             ) : null}
@@ -920,7 +920,7 @@ function HomePage() {
                   <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
                     {f.t}
                   </h3>
-                  <p className="text-white/60 text-[13px] sm:text-sm leading-relaxed flex-1">
+                  <p className="text-white/70 text-[13px] sm:text-sm leading-relaxed flex-1">
                     {f.d}
                   </p>
                   <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
@@ -984,7 +984,7 @@ function HomePage() {
               {b.section_howto_kicker}
             </div>
             <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
-            <p className="mt-4 sm:mt-5 text-white/60 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
+            <p className="mt-4 sm:mt-5 text-white/70 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
           <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -1130,7 +1130,7 @@ function HomePage() {
               {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
             </h2>
             {b.section_live_sub ? (
-              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
+              <p className="mt-5 sm:mt-6 text-white/70 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_live_sub}
               </p>
             ) : null}
