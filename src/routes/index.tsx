@@ -112,6 +112,7 @@ function HomePage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
   const [openFeature, setOpenFeature] = useState<number | null>(null);
+  const [openStep, setOpenStep] = useState<number | null>(null);
   // Single generic in-flight indicator; internal stages are not exposed.
   const [stage, setStage] = useState<"idle" | "working">("idle");
   // Live digit count from the CodeInput so Stage 01 (ENTER) fills instantly as user types.
