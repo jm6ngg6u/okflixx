@@ -112,6 +112,7 @@ function HomePage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
   const [openFeature, setOpenFeature] = useState<number | null>(null);
+  const [openStep, setOpenStep] = useState<number | null>(null);
   // Single generic in-flight indicator; internal stages are not exposed.
   const [stage, setStage] = useState<"idle" | "working">("idle");
   // Live digit count from the CodeInput so Stage 01 (ENTER) fills instantly as user types.
@@ -937,25 +938,63 @@ function HomePage() {
               const title = b[`howto_step_${n}_title` as keyof typeof b];
               const desc = b[`howto_step_${n}_desc` as keyof typeof b];
               return (
-                <li
-                  key={n}
-                  className="glass relative flex flex-col p-5 sm:p-6 reveal h-full min-h-[220px] lg:min-h-[260px] transition-transform hover:-translate-y-1"
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <span
-                      aria-hidden
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
-                    >
-                      {n}
-                    </span>
-                    <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
-                  </div>
-                  <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
-                  <p className="text-sm text-white/65 leading-relaxed">{desc}</p>
+                <li key={n} className="contents">
+                  <button
+                    type="button"
+                    onClick={() => setOpenStep(n)}
+                    aria-label={`${title} — open details`}
+                    className="glass group relative flex flex-col p-5 sm:p-6 reveal h-full min-h-[220px] lg:min-h-[260px] text-left transition-transform hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a]/60 rounded-2xl"
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <span
+                        aria-hidden
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                      >
+                        {n}
+                      </span>
+                      <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
+                    </div>
+                    <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
+                    <p className="text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
+                    <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.28em] text-[#ff2a3a]/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Tap to read more →
+                    </div>
+                  </button>
                 </li>
               );
             })}
           </ol>
+
+          <Dialog open={openStep !== null} onOpenChange={(o) => !o && setOpenStep(null)}>
+            <DialogContent className="max-w-2xl bg-black/90 backdrop-blur-2xl border border-[#ff2a3a]/30 text-white">
+              {openStep !== null && (() => {
+                const n = openStep;
+                const icon = b[`howto_step_${n}_icon` as keyof typeof b] as string;
+                const title = b[`howto_step_${n}_title` as keyof typeof b] as string;
+                const detail = (b[`howto_step_${n}_detail` as keyof typeof b] as string) || (b[`howto_step_${n}_desc` as keyof typeof b] as string);
+                return (
+                  <>
+                    <DialogHeader>
+                      <div className="flex items-center gap-4 mb-2">
+                        <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full font-mono text-base font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_22px_rgba(255,42,58,0.6)]">
+                          {n}
+                        </span>
+                        <div className="text-4xl leading-none" aria-hidden>{icon}</div>
+                        <div>
+                          <div className="font-mono text-[11px] uppercase tracking-[0.32em] text-[#ff2a3a]">Step {String(n).padStart(2, "0")} · Guide</div>
+                          <DialogTitle className="font-display text-2xl sm:text-3xl leading-tight mt-1">{title}</DialogTitle>
+                        </div>
+                      </div>
+                    </DialogHeader>
+                    <DialogDescription className="text-white/70 text-[15px] leading-relaxed whitespace-pre-line">
+                      {detail}
+                    </DialogDescription>
+                  </>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
+
 
           <div className="mt-10 sm:mt-12 text-center reveal">
             <a href="#activate" className="btn-red inline-block">Enter your code</a>
