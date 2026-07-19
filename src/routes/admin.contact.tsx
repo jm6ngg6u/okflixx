@@ -6,7 +6,7 @@ import { listSettings, setSetting, getPublicContacts } from "@/lib/settings.func
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Send, Instagram, Phone, RefreshCw } from "lucide-react";
+import { MessageCircle, Send, Instagram, Phone, Mail, Hash, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/contact")({
@@ -14,12 +14,21 @@ export const Route = createFileRoute("/admin/contact")({
   component: ContactPage,
 });
 
-type Kind = "telegram" | "instagram" | "whatsapp";
+type Kind = "telegram" | "instagram" | "whatsapp" | "email" | "discord";
 
 function normalizeHandle(kind: Kind, raw: string): string {
   const v = (raw ?? "").trim();
   if (!v) return "";
   if (kind === "whatsapp") return v.replace(/[^\d+]/g, "").replace(/\+/g, "");
+  if (kind === "email") {
+    const s = v.toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : "";
+  }
+  if (kind === "discord") {
+    let s = v.replace(/^https?:\/\/(www\.)?(discord\.gg|discord\.com\/invite)\//i, "");
+    s = s.replace(/^\/+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
+    return s.replace(/[^A-Za-z0-9-]/g, "");
+  }
   let u = v.replace(/^https?:\/\/(t\.me|telegram\.me|instagram\.com|www\.instagram\.com)\//i, "");
   u = u.replace(/^@+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
   return u.replace(/[^A-Za-z0-9_.]/g, "");
@@ -28,11 +37,16 @@ function hrefFor(kind: Kind, h: string) {
   if (!h) return "";
   if (kind === "telegram") return `https://t.me/${h}`;
   if (kind === "instagram") return `https://instagram.com/${h}`;
+  if (kind === "email") return `mailto:${h}`;
+  if (kind === "discord") return `https://discord.gg/${h}`;
   return `https://wa.me/${h}`;
 }
 function displayHandle(kind: Kind, h: string) {
   if (!h) return "";
-  return kind === "whatsapp" ? `+${h}` : `@${h}`;
+  if (kind === "whatsapp") return `+${h}`;
+  if (kind === "email") return h;
+  if (kind === "discord") return `discord.gg/${h}`;
+  return `@${h}`;
 }
 
 function ContactPage() {
@@ -71,9 +85,15 @@ function ContactPage() {
     }
   };
 
-  const visibleCount = (["telegram", "instagram", "whatsapp"] as Kind[]).filter((k) => {
-    const enableKey = k === "telegram" ? "contact_tg_enabled" : k === "instagram" ? "contact_ig_enabled" : "contact_wa_enabled";
-    const handleKey = k === "telegram" ? "contact_tg_username" : k === "instagram" ? "contact_ig_username" : "contact_wa_number";
+  const chanMap: Record<Kind, { enableKey: string; handleKey: string }> = {
+    telegram: { enableKey: "contact_tg_enabled", handleKey: "contact_tg_username" },
+    instagram: { enableKey: "contact_ig_enabled", handleKey: "contact_ig_username" },
+    whatsapp: { enableKey: "contact_wa_enabled", handleKey: "contact_wa_number" },
+    email: { enableKey: "contact_em_enabled", handleKey: "contact_em_address" },
+    discord: { enableKey: "contact_dc_enabled", handleKey: "contact_dc_invite" },
+  };
+  const visibleCount = (Object.keys(chanMap) as Kind[]).filter((k) => {
+    const { enableKey, handleKey } = chanMap[k];
     return (local[enableKey] ?? "1") === "1" && !!normalizeHandle(k, local[handleKey] ?? "");
   }).length;
 
@@ -107,6 +127,12 @@ function ContactPage() {
         <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp"
           enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number"
           handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+        <ContactRow icon={Mail} label="Email" kind="email"
+          enableKey="contact_em_enabled" nameKey="contact_em_name" handleKey="contact_em_address"
+          handlePlaceholder="support@example.com" local={local} set={set} onSave={save} />
+        <ContactRow icon={Hash} label="Discord" kind="discord"
+          enableKey="contact_dc_enabled" nameKey="contact_dc_name" handleKey="contact_dc_invite"
+          handlePlaceholder="invitecode or discord.gg/xxx" local={local} set={set} onSave={save} />
 
         <ContactPreview local={local} />
         <ContactServerCheck local={local} />
@@ -161,7 +187,10 @@ function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, ha
         </div>
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
-            {kind === "whatsapp" ? "Phone number (with country code)" : "Username"}
+            {kind === "whatsapp" ? "Phone number (with country code)"
+              : kind === "email" ? "Email address"
+              : kind === "discord" ? "Invite code or URL"
+              : "Username"}
           </label>
           <Input placeholder={handlePlaceholder} value={local[handleKey] ?? ""}
             onChange={(e) => set(handleKey, e.target.value)}
@@ -179,7 +208,12 @@ function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, ha
             ) : invalid ? (
               <span className="text-red-300">Invalid — check the format</span>
             ) : (
-              <span className="text-white/30">{kind === "whatsapp" ? "Digits only, include country code" : "@ and URL prefix are stripped automatically"}</span>
+              <span className="text-white/30">
+                {kind === "whatsapp" ? "Digits only, include country code"
+                  : kind === "email" ? "user@domain.tld"
+                  : kind === "discord" ? "Just the invite code — URL prefix is stripped"
+                  : "@ and URL prefix are stripped automatically"}
+              </span>
             )}
           </div>
         </div>
@@ -200,6 +234,8 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
   push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", Send);
   push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", Instagram);
   push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", Phone);
+  push("email", "contact_em_enabled", "contact_em_name", "contact_em_address", Mail);
+  push("discord", "contact_dc_enabled", "contact_dc_name", "contact_dc_invite", Hash);
   return (
     <div className="rounded-md border border-white/10 bg-black/40 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -252,6 +288,8 @@ function ContactServerCheck({ local }: { local: Record<string, string> }) {
     { kind: "telegram", enableKey: "contact_tg_enabled", handleKey: "contact_tg_username" },
     { kind: "instagram", enableKey: "contact_ig_enabled", handleKey: "contact_ig_username" },
     { kind: "whatsapp", enableKey: "contact_wa_enabled", handleKey: "contact_wa_number" },
+    { kind: "email", enableKey: "contact_em_enabled", handleKey: "contact_em_address" },
+    { kind: "discord", enableKey: "contact_dc_enabled", handleKey: "contact_dc_invite" },
   ];
   const mismatches: string[] = [];
   if (dbg) {

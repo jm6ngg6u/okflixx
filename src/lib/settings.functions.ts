@@ -151,6 +151,8 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
     "contact_tg_enabled", "contact_tg_name", "contact_tg_username",
     "contact_ig_enabled", "contact_ig_name", "contact_ig_username",
     "contact_wa_enabled", "contact_wa_name", "contact_wa_number",
+    "contact_em_enabled", "contact_em_name", "contact_em_address",
+    "contact_dc_enabled", "contact_dc_name", "contact_dc_invite",
   ];
   const { data } = await supabaseAdmin.from("app_settings").select("key,value,updated_at").in("key", keys);
   const m: Record<string, string> = {};
@@ -164,6 +166,8 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
   const tgOn = (m.contact_tg_enabled ?? "1") === "1";
   const igOn = (m.contact_ig_enabled ?? "1") === "1";
   const waOn = (m.contact_wa_enabled ?? "1") === "1";
+  const emOn = (m.contact_em_enabled ?? "1") === "1";
+  const dcOn = (m.contact_dc_enabled ?? "1") === "1";
 
   const normUser = (v: string) => {
     let u = (v ?? "").trim();
@@ -173,15 +177,29 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
   };
   const normPhone = (v: string) =>
     (v ?? "").trim().replace(/[^\d+]/g, "").replace(/\+/g, "");
+  const normEmail = (v: string) => {
+    const s = (v ?? "").trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : "";
+  };
+  const normDiscord = (v: string) => {
+    let s = (v ?? "").trim();
+    s = s.replace(/^https?:\/\/(www\.)?(discord\.gg|discord\.com\/invite)\//i, "");
+    s = s.replace(/^\/+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
+    return s.replace(/[^A-Za-z0-9-]/g, "");
+  };
 
   const tg = normUser(m.contact_tg_username ?? "");
   const ig = normUser(m.contact_ig_username ?? "");
   const wa = normPhone(m.contact_wa_number ?? "");
+  const em = normEmail(m.contact_em_address ?? "");
+  const dc = normDiscord(m.contact_dc_invite ?? "");
 
   const all = [
     { kind: "telegram", enabled: tgOn, name: (m.contact_tg_name ?? "").trim(), raw: m.contact_tg_username ?? "", handleNorm: tg, handle: tg ? `@${tg}` : "", href: tg ? `https://t.me/${tg}` : "" },
     { kind: "instagram", enabled: igOn, name: (m.contact_ig_name ?? "").trim(), raw: m.contact_ig_username ?? "", handleNorm: ig, handle: ig ? `@${ig}` : "", href: ig ? `https://instagram.com/${ig}` : "" },
     { kind: "whatsapp", enabled: waOn, name: (m.contact_wa_name ?? "").trim(), raw: m.contact_wa_number ?? "", handleNorm: wa, handle: wa ? `+${wa}` : "", href: wa ? `https://wa.me/${wa}` : "" },
+    { kind: "email", enabled: emOn, name: (m.contact_em_name ?? "").trim(), raw: m.contact_em_address ?? "", handleNorm: em, handle: em, href: em ? `mailto:${em}` : "" },
+    { kind: "discord", enabled: dcOn, name: (m.contact_dc_name ?? "").trim(), raw: m.contact_dc_invite ?? "", handleNorm: dc, handle: dc ? `discord.gg/${dc}` : "", href: dc ? `https://discord.gg/${dc}` : "" },
   ];
   const channels = all
     .filter((c) => c.enabled && !!c.handleNorm)

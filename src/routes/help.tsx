@@ -1,4 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { getPublicContacts } from "@/lib/settings.functions";
+import { Send, Instagram, Phone, Mail, Hash } from "lucide-react";
 import { LegalShell } from "@/components/LegalShell";
 
 export const Route = createFileRoute("/help")({
@@ -66,12 +70,83 @@ function HelpPage() {
           <p className="text-white/70 leading-relaxed text-sm md:text-base">{t.body}</p>
         </section>
       ))}
-      <section className="pt-4 border-t border-white/10">
+      <section id="contact" className="pt-6 border-t border-white/10 space-y-4 scroll-mt-24">
+        <div className="flex items-baseline gap-3">
+          <span className="font-mono text-xs text-[#ff2a3a]/80 tracking-widest">// Contact</span>
+          <h2 className="font-display text-lg md:text-xl text-white">Reach the team</h2>
+        </div>
+        <p className="text-white/60 text-sm">
+          For activation help, abuse reports, or press inquiries — pick whichever channel is easiest. Handles are managed live by the operator.
+        </p>
+        <ContactList />
         <p className="text-white/60 text-sm">
           Still stuck? Head back to the <Link to="/" hash="activate" className="text-[#ff2a3a] hover:underline">activation form</Link> — our system will
-          auto-retry with a fresh session. For anything else, use the contact channels on the home page footer.
+          auto-retry with a fresh session.
         </p>
       </section>
     </LegalShell>
+  );
+}
+
+function ContactList() {
+  const fetchContacts = useServerFn(getPublicContacts);
+  const q = useQuery({
+    queryKey: ["public-contacts", "help"],
+    queryFn: () => fetchContacts(),
+    refetchInterval: 2000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+  const channels = q.data?.channels ?? [];
+  const iconFor = (kind: string) => {
+    if (kind === "telegram") return Send;
+    if (kind === "instagram") return Instagram;
+    if (kind === "email") return Mail;
+    if (kind === "discord") return Hash;
+    return Phone;
+  };
+  const labelFor = (kind: string) => {
+    if (kind === "telegram") return "Telegram";
+    if (kind === "instagram") return "Instagram";
+    if (kind === "whatsapp") return "WhatsApp";
+    if (kind === "email") return "Email";
+    if (kind === "discord") return "Discord";
+    return kind;
+  };
+  if (q.isLoading) {
+    return <div className="text-white/40 text-sm font-mono">Loading channels…</div>;
+  }
+  if (channels.length === 0) {
+    return (
+      <div className="rounded-md border border-white/10 bg-white/[0.02] p-4 text-white/50 text-sm">
+        Contact channels are currently offline. Please check back shortly.
+      </div>
+    );
+  }
+  return (
+    <div className="grid sm:grid-cols-2 gap-3">
+      {channels.map((c) => {
+        const Icon = iconFor(c.kind);
+        const isMail = c.kind === "email";
+        return (
+          <a
+            key={c.kind}
+            href={c.href}
+            {...(isMail ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+            className="group flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 hover:border-[#ff2a3a]/40 hover:bg-[#ff2a3a]/[0.06] transition"
+          >
+            <span className="w-10 h-10 rounded-md flex items-center justify-center border border-white/10 bg-white/[0.03] text-white/70 group-hover:text-[#ff2a3a] group-hover:border-[#ff2a3a]/40 transition">
+              <Icon className="w-4 h-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.28em] font-mono text-white/40">
+                {c.name?.trim() ? c.name : labelFor(c.kind)}
+              </div>
+              <div className="text-sm text-white/90 truncate font-mono">{c.handle}</div>
+            </div>
+          </a>
+        );
+      })}
+    </div>
   );
 }
