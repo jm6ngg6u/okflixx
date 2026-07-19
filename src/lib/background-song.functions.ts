@@ -366,6 +366,7 @@ export const setBackgroundSongEnabled = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_enabled", value: data.enabled ? "true" : "false",
       updated_at: nowIso(), updated_by: userId,
