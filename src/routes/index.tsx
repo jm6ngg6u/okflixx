@@ -880,7 +880,7 @@ function HomePage() {
       {/* FEATURES — editable via Branding Studio. Click a card to open its detail. */}
       <section id="features" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
         <div aria-hidden className="why-orb" />
-        <div className="max-w-6xl mx-auto relative glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
+        <div className="max-w-6xl mx-auto relative">
           <div className="text-center mb-14 md:mb-20 reveal">
             <div className="font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs mb-5 inline-flex items-center gap-3">
               <span className="relative flex h-1.5 w-1.5">
@@ -889,9 +889,11 @@ function HomePage() {
               </span>
               {b.section_features_kicker}
             </div>
-            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
-              {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
-            </h2>
+            <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+              <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+                {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
+              </h2>
+            </div>
             {b.section_features_sub ? (
               <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
                 {b.section_features_sub}
@@ -974,10 +976,12 @@ function HomePage() {
 
       {/* HOW IT WORKS — STEP-BY-STEP GUIDE */}
       <section id="how-it-works" className="relative py-24 sm:py-28 px-4 sm:px-6 md:px-12">
-        <div className="max-w-6xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 sm:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_howto_kicker}</div>
-            <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+              <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            </div>
             <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
@@ -1054,14 +1058,16 @@ function HomePage() {
 
       {/* FAQ — editable via Branding Studio. Accordion opens on click. */}
       <section id="faq" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
-        <div className="max-w-4xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12 sm:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker text-[11px] sm:text-xs">
               {b.section_faq_kicker}
             </div>
-            <h2 className="font-display brand-section-title">
-              {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
-            </h2>
+            <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+              <h2 className="font-display brand-section-title">
+                {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
+              </h2>
+            </div>
             {b.section_faq_sub ? (
               <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2 text-base sm:text-lg leading-relaxed">
                 {b.section_faq_sub}
@@ -1106,7 +1112,7 @@ function HomePage() {
 
       {/* LIVE ACTIVATION FEED — system-owned realtime metrics. Copy editable in Branding Studio. */}
       <section id="live" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
-        <div className="max-w-6xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 md:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-[#ff2a3a] mb-5 inline-flex items-center gap-3 text-[11px] sm:text-xs">
               <span className="relative flex h-1.5 w-1.5">
@@ -1115,9 +1121,11 @@ function HomePage() {
               </span>
               {b.section_live_kicker}
             </div>
-            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
-              {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
-            </h2>
+            <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+              <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+                {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
+              </h2>
+            </div>
             {b.section_live_sub ? (
               <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
                 {b.section_live_sub}
@@ -1220,7 +1228,7 @@ function HomePage() {
 
       {/* CTA */}
       <section className="relative py-32 px-6 md:px-12">
-        <div className="relative max-w-3xl mx-auto text-center reveal glow-border rounded-[32px] p-8 sm:p-12 md:p-16">
+        <div className="relative max-w-3xl mx-auto text-center reveal">
           <div className="font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs mb-5 inline-flex items-center gap-3">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
@@ -1228,9 +1236,11 @@ function HomePage() {
             </span>
             Final step
           </div>
-          <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">
-            {b.section_cta_title_1} <span className="text-shine">{b.section_cta_title_2}</span>
-          </h2>
+          <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+            <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">
+              {b.section_cta_title_1} <span className="text-shine">{b.section_cta_title_2}</span>
+            </h2>
+          </div>
           <p className="mt-6 text-white/65 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
             Point your TV to <span className="text-white font-mono">netflix.com/tv8</span>, type the 8-character code on screen, and we'll pair a verified Premium session to your device in seconds — 4K where supported, zero setup, no card required.
           </p>
