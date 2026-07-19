@@ -1120,3 +1120,26 @@ html, body {
   .faq-card,
   .faq-card::before { transition: none; }
 }
+
+/* Fluid, device-consistent section sizing (mobile → tablet → desktop → TV) */
+.section-pad-y { padding-top: clamp(3.5rem, 7vw, 8rem); padding-bottom: clamp(3.5rem, 7vw, 8rem); }
+.section-pad-x { padding-left: clamp(1rem, 3vw, 3rem); padding-right: clamp(1rem, 3vw, 3rem); }
+.section-title-fluid {
+  font-size: clamp(2rem, 5.6vw, 4.75rem);
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+}
+.section-sub-fluid {
+  font-size: clamp(0.95rem, 1.2vw, 1.125rem);
+  line-height: 1.65;
+}
+.section-kicker-fluid { font-size: clamp(0.68rem, 0.9vw, 0.78rem); }
+.metric-fluid {
+  font-size: clamp(2.75rem, 7.5vw, 4.25rem);
+  line-height: 1;
+}
+/* Ultra-wide / TV boost so hero titles keep presence at 1440px+ */
+@media (min-width: 1600px) {
+  .section-title-fluid { font-size: clamp(3.5rem, 4.2vw, 5.5rem); }
+  .metric-fluid { font-size: clamp(3.75rem, 4.6vw, 5.25rem); }
+}
