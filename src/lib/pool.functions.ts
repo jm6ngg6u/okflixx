@@ -620,7 +620,8 @@ export const getProxyStats = createServerFn({ method: "POST" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
-    const { data } = await supabase.rpc("get_proxy_stats");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.rpc("get_proxy_stats");
     return data ?? {};
   });
 
