@@ -6,7 +6,7 @@ import { listSettings, setSetting, getPublicContacts } from "@/lib/settings.func
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Send, Instagram, Phone, RefreshCw } from "lucide-react";
+import { MessageCircle, Send, Instagram, Phone, Mail, Hash, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/contact")({
@@ -14,12 +14,21 @@ export const Route = createFileRoute("/admin/contact")({
   component: ContactPage,
 });
 
-type Kind = "telegram" | "instagram" | "whatsapp";
+type Kind = "telegram" | "instagram" | "whatsapp" | "email" | "discord";
 
 function normalizeHandle(kind: Kind, raw: string): string {
   const v = (raw ?? "").trim();
   if (!v) return "";
   if (kind === "whatsapp") return v.replace(/[^\d+]/g, "").replace(/\+/g, "");
+  if (kind === "email") {
+    const s = v.toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : "";
+  }
+  if (kind === "discord") {
+    let s = v.replace(/^https?:\/\/(www\.)?(discord\.gg|discord\.com\/invite)\//i, "");
+    s = s.replace(/^\/+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
+    return s.replace(/[^A-Za-z0-9-]/g, "");
+  }
   let u = v.replace(/^https?:\/\/(t\.me|telegram\.me|instagram\.com|www\.instagram\.com)\//i, "");
   u = u.replace(/^@+/, "").replace(/\/+$/, "").split(/[?#/]/)[0];
   return u.replace(/[^A-Za-z0-9_.]/g, "");
@@ -28,11 +37,16 @@ function hrefFor(kind: Kind, h: string) {
   if (!h) return "";
   if (kind === "telegram") return `https://t.me/${h}`;
   if (kind === "instagram") return `https://instagram.com/${h}`;
+  if (kind === "email") return `mailto:${h}`;
+  if (kind === "discord") return `https://discord.gg/${h}`;
   return `https://wa.me/${h}`;
 }
 function displayHandle(kind: Kind, h: string) {
   if (!h) return "";
-  return kind === "whatsapp" ? `+${h}` : `@${h}`;
+  if (kind === "whatsapp") return `+${h}`;
+  if (kind === "email") return h;
+  if (kind === "discord") return `discord.gg/${h}`;
+  return `@${h}`;
 }
 
 function ContactPage() {
