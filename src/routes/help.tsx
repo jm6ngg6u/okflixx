@@ -8,10 +8,10 @@ import { LegalShell } from "@/components/LegalShell";
 export const Route = createFileRoute("/help")({
   head: () => ({
     meta: [
-      { title: "Help Center — Emberlord" },
-      { name: "description", content: "Troubleshoot activation, understand error codes, and reach Emberlord support." },
-      { property: "og:title", content: "Help Center — Emberlord" },
-      { property: "og:description", content: "Troubleshoot activation, understand error codes, and reach Emberlord support." },
+      { title: "Help Center — OKFLIX" },
+      { name: "description", content: "Troubleshoot activation, understand error codes, and reach OKFLIX support." },
+      { property: "og:title", content: "Help Center — OKFLIX" },
+      { property: "og:description", content: "Troubleshoot activation, understand error codes, and reach OKFLIX support." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "index,follow" },
@@ -24,7 +24,7 @@ const topics = [
   {
     n: "01",
     title: "Where do I find the 8-character TV code?",
-    body: "On your TV, open the Netflix app and sign out (or select 'Sign in with a code'). Netflix will show netflix.com/tv8 and an 8-character code. Type that code exactly into Emberlord.",
+    body: "On your TV, open the Netflix app and sign out (or select 'Sign in with a code'). Netflix will show netflix.com/tv8 and an 8-character code. Type that code exactly into OKFLIX.",
   },
   {
     n: "02",
@@ -44,7 +44,7 @@ const topics = [
   {
     n: "05",
     title: "Is this legal / safe?",
-    body: "Emberlord uses pooled Premium sessions donated to the community. We are not affiliated with Netflix. Your TV device and your personal data are never exposed to other users of the pool.",
+    body: "OKFLIX uses pooled Premium sessions donated to the community. We are not affiliated with Netflix. Your TV device and your personal data are never exposed to other users of the pool.",
   },
   {
     n: "06",

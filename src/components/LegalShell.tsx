@@ -22,7 +22,7 @@ export function LegalShell({ kicker, title, updated, intro, children }: Props) {
       <LiveBackground />
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto">
         <Link to="/" className="flex items-center gap-2" data-wave-origin>
-          <img src={logo} alt="Emberlord" className="h-8 w-8 object-contain" width={32} height={32} />
+          <img src={logo} alt="OKFLIX" className="h-8 w-8 object-contain" width={32} height={32} />
           <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse"><Wordmark /></span>
         </Link>
         <div className="hidden md:flex items-center gap-6 text-sm text-white/70 font-medium">

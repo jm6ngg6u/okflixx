@@ -169,9 +169,9 @@ function humanCron(expr: string): string {
 }
 
 const JOBNAME_TO_JOB: Record<string, string> = {
-  "emberlord-cookies-autocheck": "cookies-autocheck",
-  "emberlord-proxies-autocheck": "proxies-autocheck",
-  "emberlord-auto-cleanup": "auto-cleanup",
+  "okflix-cookies-autocheck": "cookies-autocheck",
+  "okflix-proxies-autocheck": "proxies-autocheck",
+  "okflix-auto-cleanup": "auto-cleanup",
 };
 
 export function LiveJobsPanel() {

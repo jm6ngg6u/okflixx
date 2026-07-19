@@ -1,4 +1,4 @@
-# Emberlord Netflix Worker
+# OKFLIX Netflix Worker
 
 Thin FastAPI wrapper around the Telegram-bot's Netflix modules
 (`netflix_session.py`, `fast_checker.py`, `netflix_adapter.py`). The website
@@ -37,8 +37,8 @@ All require header `X-Worker-Token: <shared secret>`.
 Any host that runs a Python 3.11 container works:
 
 ```bash
-docker build -t emberlord-worker .
-docker run -e WORKER_TOKEN=$(openssl rand -hex 32) -p 8080:8080 emberlord-worker
+docker build -t okflix-worker .
+docker run -e WORKER_TOKEN=$(openssl rand -hex 32) -p 8080:8080 okflix-worker
 ```
 
 ## Notes

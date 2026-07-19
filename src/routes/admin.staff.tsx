@@ -11,7 +11,7 @@ import { Users, UserPlus, Trash2, Mail, ShieldCheck, Loader2 } from "lucide-reac
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/staff")({
-  head: () => ({ meta: [{ title: "Staff — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Staff — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: StaffPage,
 });
 

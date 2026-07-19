@@ -17,7 +17,7 @@ export const Route = createFileRoute("/login")({
   validateSearch: loginSearchSchema,
   head: () => ({
     meta: [
-      { title: "Sign in — Emberlord" },
+      { title: "Sign in — OKFLIX" },
       { name: "description", content: "Sign in with Google to command Netflix on any TV." },
       { name: "robots", content: "noindex" },
     ],

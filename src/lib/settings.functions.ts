@@ -335,7 +335,7 @@ export const listRecentJobRuns = createServerFn({ method: "GET" })
     return { rows: data ?? [] };
   });
 
-/** Live schedules for the emberlord-* pg_cron jobs, for the admin live-jobs panel. */
+/** Live schedules for the okflix-* pg_cron jobs, for the admin live-jobs panel. */
 export const listCronSchedules = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

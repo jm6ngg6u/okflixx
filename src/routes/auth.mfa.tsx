@@ -33,7 +33,7 @@ function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 15000): 
 export const Route = createFileRoute("/auth/mfa")({
   ssr: false,
   validateSearch: (s) => searchSchema.parse(s),
-  head: () => ({ meta: [{ title: "Two-factor setup — Emberlord" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Two-factor setup — OKFLIX" }, { name: "robots", content: "noindex" }] }),
   component: MfaPage,
 });
 
@@ -103,7 +103,7 @@ function MfaPage() {
         }
       }
       const { data: en, error } = await withTimeout(
-        supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Emberlord Admin" }),
+        supabase.auth.mfa.enroll({ factorType: "totp", issuer: "OKFLIX Admin" }),
         "Authenticator setup",
       );
       if (error) throw error;
@@ -202,13 +202,13 @@ function MfaPage() {
   }
   function downloadCodes() {
     const blob = new Blob(
-      [`Emberlord Admin Recovery Codes\nGenerated: ${new Date().toISOString()}\n\n${codes.join("\n")}\n\nStore securely. Each code works once.`],
+      [`OKFLIX Admin Recovery Codes\nGenerated: ${new Date().toISOString()}\n\n${codes.join("\n")}\n\nStore securely. Each code works once.`],
       { type: "text/plain" },
     );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "emberlord-recovery-codes.txt";
+    a.download = "okflix-recovery-codes.txt";
     a.click();
     URL.revokeObjectURL(url);
   }

@@ -32,7 +32,7 @@ import {
 
 
 export const Route = createFileRoute("/admin/access")({
-  head: () => ({ meta: [{ title: "Access gates — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Access gates — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: AccessAdminPage,
 });
 

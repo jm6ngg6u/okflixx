@@ -13,7 +13,7 @@ import { Shuffle, Repeat, Sparkles, CheckCircle2, Loader2, RefreshCw, Filter, Sa
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/rotation")({
-  head: () => ({ meta: [{ title: "Rotation Policy — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Rotation Policy — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: RotationPage,
 });
 

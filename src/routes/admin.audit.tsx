@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/audit")({
-  head: () => ({ meta: [{ title: "Auth audit — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Auth audit — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: AuditPage,
 });
 

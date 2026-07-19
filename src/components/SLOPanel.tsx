@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const SLO_KEY = "emberlord.dashboard.slo";
+const SLO_KEY = "okflix.dashboard.slo";
 const DEFAULT_SLO = { targetPct: 85 }; // configurable per-admin
 
 function loadSLO(): { targetPct: number } {

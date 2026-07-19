@@ -48,7 +48,7 @@ async function computeFingerprint(): Promise<string> {
         ctx.fillStyle = "#f60";
         ctx.fillRect(0, 0, 100, 30);
         ctx.fillStyle = "#069";
-        ctx.fillText("emberlord-fp", 2, 15);
+        ctx.fillText("okflix-fp", 2, 15);
         parts.push(c.toDataURL().slice(-64));
       }
     } catch {}
@@ -62,13 +62,13 @@ async function computeFingerprint(): Promise<string> {
   }
 }
 
-const SESSION_KEY = "emberlord_access_session";
+const SESSION_KEY = "okflix_access_session";
 
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "EMBERLORD — Activate Netflix on any TV in seconds" },
+      { title: "OKFLIX — Activate Netflix on any TV in seconds" },
       { name: "description", content: "Enter your 8-digit code and stream Netflix instantly on any Smart TV, Apple TV, Roku, PS5 or Xbox. Encrypted, always-on, 2026-ready." },
     ],
   }),
@@ -479,7 +479,7 @@ function HomePage() {
         <nav className="max-w-7xl mx-auto rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-[0_20px_60px_-30px_rgba(255,42,58,0.35)] px-3 md:px-4 py-2 flex items-center justify-between gap-3">
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2.5 group shrink-0 pl-1 pr-2">
-            <img src={logo} alt="Emberlord" data-wave-origin className="h-9 w-9 object-contain logo-shine group-hover:scale-110 transition" width={36} height={36} />
+            <img src={logo} alt="OKFLIX" data-wave-origin className="h-9 w-9 object-contain logo-shine group-hover:scale-110 transition" width={36} height={36} />
             <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse hidden xs:inline sm:inline"><Wordmark /></span>
           </Link>
 
@@ -1468,7 +1468,7 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
     try {
       const a = payload.account;
       const lines = [
-        `EMBERLORD · Netflix TV Activation`,
+        `OKFLIX · Netflix TV Activation`,
         `Code: ${payload.code}`,
         `Time: ${new Date().toLocaleString()}`,
         `Plan: ${a.plan_name ?? "Premium"} · ${a.video_quality ?? "UHD"}`,

@@ -33,7 +33,7 @@ import { useBrand, type BrandingMap } from "@/lib/branding-context";
 
 export const Route = createFileRoute("/admin/branding")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Branding studio — Emberlord" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Branding studio — OKFLIX" }, { name: "robots", content: "noindex" }] }),
   component: BrandingStudio,
 });
 

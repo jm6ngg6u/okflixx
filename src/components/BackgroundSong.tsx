@@ -36,9 +36,9 @@ import { BackgroundSongHealthPanel } from "@/components/BackgroundSongHealthPane
  *  - Anonymous analytics: impression, autoplay, unmute, tap_play,
  *    out_of_schedule, silence_detected
  */
-const VOLUME_KEY = "emberlord.bgs.volume";
-const SESSION_KEY = "emberlord.bgs.session";
-const IMPRESSION_KEY = "emberlord.bgs.impressed";
+const VOLUME_KEY = "okflix.bgs.volume";
+const SESSION_KEY = "okflix.bgs.session";
+const IMPRESSION_KEY = "okflix.bgs.impressed";
 
 function parseHHMM(v: string) {
   const [h, m] = v.split(":").map((n) => Number.parseInt(n, 10));
