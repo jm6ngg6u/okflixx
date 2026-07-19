@@ -85,9 +85,15 @@ function ContactPage() {
     }
   };
 
-  const visibleCount = (["telegram", "instagram", "whatsapp"] as Kind[]).filter((k) => {
-    const enableKey = k === "telegram" ? "contact_tg_enabled" : k === "instagram" ? "contact_ig_enabled" : "contact_wa_enabled";
-    const handleKey = k === "telegram" ? "contact_tg_username" : k === "instagram" ? "contact_ig_username" : "contact_wa_number";
+  const chanMap: Record<Kind, { enableKey: string; handleKey: string }> = {
+    telegram: { enableKey: "contact_tg_enabled", handleKey: "contact_tg_username" },
+    instagram: { enableKey: "contact_ig_enabled", handleKey: "contact_ig_username" },
+    whatsapp: { enableKey: "contact_wa_enabled", handleKey: "contact_wa_number" },
+    email: { enableKey: "contact_em_enabled", handleKey: "contact_em_address" },
+    discord: { enableKey: "contact_dc_enabled", handleKey: "contact_dc_invite" },
+  };
+  const visibleCount = (Object.keys(chanMap) as Kind[]).filter((k) => {
+    const { enableKey, handleKey } = chanMap[k];
     return (local[enableKey] ?? "1") === "1" && !!normalizeHandle(k, local[handleKey] ?? "");
   }).length;
 
