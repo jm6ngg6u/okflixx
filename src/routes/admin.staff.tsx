@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { listStaff, inviteStaff, revokeRole } from "@/lib/staff.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, UserPlus, Trash2, Mail, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/staff")({
   head: () => ({ meta: [{ title: "Staff — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
@@ -21,24 +22,56 @@ function StaffPage() {
   const doRevoke = useServerFn(revokeRole);
   const qc = useQueryClient();
 
-  const q = useQuery({ queryKey: ["staff"], queryFn: () => fetchStaff() });
+  const q = useQuery({
+    queryKey: ["staff"],
+    queryFn: () => fetchStaff(),
+    refetchInterval: () => (typeof document !== "undefined" && document.visibilityState === "hidden" ? false : 2000),
+    refetchOnWindowFocus: true,
+  });
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "moderator">("moderator");
   const [busy, setBusy] = useState(false);
+
+  // Realtime cross-tab sync (~2s) for role grants/revokes and invites.
+  useEffect(() => {
+    const ch = supabase
+      .channel("admin-staff")
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, () =>
+        qc.invalidateQueries({ queryKey: ["staff"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "staff_invites" }, () =>
+        qc.invalidateQueries({ queryKey: ["staff"] }),
+      )
+      .subscribe();
+    const onVis = () => {
+      if (document.visibilityState === "visible") qc.invalidateQueries({ queryKey: ["staff"] });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      supabase.removeChannel(ch);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [qc]);
 
   const staff = q.data?.staff ?? [];
   const invites = q.data?.invites ?? [];
 
   async function invite() {
-    if (!email.trim()) return;
+    const trimmed = email.trim();
+    if (!trimmed) return;
     setBusy(true);
     try {
-      await doInvite({ data: { email: email.trim(), role } });
+      await doInvite({ data: { email: trimmed, role } });
       toast.success(`Invite sent · promoted on first sign-in`);
       setEmail("");
       qc.invalidateQueries({ queryKey: ["staff"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
+      const msg = String(e?.message ?? "Failed");
+      if (/duplicate|unique|staff_invites_pending_email_uniq/i.test(msg)) {
+        toast.error("A pending invite for that email already exists.");
+      } else {
+        toast.error(msg);
+      }
     } finally { setBusy(false); }
   }
 
