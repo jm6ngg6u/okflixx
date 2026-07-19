@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { LiveBackground } from "@/components/LiveBackground";
 import { useBrand } from "@/lib/branding-context";
-import logo from "@/assets/emberlord-logo.png";
+import logo from "@/assets/brand-logo.png";
 
 function Wordmark() {
   const b = useBrand();
