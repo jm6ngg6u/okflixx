@@ -1165,11 +1165,7 @@ function HomePage() {
               { v: total.toLocaleString(), l: b.section_live_total_label, h: b.section_live_total_hint, suffix: null },
               { v: rate.toFixed(1), l: b.section_live_rate_label, h: b.section_live_rate_hint, suffix: "%" },
             ];
-            const breakdown = [
-              { label: "Successful", value: total, today: today, tone: "text-emerald-400", dot: "bg-emerald-400" },
-              { label: "Wrong code", value: wrong, today: wrongToday, tone: "text-amber-300", dot: "bg-amber-300" },
-              { label: "Expired code", value: expired, today: expiredToday, tone: "text-white/70", dot: "bg-white/60" },
-            ];
+            void wrong; void expired; void wrongToday; void expiredToday;
             return (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
@@ -1207,39 +1203,6 @@ function HomePage() {
                   ))}
                 </div>
 
-                {/* Outcome breakdown — success rate = success / (success + wrong + expired). */}
-                <div className="mt-6 sm:mt-8 reveal">
-                  <div className="why-card">
-                    <div className="why-card-inner py-6 sm:py-7">
-                      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-                        <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-white/60 uppercase">
-                          Outcome breakdown
-                        </div>
-                        <div className="font-mono text-[10px] tracking-[0.22em] text-white/40 uppercase">
-                          All-time · today
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {breakdown.map((row) => (
-                          <div key={row.label} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.05] px-4 py-3">
-                            <span className={`h-2 w-2 rounded-full ${row.dot} shrink-0`} />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/60">
-                                {row.label}
-                              </div>
-                              <div className={`font-display tabular-nums text-2xl sm:text-3xl ${row.tone} leading-tight`}>
-                                {row.value.toLocaleString()}
-                                <span className="ml-2 text-xs sm:text-sm text-white/40 font-mono tracking-wide">
-                                  +{row.today.toLocaleString()} today
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </>
             );
           })()}
