@@ -976,10 +976,12 @@ function HomePage() {
 
       {/* HOW IT WORKS — STEP-BY-STEP GUIDE */}
       <section id="how-it-works" className="relative py-24 sm:py-28 px-4 sm:px-6 md:px-12">
-        <div className="max-w-6xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 sm:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_howto_kicker}</div>
-            <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+              <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            </div>
             <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
