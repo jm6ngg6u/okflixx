@@ -1106,7 +1106,7 @@ function HomePage() {
 
       {/* LIVE ACTIVATION FEED — system-owned realtime metrics. Copy editable in Branding Studio. */}
       <section id="live" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
           <div className="text-center mb-12 md:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-[#ff2a3a] mb-5 inline-flex items-center gap-3 text-[11px] sm:text-xs">
               <span className="relative flex h-1.5 w-1.5">
