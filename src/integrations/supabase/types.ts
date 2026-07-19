@@ -948,6 +948,7 @@ export type Database = {
       }
       purge_auth_audit_log: { Args: { _days?: number }; Returns: number }
       purge_expired_access_sessions: { Args: never; Returns: number }
+      reap_stuck_locks: { Args: never; Returns: Json }
       record_otp_attempt: {
         Args: { _email: string; _ip_hash?: string; _kind?: string }
         Returns: undefined
