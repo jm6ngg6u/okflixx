@@ -648,8 +648,9 @@ function HomePage() {
                   tabIndex={-1}
                   autoComplete="off"
                   aria-hidden="true"
-                  style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+                  className="okflix-honeypot"
                 />
+
               </div>
 
               {/* ---- ACCESS GATES ---- only visible for gates admin enabled */}
