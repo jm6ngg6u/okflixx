@@ -1039,21 +1039,23 @@ function HomePage() {
                 <AccordionItem
                   key={n}
                   value={`faq-${n}`}
-                  className="glass rounded-2xl border border-white/[0.06] px-5 sm:px-6 data-[state=open]:border-[#ff2a3a]/40 data-[state=open]:shadow-[0_0_28px_-8px_rgba(255,42,58,0.55)] transition-all"
+                  className="faq-card border-0"
                 >
-                  <AccordionTrigger className="hover:no-underline py-5 sm:py-6 gap-4 text-left">
-                    <div className="flex items-center gap-4 min-w-0 flex-1">
-                      <span className="font-mono text-[11px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
-                        {String(n).padStart(2, "0")}
-                      </span>
-                      <span className="font-display text-base sm:text-lg md:text-xl leading-snug text-white">
-                        {q}
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="text-white/70 text-[15px] leading-relaxed pb-6 pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
-                    {a}
-                  </AccordionContent>
+                  <div className="faq-card-inner px-5 sm:px-6">
+                    <AccordionTrigger className="hover:no-underline py-5 sm:py-6 gap-4 text-left">
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <span className="font-mono text-[11px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
+                          {String(n).padStart(2, "0")}
+                        </span>
+                        <span className="font-display text-base sm:text-lg md:text-xl leading-snug text-white">
+                          {q}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-white/70 text-[15px] leading-relaxed pb-6 pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
+                      {a}
+                    </AccordionContent>
+                  </div>
                 </AccordionItem>
               );
             })}
