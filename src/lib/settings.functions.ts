@@ -76,12 +76,21 @@ export const toggleProxyMode = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceSettingsRateLimit(supabaseAdmin, userId);
     const { data: cur } = await supabaseAdmin
       .from("app_settings")
       .select("value")
       .eq("key", "proxy_mode")
       .maybeSingle();
     const next = cur?.value === "1" ? "0" : "1";
+    // Interlock: refuse to enable strict proxy mode if zero usable proxies exist.
+    if (next === "1") {
+      const { data: stats } = await supabaseAdmin.rpc("get_proxy_stats");
+      const usable = (stats as any)?.valid ?? 0;
+      if (!usable || usable <= 0) {
+        throw new Error("Cannot enable strict proxy mode: no usable proxies in the pool.");
+      }
+    }
     await supabaseAdmin
       .from("app_settings")
       .upsert({ key: "proxy_mode", value: next, updated_at: new Date().toISOString(), updated_by: userId });
