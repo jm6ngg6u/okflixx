@@ -9,9 +9,9 @@
         "detail": "overflow=0px"
       },
       {
-        "ok": false,
+        "ok": true,
         "label": "kicker dots >= 5",
-        "detail": "count=0"
+        "detail": "count=9"
       },
       {
         "ok": true,
@@ -55,9 +55,9 @@
         "detail": "overflow=0px"
       },
       {
-        "ok": false,
+        "ok": true,
         "label": "kicker dots >= 5",
-        "detail": "count=0"
+        "detail": "count=9"
       },
       {
         "ok": true,
@@ -91,9 +91,9 @@
         "detail": "overflow=0px"
       },
       {
-        "ok": false,
+        "ok": true,
         "label": "kicker dots >= 5",
-        "detail": "count=0"
+        "detail": "count=9"
       },
       {
         "ok": true,
@@ -127,9 +127,9 @@
         "detail": "overflow=0px"
       },
       {
-        "ok": false,
+        "ok": true,
         "label": "kicker dots >= 5",
-        "detail": "count=0"
+        "detail": "count=9"
       },
       {
         "ok": true,
