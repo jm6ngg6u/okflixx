@@ -173,8 +173,14 @@ function HomePage() {
       .channel("activation-success")
       .on("broadcast", { event: "tick" }, () => {
         qc.setQueryData(["success-activation-count"], (old: any) => {
-          if (!old || typeof old.count !== "number") return old;
-          return { ...old, ok: true, count: old.count + 1 };
+          if (!old) return old;
+          return {
+            ...old,
+            ok: true,
+            count: (old.count ?? 0) + 1,
+            totalSuccess: (old.totalSuccess ?? old.count ?? 0) + 1,
+            todaySuccess: (old.todaySuccess ?? 0) + 1,
+          };
         });
         qc.invalidateQueries({ queryKey: ["success-activation-count"] });
       })
@@ -440,7 +446,13 @@ function HomePage() {
           <a href="#features" className="hover:text-white transition">Features</a>
           <a href="#plans" className="hover:text-white transition">Access</a>
           <a href="#faq" className="hover:text-white transition">FAQ</a>
-          <a href="#reviews" className="hover:text-white transition">Reviews</a>
+          <a href="#live" className="hover:text-white transition inline-flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+            </span>
+            {b.nav_link_live}
+          </a>
         </div>
         <div className="flex items-center gap-3">
           {authUserId ? (
@@ -1051,47 +1063,82 @@ function HomePage() {
 
 
 
-      {/* LIVE ACTIVATIONS — system-owned realtime count. Not editable in Branding Studio. */}
-      <section id="reviews" className="relative py-20 sm:py-24 md:py-28 px-4 sm:px-6 md:px-12">
+      {/* LIVE ACTIVATION FEED — system-owned realtime metrics. Copy editable in Branding Studio. */}
+      <section id="live" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-12 md:mb-16 reveal flex justify-center">
-            <div className="activation-panel live-count-panel relative w-full max-w-3xl text-center px-6 sm:px-10 py-10 sm:py-14">
-              <div className="font-mono text-[10px] sm:text-xs uppercase tracking-[0.28em] sm:tracking-[0.3em] text-[#ff2a3a] mb-4 break-words">
-                // Live activations
-              </div>
-              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight">
-                <span className="text-live tabular-nums inline-flex items-center gap-2 align-baseline">
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff2a3a]" />
-                  </span>
-                  <span className="break-normal">{(successCount.data?.count ?? 0).toLocaleString()}</span>
-                </span>{" "}
-                <span className="block sm:inline text-white/90">successful TV activations</span>
-              </h2>
-              <p className="mt-4 text-sm sm:text-base text-white/55 leading-relaxed max-w-2xl mx-auto">
-                This number is automatic and updates from completed activations only.
-              </p>
+          <div className="text-center mb-12 md:mb-16 reveal">
+            <div className="font-mono uppercase tracking-[0.3em] text-[#ff2a3a] mb-5 inline-flex items-center gap-3 text-[11px] sm:text-xs">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              </span>
+              {b.section_live_kicker}
             </div>
+            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+              {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
+            </h2>
+            {b.section_live_sub ? (
+              <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+                {b.section_live_sub}
+              </p>
+            ) : null}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { q: "Activated in under 20 seconds. Genuinely smooth.", n: "M. Ortega" },
-              { q: "The code flow just works. No hoops, no spam.", n: "J. Chen" },
-              { q: "Fastest TV setup I've ever done. Support was instant.", n: "S. Nakamura" },
-            ].map((t, i) => (
-              <div key={`${t.n}-${i}`} className="glass glass-hover p-6 sm:p-8 reveal">
-                <div className="text-[#ff2a3a] text-sm mb-4">★ ★ ★ ★ ★</div>
-                <p className="text-white/85 leading-relaxed text-[15px] sm:text-base">"{t.q}"</p>
-                <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center gap-2 text-[10px] sm:text-xs font-mono uppercase tracking-widest text-white/50">
-                  <span className="truncate">{t.n}</span>
-                  <span className="text-[#ff2a3a] shrink-0">Verified</span>
-                </div>
+
+          {(() => {
+            const today = successCount.data?.todaySuccess ?? 0;
+            const total = successCount.data?.totalSuccess ?? 0;
+            const rate = successCount.data?.successRate ?? 0;
+            const tiles = [
+              { v: today.toLocaleString(), l: b.section_live_today_label, h: b.section_live_today_hint, suffix: null as string | null },
+              { v: total.toLocaleString(), l: b.section_live_total_label, h: b.section_live_total_hint, suffix: null },
+              { v: rate.toFixed(1), l: b.section_live_rate_label, h: b.section_live_rate_hint, suffix: "%" },
+            ];
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                {tiles.map((t, i) => (
+                  <div key={i} className="why-card reveal">
+                    <div className="why-card-inner h-full flex flex-col">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                          </span>
+                          {b.section_live_pulse_label}
+                        </div>
+                        <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/40">
+                          {String(i + 1).padStart(2, "0")}
+                        </div>
+                      </div>
+                      <div className="font-display leading-none tabular-nums text-5xl sm:text-6xl md:text-[4rem] text-white">
+                        <span className="text-live">{t.v}</span>
+                        {t.suffix ? <span className="text-white/70 text-3xl sm:text-4xl ml-1">{t.suffix}</span> : null}
+                      </div>
+                      <div className="mt-6 pt-5 border-t border-white/[0.06]">
+                        <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/70">
+                          {t.l}
+                        </div>
+                        {t.h ? (
+                          <div className="mt-1.5 text-sm text-white/50 leading-relaxed">
+                            {t.h}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
+
+          {b.section_live_footnote ? (
+            <p className="mt-10 text-center text-sm text-white/45 max-w-3xl mx-auto leading-relaxed reveal">
+              {b.section_live_footnote}
+            </p>
+          ) : null}
         </div>
       </section>
+
 
 
       {/* CTA */}

@@ -531,18 +531,36 @@ export const submitActivation = createServerFn({ method: "POST" })
     };
   });
 
-// Public live counter of ONLY successful TV activations.
-// No auth, no PII returned — just a scalar count. Polled every 2s from the homepage.
+// Public live feed of activation stats. No auth, no PII — just scalars.
+// `count` (all-time success) is retained for backward compatibility.
+// Success-rate excludes user-typo outcomes (`invalid_code`, `expired_code`)
+// from the denominator so a burst of test codes doesn't sink the number.
 export const getSuccessActivationCount = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { count, error } = await supabaseAdmin
-      .from("activation_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("result", "success");
-    if (error) return { count: 0, ok: false as const };
-    return { count: count ?? 0, ok: true as const };
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startIso = startOfToday.toISOString();
+
+    const [totalSuccess, todaySuccess, genuineAttempts] = await Promise.all([
+      supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).eq("result", "success"),
+      supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).eq("result", "success").gte("created_at", startIso),
+      supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).not("result", "in", "(invalid_code,expired_code)"),
+    ]);
+
+    const total = totalSuccess.count ?? 0;
+    const today = todaySuccess.count ?? 0;
+    const denom = genuineAttempts.count ?? 0;
+    const rate = denom > 0 ? Math.max(0, Math.min(100, (total / denom) * 100)) : 0;
+
+    return {
+      ok: true as const,
+      count: total,
+      totalSuccess: total,
+      todaySuccess: today,
+      successRate: Number(rate.toFixed(1)),
+    };
   } catch {
-    return { count: 0, ok: false as const };
+    return { ok: false as const, count: 0, totalSuccess: 0, todaySuccess: 0, successRate: 0 };
   }
 });
