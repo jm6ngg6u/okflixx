@@ -61,6 +61,9 @@ function LoginPage() {
   const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<OAuthErrorKind | null>(null);
+  const [errorHint, setErrorHint] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [diagOpen, setDiagOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).has("diag");
