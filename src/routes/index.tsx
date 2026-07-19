@@ -68,7 +68,7 @@ const SESSION_KEY = "okflix_access_session";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "OKFLIX — Activate Netflix on any TV in seconds" },
+      { title: "OKFLIX — Activate Netflix on any TV" },
       { name: "description", content: "Enter your 8-digit code and stream Netflix instantly on any Smart TV, Apple TV, Roku, PS5 or Xbox. Encrypted, always-on, 2026-ready." },
     ],
   }),
