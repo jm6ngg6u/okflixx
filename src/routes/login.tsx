@@ -27,6 +27,34 @@ export const Route = createFileRoute("/login")({
 
 type DiagLine = { ts: number; label: string; status: "ok" | "warn" | "fail" | "info"; detail?: string };
 
+type OAuthErrorKind =
+  | "denied"       // user cancelled or refused consent
+  | "blocked"      // account disabled / admin blocked / access_denied by IdP
+  | "network"      // offline, DNS, fetch failure, timeout
+  | "popup"        // popup blocked / closed by user
+  | "config"       // provider misconfig / redirect mismatch
+  | "unknown";
+
+function classifyOAuthError(raw: string): { kind: OAuthErrorKind; title: string; hint: string } {
+  const msg = (raw || "").toLowerCase();
+  if (!navigator.onLine || msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout") || msg.includes("timed out")) {
+    return { kind: "network", title: "You appear to be offline", hint: "Check your internet connection, then retry." };
+  }
+  if (msg.includes("popup") || msg.includes("closed") || msg.includes("cancel")) {
+    return { kind: "popup", title: "Sign-in window was closed", hint: "Try again — or use full-page sign-in if popups are blocked." };
+  }
+  if (msg.includes("access_denied") || msg.includes("consent") || msg.includes("denied")) {
+    return { kind: "denied", title: "Consent was declined", hint: "You must approve Google's consent screen to continue." };
+  }
+  if (msg.includes("disabled") || msg.includes("blocked") || msg.includes("suspend") || msg.includes("unauthorized_client") || msg.includes("forbidden")) {
+    return { kind: "blocked", title: "This Google account can't sign in", hint: "It may be blocked or disabled. Try a different account or contact support." };
+  }
+  if (msg.includes("redirect") || msg.includes("mismatch") || msg.includes("invalid_client") || msg.includes("configuration")) {
+    return { kind: "config", title: "Sign-in is temporarily misconfigured", hint: "Please retry in a moment. If it persists, contact support." };
+  }
+  return { kind: "unknown", title: "Google sign-in failed", hint: "Please retry. If it keeps failing, try full-page sign-in." };
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const brand = useBrand();
