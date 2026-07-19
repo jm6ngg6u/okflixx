@@ -922,37 +922,43 @@ function HomePage() {
 
 
 
-      {/* PLAN — SINGLE FREE PREMIUM */}
-      <section id="plans" className="relative py-28 px-6 md:px-12">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12 reveal">
-            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_plan_kicker}</div>
-            <h2 className="font-display brand-section-title">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
-            <p className="mt-5 text-white/60 max-w-xl mx-auto">{b.section_plan_sub}</p>
+      {/* HOW IT WORKS — STEP-BY-STEP GUIDE */}
+      <section id="how-it-works" className="relative py-24 sm:py-28 px-4 sm:px-6 md:px-12">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16 reveal">
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_howto_kicker}</div>
+            <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
-          <div className="glass glow-ring-anim p-10 md:p-12 reveal text-center">
-            <div className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.32em] text-[#ff2a3a] mb-5">
-              <span aria-hidden>◆</span>
-              {b.plan_badge}
-            </div>
-            <div className="font-display brand-card-title mb-2">{b.plan_name}</div>
-            <div className="flex items-baseline justify-center gap-2 mb-8">
-              <span className="font-display text-7xl text-shine">{b.plan_price}</span>
-              <span className="text-white/40 text-sm">{b.plan_price_period}</span>
-            </div>
-            <ul className="grid sm:grid-cols-2 gap-3 text-sm text-white/75 text-left max-w-md mx-auto">
-              {[b.plan_feature_1, b.plan_feature_2, b.plan_feature_3, b.plan_feature_4, b.plan_feature_5, b.plan_feature_6]
-                .filter(Boolean)
-                .map((feat, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span aria-hidden className="text-[#ff2a3a]">◆</span>
-                    <span>{feat}</span>
-                  </li>
-                ))}
-            </ul>
-            <a href="#activate" className="btn-red mt-10 inline-block">{b.plan_cta}</a>
-            <div className="mt-6 font-mono text-[10px] uppercase tracking-widest text-white/40">{b.plan_footnote}</div>
+          <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+            {[1, 2, 3, 4, 5].map((n) => {
+              const icon = b[`howto_step_${n}_icon` as keyof typeof b];
+              const title = b[`howto_step_${n}_title` as keyof typeof b];
+              const desc = b[`howto_step_${n}_desc` as keyof typeof b];
+              return (
+                <li
+                  key={n}
+                  className="glass relative flex flex-col p-5 sm:p-6 reveal h-full min-h-[220px] lg:min-h-[260px] transition-transform hover:-translate-y-1"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <span
+                      aria-hidden
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                    >
+                      {n}
+                    </span>
+                    <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
+                  </div>
+                  <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
+                  <p className="text-sm text-white/65 leading-relaxed">{desc}</p>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="mt-10 sm:mt-12 text-center reveal">
+            <a href="#activate" className="btn-red inline-block">Enter your code</a>
           </div>
         </div>
       </section>
