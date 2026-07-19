@@ -27,12 +27,43 @@ export const Route = createFileRoute("/login")({
 
 type DiagLine = { ts: number; label: string; status: "ok" | "warn" | "fail" | "info"; detail?: string };
 
+type OAuthErrorKind =
+  | "denied"       // user cancelled or refused consent
+  | "blocked"      // account disabled / admin blocked / access_denied by IdP
+  | "network"      // offline, DNS, fetch failure, timeout
+  | "popup"        // popup blocked / closed by user
+  | "config"       // provider misconfig / redirect mismatch
+  | "unknown";
+
+function classifyOAuthError(raw: string): { kind: OAuthErrorKind; title: string; hint: string } {
+  const msg = (raw || "").toLowerCase();
+  if (!navigator.onLine || msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout") || msg.includes("timed out")) {
+    return { kind: "network", title: "You appear to be offline", hint: "Check your internet connection, then retry." };
+  }
+  if (msg.includes("popup") || msg.includes("closed") || msg.includes("cancel")) {
+    return { kind: "popup", title: "Sign-in window was closed", hint: "Try again — or use full-page sign-in if popups are blocked." };
+  }
+  if (msg.includes("access_denied") || msg.includes("consent") || msg.includes("denied")) {
+    return { kind: "denied", title: "Consent was declined", hint: "You must approve Google's consent screen to continue." };
+  }
+  if (msg.includes("disabled") || msg.includes("blocked") || msg.includes("suspend") || msg.includes("unauthorized_client") || msg.includes("forbidden")) {
+    return { kind: "blocked", title: "This Google account can't sign in", hint: "It may be blocked or disabled. Try a different account or contact support." };
+  }
+  if (msg.includes("redirect") || msg.includes("mismatch") || msg.includes("invalid_client") || msg.includes("configuration")) {
+    return { kind: "config", title: "Sign-in is temporarily misconfigured", hint: "Please retry in a moment. If it persists, contact support." };
+  }
+  return { kind: "unknown", title: "Google sign-in failed", hint: "Please retry. If it keeps failing, try full-page sign-in." };
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const brand = useBrand();
   const search = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<OAuthErrorKind | null>(null);
+  const [errorHint, setErrorHint] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [diagOpen, setDiagOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).has("diag");
@@ -105,12 +136,31 @@ function LoginPage() {
     // Browser is navigating away — nothing else to do.
   }
 
+  function reportError(rawMsg: string) {
+    const { kind, title, hint } = classifyOAuthError(rawMsg);
+    setErrorKind(kind);
+    setErrorMessage(title);
+    setErrorHint(hint);
+    logDiag("OAuth error", "fail", `${kind}: ${rawMsg}`);
+    toast.error(title, { description: hint });
+    setBusy(false);
+  }
+
   async function handleGoogle(opts?: { forceRedirect?: boolean }) {
     if (busy) return;
     setBusy(true);
     setErrorMessage(null);
+    setErrorKind(null);
+    setErrorHint(null);
+    setRetryCount((n) => n + 1);
     stashRedirect(search.redirect ?? null);
     logDiag(opts?.forceRedirect ? "Sign-in start · redirect mode" : "Sign-in start · popup mode", "info");
+
+    // Offline guard — save a wasted round-trip.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      reportError("network offline");
+      return;
+    }
 
     // Pre-flight popup probe. MUST run synchronously in the click handler so
     // the browser attributes the resulting popup to the user gesture.
@@ -149,11 +199,7 @@ function LoginPage() {
       });
       if (result.error) {
         window.clearTimeout(stuck);
-        const msg = result.error.message ?? "Google sign-in failed.";
-        logDiag("OAuth error", "fail", msg);
-        setErrorMessage(msg);
-        toast.error(msg);
-        setBusy(false);
+        reportError(result.error.message ?? "Google sign-in failed.");
         return;
       }
       if (result.redirected) {
@@ -167,13 +213,10 @@ function LoginPage() {
       navigate({ to: target, replace: true });
     } catch (err: any) {
       window.clearTimeout(stuck);
-      const msg = err?.message ?? "Google sign-in failed.";
-      logDiag("Exception", "fail", msg);
-      setErrorMessage(msg);
-      toast.error(msg);
-      setBusy(false);
+      reportError(err?.message ?? "Google sign-in failed.");
     }
   }
+
 
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
@@ -484,22 +527,36 @@ function LoginPage() {
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ff5a68]" aria-hidden="true" />
                   <div className="flex-1 space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff8894]">
-                      {loginErrorTitle}
+                      {errorKind === "network"
+                        ? "Connection lost"
+                        : errorKind === "blocked"
+                        ? "Account blocked"
+                        : errorKind === "denied"
+                        ? "Consent declined"
+                        : errorKind === "popup"
+                        ? "Popup closed"
+                        : errorKind === "config"
+                        ? "Configuration error"
+                        : loginErrorTitle}
                     </p>
-                    <p className="leading-snug text-red-50/95 font-mono text-[12.5px] break-words">
+                    <p className="leading-snug text-red-50/95 text-[13px] break-words">
                       {errorMessage}
                     </p>
-                    {loginErrorHint && (
-                      <p className="leading-snug text-red-50/70 text-[12.5px]">{loginErrorHint}</p>
+                    {(errorHint || loginErrorHint) && (
+                      <p className="leading-snug text-red-50/70 text-[12.5px]">{errorHint || loginErrorHint}</p>
                     )}
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => handleGoogle({ forceRedirect: true })}
+                        onClick={() => handleGoogle({ forceRedirect: errorKind !== "denied" && errorKind !== "blocked" })}
                         disabled={busy}
                         className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
                       >
-                        Try full-page sign-in instead
+                        {errorKind === "network"
+                          ? `Retry${retryCount > 1 ? ` (attempt ${retryCount + 1})` : ""}`
+                          : errorKind === "denied" || errorKind === "blocked"
+                          ? "Try a different Google account"
+                          : "Try full-page sign-in instead"}
                       </button>
                       {loginHelpUrl && (
                         <a
