@@ -138,6 +138,7 @@ export const setMaintenance = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceSettingsRateLimit(supabaseAdmin, userId);
     const nowIso = new Date().toISOString();
     const rows: Array<{ key: string; value: string; updated_at: string; updated_by: string }> = [];
     if (typeof data.enabled === "boolean") {
