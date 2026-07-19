@@ -383,6 +383,7 @@ export const setBackgroundSongReactive = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_reactive", value: data.reactive ? "true" : "false",
       updated_at: nowIso(), updated_by: userId,
@@ -407,6 +408,7 @@ export const setBackgroundSongSchedule = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     const ts = nowIso();
     await supabaseAdmin.from("app_settings").upsert([
       { key: "background_song_schedule_enabled", value: data.enabled ? "true" : "false", updated_at: ts, updated_by: userId },
@@ -426,6 +428,7 @@ export const setBackgroundSongIntensity = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_intensity", value: data.intensity.toFixed(2),
       updated_at: nowIso(), updated_by: userId,
@@ -439,6 +442,7 @@ export const setBackgroundSongSensitivity = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_sensitivity", value: data.sensitivity.toFixed(2),
       updated_at: nowIso(), updated_by: userId,
@@ -463,6 +467,7 @@ export const setBackgroundSongTrackTitle = createServerFn({ method: "POST" })
     const { userId } = await requireAdmin(context);
     const clean = normalizeTrackTitle(data.title);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_track_title", value: clean,
       updated_at: nowIso(), updated_by: userId,
@@ -479,6 +484,7 @@ export const removeBackgroundSong = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     const { data: cur } = await supabaseAdmin
       .from("app_settings").select("value").eq("key", "background_song_path").maybeSingle();
     const path = cur?.value;
@@ -505,6 +511,7 @@ export const restoreBackgroundSong = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
 
     const { data: row, error } = await supabaseAdmin
       .from("background_song_history")
@@ -539,6 +546,7 @@ export const deleteBackgroundSongVersion = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     const { data: row } = await supabaseAdmin
       .from("background_song_history")
       .select("id, path, is_current").eq("id", data.id).maybeSingle();
