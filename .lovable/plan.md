@@ -1,80 +1,63 @@
-# Audio-Reactive Background — Deep Hardening Plan
+# Responsive & Consistency Hardening Plan
 
-Goal: make the reactive engine correct, safe, and scalable for 2000+ concurrent visitors, with a clear admin experience. No cosmetic bloat.
+Five issues, tackled one by one. No skipped items.
 
-## Real issues found (grounded in code)
+## 1. Fluid icon + red-dot sizing (src/styles.css, src/routes/index.tsx)
 
-1. **Live slider = local state only.** In `admin.background-song.tsx` the "Beam intensity" and "Bass sensitivity" sliders update React state but never call `setIntensity()` / `setSensitivity()` from `src/lib/audio-reactive.ts`. Values only take effect after Save + reload. The card even claims "no reload needed" — currently false for these two controls.
-2. **Sensitivity not read on public site.** `LiveBackground.tsx` reads `getIntensity()` per frame but never reads `getSensitivity()`; visitors' bass response is stuck at 1× regardless of the admin slider.
-3. **Silence auto-fallback is one-way.** `BackgroundSong.tsx` calls `setReactiveEnabled(false)` on 3s silence, but never re-enables when the analyser recovers (e.g. after unmute / URL refresh). Reactive stays STATIC until page reload.
-4. **AudioContext leak on iOS Safari.** `createMediaElementSource` throws if called twice on same element; try/catch swallows it but the graph then has no analyser — analyser stays silent, reactive silently dies. No `blocked` status is reported.
-5. **No FPS/thermal guard.** On low-end phones the beam loop can drop below 20 fps; there is no auto-downshift (beam count, layer count, blur). At 2000+ users this shows up as janky first-paint on cheap Android.
-6. **Tab hidden throttle correct, but `noteFrame()` still ticks at 8 fps hidden** → FPS meter shows misleading "8" in admin. Meter should freeze / mark "hidden".
-7. **`reduced-motion` disables beam bob but still runs the loop at 6 fps forever** — fine, but analyser still hits `getByteFrequencyData` unnecessarily. Small CPU waste at scale.
-8. **No visibility in admin of what visitors' engines are actually doing** (reactive on/off, silent-fallback rate, avg fps). The bg-heartbeat added last turn only tracks playback, not reactive health.
-9. **Admin preview shares the global AudioContext** via `attachAudio(previewEl)` in Live Preview. If admin has main site open in another tab the same MediaElementSource error can fire. Preview should own its own context or be explicitly documented as sharing.
-10. **`prefers-reduced-motion` ignored for admin preview** — preview keeps running full-frame even for accessibility users.
+Problem: red pulsing dot and card icons are hardcoded (`h-1.5 w-1.5`, fixed SVG sizes) so they don't scale with the kicker/text at TV or small mobile widths.
 
-## Implementation (one file per fix, no skipped items)
+- Add utility classes in `src/styles.css`:
+  - `.kicker-dot` — width/height `clamp(6px, 0.7vw, 10px)` for the solid dot; wrapper matches for the `animate-ping` layer.
+  - `.icon-fluid` — `width/height: clamp(20px, 2.4vw, 32px)` for card icons (why-card, step icons, faq numerals).
+  - `.icon-fluid-lg` — `clamp(28px, 3vw, 44px)` for hero/CTA icons.
+- Swap all hardcoded `h-1.5 w-1.5` dot spans in `index.tsx` to `.kicker-dot`.
+- Swap fixed `w-6 h-6` / `w-8 h-8` icon classes inside `.why-card`, step cards, FAQ number badges, and Final Step CTA to `.icon-fluid` / `.icon-fluid-lg`.
 
-### 1. Wire sliders to live engine (`admin.background-song.tsx`)
-- On slider `onChange`, call `setIntensity(v)` / `setSensitivity(v)` from `@/lib/audio-reactive` so admin sees instant response in Live Preview and the change takes effect for visitors on next `getLevels()` tick (already imported client-side via the audio module).
-- Keep `onCommit` → server save. No debounce change.
+## 2. Consistent pulsing red dot on ALL kickers (src/routes/index.tsx)
 
-### 2. Public site reads sensitivity (`LiveBackground.tsx`)
-- Import `getSensitivity` and multiply the bass/beat contributions by it inside the frame loop (single multiply — no extra allocations). This is the only change to the public renderer.
+Currently: Features, Step-by-Step Guide, and FAQ have the dot. Missing on **Live Activation Feed** and **Final Step** kickers (and re-verify Features).
 
-### 3. Silence recovery (`BackgroundSong.tsx`)
-- Track `wantReactive` (admin setting). When `onSilenceChange(false)` fires and `wantReactive` is true, re-enable via `setReactiveEnabled(true)` and clear the "fell back to STATIC" toast state so it can fire again on the next real failure.
-- Add a 10s cooldown to avoid oscillation.
+- Insert the same `<span className="relative flex kicker-dot">…animate-ping…</span>` pattern into the LIVE and FINAL STEP kicker pills so all five kickers are visually identical.
 
-### 4. Hardened AudioContext (`audio-reactive.ts`)
-- If `new AudioContext()` throws (iOS lockdown / older Safari), set an internal `blocked=true` flag and expose `isAudioBlocked()`. `getLevels()` returns zero without touching a null analyser (already does — keep).
-- On `createMediaElementSource` throw when the element already has a source in the WeakMap, reuse the cached node (already works) — but when the *context* is different (e.g. after a suspend/close cycle), rebuild the chain instead of leaving analyser=null.
-- Add `detachAudio(el)` for preview unmount (`pause + src="" + disconnect source cleanly`).
+## 3. Grid density tuning (src/routes/index.tsx, src/styles.css)
 
-### 5. Adaptive quality guard (`LiveBackground.tsx`)
-- Rolling 60-frame fps sample already exists via `noteFrame`. Add a lightweight quality controller:
-  - fps < 30 for 3s → drop to 2 layers per beam (currently 4) and halve `beamsPerBand`
-  - fps < 20 for 3s → freeze bob, keep only base line
-  - fps recovers > 50 for 5s → restore
-- Store level in a ref; no re-render.
+Problem: awkward wrapping — Features jumps 1→2→4 with no tablet step; Step-by-Step is 2→3→5 but the 3-col row on `md` leaves 2 orphan cards; FAQ list is single-column even on desktop where 2-col reads better.
 
-### 6. FPS meter accuracy (`audio-reactive.ts` + admin)
-- When `document.hidden` or `reduced-motion` throttled: `noteFrame` skips FPS averaging; getter returns last "active" fps and a flag. Admin card labels it "PAUSED (hidden)" or "REDUCED-MOTION" instead of showing 6/8.
+- Features grid: `grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4` (unchanged if already good) — verify gutters use `gap-4 sm:gap-6 lg:gap-8`.
+- Step-by-Step: switch to `grid-cols-1 sm:grid-cols-2 lg:grid-cols-5` (drop the awkward 3-col md tier); on `md` keep 2-col but widen container.
+- FAQ: `grid-cols-1 lg:grid-cols-2 gap-4` so long question list doesn't run 6-deep on desktop.
+- Tighten `.why-card-inner` min-height on tablet with a mid clamp so tablet doesn't show excessive whitespace under short copy.
 
-### 7. Skip analyser reads when reactive off (`audio-reactive.ts`)
-- Already short-circuits when `enabled=false`. Also short-circuit when `attachedEl.paused` — avoids one FFT copy per frame per visitor with reactive-on but paused audio. Big deal at 2000 concurrent tabs.
+## 4. Accessibility: contrast + touch targets (src/styles.css, src/routes/index.tsx)
 
-### 8. Reactive telemetry (piggyback existing heartbeat)
-- Extend the `bgs-heartbeat` payload built last turn with `reactive: boolean`, `reactiveFps: number` (rounded), `analyserSilent: boolean`, `audioBlocked: boolean`. No new endpoint, no new table columns — write into the existing `error` JSON slot only when non-nominal (silent/blocked). Purely additive on the client; server just accepts extra fields.
-- Admin card gains a compact "Reactive engine" strip below the master pill: Median FPS · Silent-fallback % · Blocked-context % · Reactive-on % (query already refetches every 2s).
+Audit and fix Features + Live Activation Feed:
+- Body copy currently `text-white/60` on near-black — bump muted card text to `text-white/70` (WCAG AA at these sizes).
+- Kicker `text-[#ff2a3a]` on `#0a0a0c` passes AA large; keep — but add `text-shadow: 0 0 12px rgba(255,42,58,0.35)` only when reduced-motion is off.
+- Ensure every interactive element (FAQ accordion trigger, feed row, CTA button) has `min-height: 44px` via a `.tap-44` utility applied on mobile.
+- Add `focus-visible` ring using existing red token for accordion triggers and CTA links.
 
-### 9. Admin preview isolation (`admin.background-song.tsx`)
-- Preview `<audio>` element stays on the shared context (documented), but on unmount call the new `detachAudio(el)` so leaving the page frees the source and stops analyser reads.
-- Respect `prefers-reduced-motion` in preview: show "Reduced-motion active — meters paused" instead of running the analyser loop.
+## 5. Playwright responsive regression suite (scripts/responsive-regression.py)
 
-### 10. UI polish (only what improves signal, no bloat)
-- The "REACTIVE / STATIC" pill picks up a third state "BLOCKED" when `audioBlocked` is true (iOS lockdown) and a fourth "FALLBACK" when silence auto-disabled. Same admin brand tokens, no new palette.
-- Slider rows show a tiny live "×N applied" bubble that pulses when the value differs from the last saved value, so admins see local-vs-saved clearly.
+New script covering four viewports:
+- Mobile 390×844, Tablet 834×1194, Desktop 1440×900, TV 1920×1080.
+- For each viewport: navigate to `/`, screenshot full sections (`#features`, `#how-it-works`, `#faq`, `#live`, `#final-step`), and assert:
+  - kicker dot rendered on all five sections (`document.querySelectorAll('.kicker-dot').length >= 5`)
+  - no horizontal scroll (`document.documentElement.scrollWidth <= innerWidth + 1`)
+  - card min-height within tolerance per breakpoint
+  - computed font-size of section titles within expected clamp range
+  - tap targets ≥ 44px on mobile only (query buttons + accordion triggers)
+- Write `scripts/screenshots/responsive/` PNGs and `report.json` with pass/fail per assertion. Exit non-zero on failure so it can gate future changes.
 
-## Not doing (explicitly rejected)
-- Per-visitor waveform recording (privacy + bandwidth).
-- Additional visualizers / presets (visual bloat, no operational value).
-- WebGL/Shader rewrite (not warranted; 2D canvas is fine with the adaptive guard).
-- Server-side FFT (unnecessary; browsers do this natively).
+## Verification
+
+Run in this order after each fix:
+1. Typecheck (auto by harness).
+2. `python3 scripts/responsive-regression.py` — inspect `report.json` and the four screenshot sets.
+3. Manual spot-check: kicker dots identical on all five sections, no orphan grid rows on tablet, FAQ reads as 2-col on desktop, muted body text passes visual contrast.
 
 ## Files touched
-- `src/lib/audio-reactive.ts` — blocked flag, detach, paused-skip, FPS accuracy.
-- `src/components/LiveBackground.tsx` — read sensitivity, adaptive quality guard.
-- `src/components/BackgroundSong.tsx` — silence recovery, heartbeat payload extension.
-- `src/routes/admin.background-song.tsx` — live slider wiring, preview detach, reactive telemetry strip, pill states.
+- `src/styles.css` — fluid icon utilities, tap target utility, muted text bump.
+- `src/routes/index.tsx` — kicker dot on LIVE + FINAL STEP, class swaps, grid tier changes.
+- `scripts/responsive-regression.py` — new.
 
-## Verification (deep, one by one)
-- Slider drag on `/admin/background-song` → beams visibly change in Live Preview within the same frame; visitors on `/` see the same change on next `getLevels()` frame.
-- Mute the current track → after ~3s the pill shows FALLBACK; unmute → returns to REACTIVE within 10s cooldown.
-- iOS Safari private mode (AudioContext blocked) → pill shows BLOCKED, no console errors, no retry storm.
-- Chromium `--enable-features=LowEndDeviceMode` throttled 4x CPU → adaptive guard drops layers within 3s; fps recovers to 50+.
-- Playwright script `scripts/reactive-engine-e2e.py` covering the four states above + heartbeat payload assertion.
-
-Approve to start implementation.
+Approve to start.

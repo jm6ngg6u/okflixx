@@ -486,9 +486,9 @@ function HomePage() {
           <a href="#how-it-works" className="hover:text-white transition">Guide</a>
           <a href="#faq" className="hover:text-white transition">FAQ</a>
           <a href="#live" className="hover:text-white transition inline-flex items-center gap-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+            <span className="kicker-dot-wrap">
+              <span className="kicker-dot-ping" />
+              <span className="kicker-dot" />
             </span>
             {b.nav_link_live}
           </a>
@@ -883,9 +883,9 @@ function HomePage() {
         <div className="max-w-6xl mx-auto relative">
           <div className="text-center mb-10 sm:mb-14 md:mb-20 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_features_kicker}
             </div>
@@ -893,7 +893,7 @@ function HomePage() {
               {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
             </h2>
             {b.section_features_sub ? (
-              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
+              <p className="mt-5 sm:mt-6 text-white/70 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_features_sub}
               </p>
             ) : null}
@@ -920,7 +920,7 @@ function HomePage() {
                   <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
                     {f.t}
                   </h3>
-                  <p className="text-white/60 text-[13px] sm:text-sm leading-relaxed flex-1">
+                  <p className="text-white/70 text-[13px] sm:text-sm leading-relaxed flex-1">
                     {f.d}
                   </p>
                   <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
@@ -977,14 +977,14 @@ function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_howto_kicker}
             </div>
             <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
-            <p className="mt-4 sm:mt-5 text-white/60 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
+            <p className="mt-4 sm:mt-5 text-white/70 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
           <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
@@ -1064,9 +1064,9 @@ function HomePage() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_faq_kicker}
             </div>
@@ -1120,9 +1120,9 @@ function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.3em] text-[#ff2a3a] section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_live_kicker}
             </div>
@@ -1130,7 +1130,7 @@ function HomePage() {
               {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
             </h2>
             {b.section_live_sub ? (
-              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
+              <p className="mt-5 sm:mt-6 text-white/70 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_live_sub}
               </p>
             ) : null}
@@ -1154,9 +1154,9 @@ function HomePage() {
                 <div className="why-card reveal">
                   <div className="why-card-inner h-full flex flex-col items-center text-center py-14 sm:py-20">
                     <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2 mb-6">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                      <span className="kicker-dot-wrap">
+                        <span className="kicker-dot-ping" />
+                        <span className="kicker-dot" />
                       </span>
                       STANDING BY
                     </div>
@@ -1185,9 +1185,9 @@ function HomePage() {
                       <div className="why-card-inner h-full flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                           <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2">
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                            <span className="kicker-dot-wrap">
+                              <span className="kicker-dot-ping" />
+                              <span className="kicker-dot" />
                             </span>
                             {b.section_live_pulse_label}
                           </div>
@@ -1233,9 +1233,9 @@ function HomePage() {
       <section className="relative section-pad-y section-pad-x">
         <div className="relative max-w-3xl mx-auto text-center reveal">
           <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] section-kicker-fluid">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+            <span className="kicker-dot-wrap">
+              <span className="kicker-dot-ping" />
+              <span className="kicker-dot" />
             </span>
             Final step
           </div>
