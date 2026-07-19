@@ -127,6 +127,12 @@ function ContactPage() {
         <ContactRow icon={Phone} label="WhatsApp" kind="whatsapp"
           enableKey="contact_wa_enabled" nameKey="contact_wa_name" handleKey="contact_wa_number"
           handlePlaceholder="+1 555 123 4567" local={local} set={set} onSave={save} />
+        <ContactRow icon={Mail} label="Email" kind="email"
+          enableKey="contact_em_enabled" nameKey="contact_em_name" handleKey="contact_em_address"
+          handlePlaceholder="support@example.com" local={local} set={set} onSave={save} />
+        <ContactRow icon={Hash} label="Discord" kind="discord"
+          enableKey="contact_dc_enabled" nameKey="contact_dc_name" handleKey="contact_dc_invite"
+          handlePlaceholder="invitecode or discord.gg/xxx" local={local} set={set} onSave={save} />
 
         <ContactPreview local={local} />
         <ContactServerCheck local={local} />
