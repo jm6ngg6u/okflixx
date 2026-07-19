@@ -506,17 +506,15 @@ export const logAdminAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ allowed: z.boolean(), path: z.string().max(200) }).parse(input))
   .handler(async ({ data, context }) => {
-    const { userId } = context as any;
+    const { userId, claims } = context as any;
+    const email = claims?.email ?? null;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.rpc("log_admin_access_attempt", { _allowed: data.allowed, _path: data.path });
-    // Note: RPC uses auth.uid() which is null under service_role; supplement with an explicit row so the
-    // actor is preserved.
     await supabaseAdmin.from("admin_activity_log").insert({
       admin_id: userId,
-      actor_label: userId,
+      actor_label: email ?? userId,
       action: "admin_access_attempt",
       target: data.path,
-      details: { allowed: data.allowed, path: data.path, user_id: userId },
+      details: { email, allowed: data.allowed, path: data.path, user_id: userId },
     });
     return { ok: true };
   });
