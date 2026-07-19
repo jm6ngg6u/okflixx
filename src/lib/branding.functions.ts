@@ -412,6 +412,18 @@ export const setBranding = createServerFn({ method: "POST" })
     const clean = sanitize(shortKey, data.value);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Per-admin rate-limit: 30 branding writes / 60s window.
+    const since = new Date(Date.now() - 60_000).toISOString();
+    const { count: recent } = await supabaseAdmin
+      .from("admin_activity_log")
+      .select("id", { count: "exact", head: true })
+      .eq("admin_id", userId)
+      .eq("action", "branding.updated")
+      .gte("created_at", since);
+    if ((recent ?? 0) >= 30) {
+      throw new Error("Rate limit: too many branding edits — slow down for a minute.");
+    }
+
     // Debounced snapshot: only if the last history entry is >30s old.
     const { data: last } = await supabaseAdmin
       .from("branding_history")
@@ -433,9 +445,9 @@ export const setBranding = createServerFn({ method: "POST" })
     if (error) throw error;
     await supabaseAdmin.from("admin_activity_log").insert({
       admin_id: userId,
-      action: `branding.${shortKey}`,
+      action: "branding.updated",
       target: shortKey,
-      details: { value: clean.length > 200 ? clean.slice(0, 200) + "…" : clean },
+      details: { key: shortKey, value: clean.length > 200 ? clean.slice(0, 200) + "…" : clean },
     });
     return { ok: true, key: shortKey, value: clean };
   });
