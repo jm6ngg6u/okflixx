@@ -55,9 +55,8 @@ const HOME_MESSAGES: Row[] = [
   { key: "hero_headline_2", label: "Hero headline — line 2 (accent)" },
   { key: "hero_sub", label: "Hero sub-copy", multiline: true },
   // Code card title, helper, CTA + progress/error messages are system-owned. Not editable here.
-  { key: "section_features_kicker", label: "Features — kicker" },
-  { key: "section_features_title_1", label: "Features — title A" },
-  { key: "section_features_title_2", label: "Features — title B (accent)" },
+  // "Why Emberlord / Built for 2026 TVs" is system-owned. Not editable here.
+
   { key: "section_plan_kicker", label: "Plan — kicker" },
   { key: "section_plan_title_1", label: "Plan — title A" },
   { key: "section_plan_title_2", label: "Plan — title B (accent)" },
