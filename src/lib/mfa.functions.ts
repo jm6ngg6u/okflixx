@@ -81,10 +81,9 @@ export const getMyMfaStatus = createServerFn({ method: "GET" })
 export const generateRecoveryCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    const { userId, claims } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Invalidate old unused codes
     await supabaseAdmin
       .from("admin_recovery_codes")
       .update({ used_at: new Date().toISOString() })
@@ -93,7 +92,7 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
 
     const codes: string[] = [];
     const rows: { user_id: string; code_hash: string }[] = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       const code = makeCode();
       codes.push(code);
       rows.push({ user_id: userId, code_hash: await sha256Hex(normalizeCode(code)) });
@@ -102,11 +101,48 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("admin_recovery_codes").insert(rows);
     if (error) throw new Error(error.message);
 
-
-
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      actor_label: (claims as any)?.email ?? userId,
+      action: "mfa.recovery_generated",
+      details: { count: codes.length },
+    });
 
     return { codes };
   });
+
+// ---------------------------------------------------------------------------
+// Read-only summary of recovery codes for the current user (no plaintext)
+// ---------------------------------------------------------------------------
+
+export const listRecoveryCodes = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ count: total }, { count: used }, { data: last }] = await Promise.all([
+      supabaseAdmin
+        .from("admin_recovery_codes")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      supabaseAdmin
+        .from("admin_recovery_codes")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .not("used_at", "is", null),
+      supabaseAdmin
+        .from("admin_recovery_codes")
+        .select("created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const t = total ?? 0;
+    const u = used ?? 0;
+    return { total: t, used: u, remaining: Math.max(0, t - u), createdAt: last?.created_at ?? null };
+  });
+
 
 // ---------------------------------------------------------------------------
 // Redeem a recovery code (used when the authenticator app is lost)
