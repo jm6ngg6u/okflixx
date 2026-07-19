@@ -1165,11 +1165,7 @@ function HomePage() {
               { v: total.toLocaleString(), l: b.section_live_total_label, h: b.section_live_total_hint, suffix: null },
               { v: rate.toFixed(1), l: b.section_live_rate_label, h: b.section_live_rate_hint, suffix: "%" },
             ];
-            const breakdown = [
-              { label: "Successful", value: total, today: today, tone: "text-emerald-400", dot: "bg-emerald-400" },
-              { label: "Wrong code", value: wrong, today: wrongToday, tone: "text-amber-300", dot: "bg-amber-300" },
-              { label: "Expired code", value: expired, today: expiredToday, tone: "text-white/70", dot: "bg-white/60" },
-            ];
+            void wrong; void expired; void wrongToday; void expiredToday;
             return (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
