@@ -400,7 +400,8 @@ export const listCronSchedules = createServerFn({ method: "GET" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
-    const { data, error } = await supabase.rpc("list_cron_schedules");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.rpc("list_cron_schedules");
     if (error) throw error;
     return { rows: (data ?? []) as Array<{ jobname: string; schedule: string; active: boolean }> };
   });
@@ -495,3 +496,25 @@ export const requestJobControl = createServerFn({ method: "POST" })
     return { ok: true, action: data.action };
   });
 
+
+/**
+ * Log an admin panel access attempt. Called on route mount from `admin.tsx`.
+ * Wrapped in a server fn so the underlying `log_admin_access_attempt` RPC
+ * can be revoked from the authenticated role (linter 0029).
+ */
+export const logAdminAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ allowed: z.boolean(), path: z.string().max(200) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { userId, claims } = context as any;
+    const email = claims?.email ?? null;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      actor_label: email ?? userId,
+      action: "admin_access_attempt",
+      target: data.path,
+      details: { email, allowed: data.allowed, path: data.path, user_id: userId },
+    });
+    return { ok: true };
+  });
