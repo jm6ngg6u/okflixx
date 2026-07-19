@@ -527,22 +527,36 @@ function LoginPage() {
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#ff5a68]" aria-hidden="true" />
                   <div className="flex-1 space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff8894]">
-                      {loginErrorTitle}
+                      {errorKind === "network"
+                        ? "Connection lost"
+                        : errorKind === "blocked"
+                        ? "Account blocked"
+                        : errorKind === "denied"
+                        ? "Consent declined"
+                        : errorKind === "popup"
+                        ? "Popup closed"
+                        : errorKind === "config"
+                        ? "Configuration error"
+                        : loginErrorTitle}
                     </p>
-                    <p className="leading-snug text-red-50/95 font-mono text-[12.5px] break-words">
+                    <p className="leading-snug text-red-50/95 text-[13px] break-words">
                       {errorMessage}
                     </p>
-                    {loginErrorHint && (
-                      <p className="leading-snug text-red-50/70 text-[12.5px]">{loginErrorHint}</p>
+                    {(errorHint || loginErrorHint) && (
+                      <p className="leading-snug text-red-50/70 text-[12.5px]">{errorHint || loginErrorHint}</p>
                     )}
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => handleGoogle({ forceRedirect: true })}
+                        onClick={() => handleGoogle({ forceRedirect: errorKind !== "denied" && errorKind !== "blocked" })}
                         disabled={busy}
                         className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff5a68] underline underline-offset-4 hover:text-[#ff8894] disabled:opacity-60"
                       >
-                        Try full-page sign-in instead
+                        {errorKind === "network"
+                          ? `Retry${retryCount > 1 ? ` (attempt ${retryCount + 1})` : ""}`
+                          : errorKind === "denied" || errorKind === "blocked"
+                          ? "Try a different Google account"
+                          : "Try full-page sign-in instead"}
                       </button>
                       {loginHelpUrl && (
                         <a
