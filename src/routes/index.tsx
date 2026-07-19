@@ -480,7 +480,7 @@ function HomePage() {
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2.5 group shrink-0 pl-1 pr-2">
             <img src={logo} alt="OKFLIX" data-wave-origin className="h-9 w-9 object-contain logo-shine group-hover:scale-110 transition" width={36} height={36} />
-            <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse hidden xs:inline sm:inline"><Wordmark /></span>
+            <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse inline text-[15px] sm:text-base"><Wordmark /></span>
           </Link>
 
           {/* Center pill */}
