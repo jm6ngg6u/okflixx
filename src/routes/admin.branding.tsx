@@ -413,9 +413,12 @@ function BrandingStudio() {
         </TabsContent>
 
 
-        <TabsContent value="identity" className="mt-4">
+        <TabsContent value="identity" className="mt-4 space-y-6">
           <Section title="Site identity" desc="Wordmark parts, browser tab title, SEO description and footer. Tab title updates in every open browser tab.">
             <FieldGrid rows={IDENTITY} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+          <Section title="Footer" desc="Florzin-style multi-column footer. Every heading, label and href is editable and applies live within ~2s. Leave a label blank to hide that row. Use /path, /path#hash, #hash, or an https:// URL for the href.">
+            <FieldGrid rows={FOOTER_ROWS} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
