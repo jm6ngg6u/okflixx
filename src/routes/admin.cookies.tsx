@@ -194,7 +194,7 @@ function CookiePoolPage() {
   const { data, isLoading, isFetching, dataUpdatedAt, error, isError, refetch } = useQuery({
     queryKey: ["cookies", page, status, country, q, sort, sortDir, stuckOnly],
     queryFn: () => logAdminFetch("listCookies", listArgs, () => list({ data: listArgs })),
-    refetchInterval: (query) => (query.state.error ? false : (isAnyChecking ? 2_000 : LIVE_POLL_MS)),
+    refetchInterval: (query) => (query.state.error || (typeof document !== "undefined" && document.visibilityState === "hidden") ? false : (isAnyChecking ? 2_000 : LIVE_POLL_MS)),
     placeholderData: (prev) => prev,
     retry: 1,
   });
