@@ -112,14 +112,12 @@ function MfaPage() {
       setSecret(en.totp.secret);
       setStatus("");
       setPhase("enroll");
-      void logMfaEvent({ data: { event: "totp_enroll_start", success: true } }).catch(() => {});
     } catch (err: any) {
       const message = err?.message ?? "Two-factor setup could not start. Please retry.";
       setStatus("");
       setErrorMessage(message);
       setPhase("error");
       toast.error(message);
-      void logMfaEvent({ data: { event: "totp_flow_error", success: false, metadata: { reason: message } } }).catch(() => {});
     }
   }
 
@@ -145,13 +143,11 @@ function MfaPage() {
         "Authenticator verification",
       );
       if (vErr) {
-      void logMfaEvent({ data: { event: "totp_enroll_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
         setErrorMessage(vErr.message);
         toast.error(vErr.message);
         setBusy(false);
         return;
       }
-      void logMfaEvent({ data: { event: "totp_enroll_ok", success: true } }).catch(() => {});
       // Generate recovery codes
       const res = await generateRecoveryCodes();
       setCodes(res.codes);
@@ -181,13 +177,11 @@ function MfaPage() {
         "Authenticator verification",
       );
       if (vErr) {
-        void logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
         setErrorMessage(vErr.message);
         toast.error(vErr.message);
         setBusy(false);
         return;
       }
-      void logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
       navigate({ to: "/admin" });
     } catch (err: any) {
       setErrorMessage(err?.message ?? "Verification failed");
