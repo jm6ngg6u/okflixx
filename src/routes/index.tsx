@@ -1107,7 +1107,7 @@ function HomePage() {
                         <span className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
                           {String(n).padStart(2, "0")}
                         </span>
-                        <span className="font-display leading-snug text-white" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
+                        <span className="font-display leading-snug text-shine" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
                           {q}
                         </span>
                       </div>
