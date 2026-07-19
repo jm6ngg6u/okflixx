@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { KeyRound, Lock, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader2, Send, Instagram, Phone } from "lucide-react";
 import logo from "@/assets/brand-logo.png";
 import { useBrand } from "@/lib/branding-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 function Wordmark() {
   const b = useBrand();
