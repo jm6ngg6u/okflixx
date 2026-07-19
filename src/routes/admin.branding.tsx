@@ -55,7 +55,22 @@ const HOME_MESSAGES: Row[] = [
   { key: "hero_headline_2", label: "Hero headline — line 2 (accent)" },
   { key: "hero_sub", label: "Hero sub-copy", multiline: true },
   // Code card title, helper, CTA + progress/error messages are system-owned. Not editable here.
-  // "Why Emberlord / Built for 2026 TVs" is system-owned. Not editable here.
+  { key: "section_features_kicker", label: "Why — kicker" },
+  { key: "section_features_title_1", label: "Why — title A" },
+  { key: "section_features_title_2", label: "Why — title B (accent)" },
+  { key: "why_card_1_index", label: "Why card 1 — index" },
+  { key: "why_card_1_title", label: "Why card 1 — title" },
+  { key: "why_card_1_desc", label: "Why card 1 — description", multiline: true },
+  { key: "why_card_1_live", label: "Why card 1 — live label" },
+  { key: "why_card_2_index", label: "Why card 2 — index" },
+  { key: "why_card_2_title", label: "Why card 2 — title" },
+  { key: "why_card_2_desc", label: "Why card 2 — description", multiline: true },
+  { key: "why_card_2_live", label: "Why card 2 — live label" },
+  { key: "why_card_3_index", label: "Why card 3 — index" },
+  { key: "why_card_3_title", label: "Why card 3 — title" },
+  { key: "why_card_3_desc", label: "Why card 3 — description", multiline: true },
+  { key: "why_card_3_live_suffix", label: "Why card 3 — live suffix (after live count)" },
+
 
   { key: "section_plan_kicker", label: "Plan — kicker" },
   { key: "section_plan_title_1", label: "Plan — title A" },
