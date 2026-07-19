@@ -877,9 +877,6 @@ function HomePage() {
                       {f.ml}
                     </span>
                   </div>
-                  <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.28em] text-[#ff2a3a]/70 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Tap to read more →
-                  </div>
                 </div>
               </button>
             ))}
