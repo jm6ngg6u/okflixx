@@ -4,7 +4,7 @@
 // on SIGNED_IN by a root-level listener.
 import { z } from "zod";
 
-const KEY = "emberlord.postLoginRedirect";
+const KEY = "okflix.postLoginRedirect";
 
 // Only allow same-origin absolute paths ("/foo/bar"). Reject external URLs,
 // protocol-relative "//evil.com", and the login/auth pages themselves.

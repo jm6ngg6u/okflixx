@@ -499,7 +499,7 @@ html, body {
     inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
-/* Shared glow — matches the Emberlord Premium card (.glow-ring-anim):
+/* Shared glow — matches the OKFLIX Premium card (.glow-ring-anim):
    a thin rotating conic-gradient ring in brand red with transparent gaps. */
 .activation-panel,
 .live-count-panel,
@@ -978,7 +978,7 @@ html, body {
 
 
 /* =====================================================================
-   WHY EMBERLORD — system-owned "Built for 2026 TVs" feature cards.
+   WHY OKFLIX — system-owned "Built for 2026 TVs" feature cards.
    Not editable in Branding Studio.
    ===================================================================== */
 .why-orb {

@@ -23,7 +23,7 @@ import { listRecentJobRuns } from "@/lib/settings.functions";
 
 
 export const Route = createFileRoute("/admin/settings")({
-  head: () => ({ meta: [{ title: "Settings — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Settings — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: SettingsPage,
 });
 

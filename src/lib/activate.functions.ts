@@ -59,7 +59,7 @@ type ActivateResult =
 
 
 function hashIp(ip: string): string {
-  const salt = process.env.SUPABASE_PROJECT_ID ?? "emberlord";
+  const salt = process.env.SUPABASE_PROJECT_ID ?? "okflix";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }
 

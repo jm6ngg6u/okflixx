@@ -12,7 +12,7 @@ import logo from "@/assets/brand-logo.png";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Admin Sign In — Emberlord" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Admin Sign In — OKFLIX" }, { name: "robots", content: "noindex" }] }),
   component: AuthPage,
 });
 

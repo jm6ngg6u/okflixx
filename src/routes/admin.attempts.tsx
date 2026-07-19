@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/attempts")({
-  head: () => ({ meta: [{ title: "Attempts log — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Attempts log — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: AttemptsPage,
 });
 

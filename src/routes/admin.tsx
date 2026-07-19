@@ -16,7 +16,7 @@ import logo from "@/assets/brand-logo.png";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Admin — Emberlord" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Admin — OKFLIX" }, { name: "robots", content: "noindex" }] }),
   component: AdminLayout,
 });
 

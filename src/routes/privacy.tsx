@@ -4,10 +4,10 @@ import { LegalShell } from "@/components/LegalShell";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — Emberlord" },
-      { name: "description", content: "How Emberlord collects, uses, and protects your data during Netflix TV activation." },
-      { property: "og:title", content: "Privacy Policy — Emberlord" },
-      { property: "og:description", content: "How Emberlord collects, uses, and protects your data during Netflix TV activation." },
+      { title: "Privacy Policy — OKFLIX" },
+      { name: "description", content: "How OKFLIX collects, uses, and protects your data during Netflix TV activation." },
+      { property: "og:title", content: "Privacy Policy — OKFLIX" },
+      { property: "og:description", content: "How OKFLIX collects, uses, and protects your data during Netflix TV activation." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "index,follow" },
@@ -22,7 +22,7 @@ function PrivacyPage() {
       kicker="Legal"
       title="Privacy Policy"
       updated="Effective July 2026"
-      intro="This policy explains what we collect when you activate a Netflix session on your TV through Emberlord, why we collect it, and the choices you have."
+      intro="This policy explains what we collect when you activate a Netflix session on your TV through OKFLIX, why we collect it, and the choices you have."
     >
       <Section n="01" title="What we collect">
         <p>We keep the activation surface small on purpose. When you enter an 8-character TV code we log the code, the outcome (success, wrong code, expired code), a truncated IP for rate-limiting, and a short-lived request identifier. We never see the shows you watch, your Netflix email, or your billing details.</p>

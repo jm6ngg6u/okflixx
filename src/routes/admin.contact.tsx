@@ -10,7 +10,7 @@ import { MessageCircle, Send, Instagram, Phone, Mail, Hash, RefreshCw } from "lu
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/contact")({
-  head: () => ({ meta: [{ title: "Contact channels — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Contact channels — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: ContactPage,
 });
 

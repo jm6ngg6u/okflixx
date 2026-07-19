@@ -36,7 +36,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/background-song")({
-  head: () => ({ meta: [{ title: "Background song — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Background song — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: BackgroundSongPage,
 });
 

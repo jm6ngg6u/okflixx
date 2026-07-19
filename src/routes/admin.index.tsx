@@ -32,7 +32,7 @@ import { SLOPanel } from "@/components/SLOPanel";
 import { ActivationPipelines } from "@/components/ActivationPipelines";
 
 export const Route = createFileRoute("/admin/")({
-  head: () => ({ meta: [{ title: "Dashboard — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: DashboardPage,
 });
 
@@ -73,7 +73,7 @@ type Thresholds = {
   alertsMuted: boolean;
 };
 
-const THRESHOLDS_KEY = "emberlord.dashboard.alerts";
+const THRESHOLDS_KEY = "okflix.dashboard.alerts";
 const DEFAULT_THRESHOLDS: Thresholds = {
   failureRatePct: 40,
   failureWindowMin: 10,
@@ -325,7 +325,7 @@ function DashboardPage() {
   // ---------- Export ----------
   const exportCSV = () => {
     const lines: string[] = [];
-    lines.push("# Emberlord Activation Dashboard export");
+    lines.push("# OKFLIX Activation Dashboard export");
     lines.push(`# Exported at: ${new Date().toISOString()}`);
     lines.push(`# Window: ${hours}h`);
     lines.push("");
@@ -395,7 +395,7 @@ function DashboardPage() {
         .kpi .val{font-size:20px;font-weight:600;margin-top:4px}
         @media print{@page{margin:.5in}}
       </style></head><body>
-      <h1>Emberlord — Activation Dashboard</h1>
+      <h1>OKFLIX — Activation Dashboard</h1>
       <div class="meta">Window: ${hours}h · Exported ${new Date().toLocaleString()}</div>
       <h2>KPI</h2>
       <div class="kpi">

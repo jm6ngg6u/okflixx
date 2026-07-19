@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { ShieldCheck, Trash2, KeyRound, Smartphone, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/security")({
-  head: () => ({ meta: [{ title: "Security — Emberlord Admin" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Security — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
   component: SecurityPage,
 });
 
@@ -30,7 +30,7 @@ function SecurityPage() {
   async function startEnroll() {
     setBusy(true);
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `Emberlord ${new Date().toLocaleDateString()}` });
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `OKFLIX ${new Date().toLocaleDateString()}` });
       if (error) throw error;
       setEnrolling({ id: data.id, qr: data.totp.qr_code, secret: data.totp.secret });
     } catch (err: any) { toast.error(err.message ?? "Enroll failed"); }

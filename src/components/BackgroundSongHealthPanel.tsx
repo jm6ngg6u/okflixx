@@ -6,7 +6,7 @@ import {
 } from "@/lib/background-song-health";
 import { Activity, X, ChevronDown, ChevronUp } from "lucide-react";
 
-const STORAGE_KEY = "emberlord.bgs.health.show";
+const STORAGE_KEY = "okflix.bgs.health.show";
 
 const statusColor: Record<BgsStatus, string> = {
   idle: "text-white/50",

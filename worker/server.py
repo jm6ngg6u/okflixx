@@ -1,6 +1,6 @@
 """FastAPI wrapper around the untouched Netflix Telegram-bot modules.
 
-Exposes three endpoints called by the Emberlord website:
+Exposes three endpoints called by the OKFLIX website:
 
   POST /check         { cookies: [{name, value, domain?}], proxy?: {…} }
                        -> { status, is_valid, plan_name, country, ... }
@@ -32,7 +32,7 @@ log = logging.getLogger("worker")
 
 WORKER_TOKEN = os.getenv("WORKER_TOKEN", "")
 
-app = FastAPI(title="Emberlord Netflix Worker")
+app = FastAPI(title="OKFLIX Netflix Worker")
 
 
 def _require_auth(x_worker_token: str) -> None:
@@ -96,7 +96,7 @@ def _proxy_url(p: Optional[ProxyPayload]) -> Optional[str]:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "service": "emberlord-netflix-worker"}
+    return {"ok": True, "service": "okflix-netflix-worker"}
 
 
 @app.post("/check")

@@ -26,7 +26,7 @@ function toBase64Url(bytes: Uint8Array): string {
 }
 
 function ipSalt(): string {
-  return process.env.SUPABASE_PROJECT_ID ?? "emberlord";
+  return process.env.SUPABASE_PROJECT_ID ?? "okflix";
 }
 
 // NFX-XXXX-XXXX-XXXX (20 chars incl. dashes). Alphabet excludes look-alikes.

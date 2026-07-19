@@ -13,7 +13,7 @@ import {
 
 export const Route = createFileRoute("/account")({
   ssr: false,
-  head: () => ({ meta: [{ title: "My activations — Emberlord" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "My activations — OKFLIX" }, { name: "robots", content: "noindex" }] }),
   component: AccountPage,
 });
 
