@@ -1021,7 +1021,7 @@ function HomePage() {
                         </span>
                         <span aria-hidden className="leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 1.9rem)" }}>{icon}</span>
                       </div>
-                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-white" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
+                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-shine" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
                       <p className="text-[13px] sm:text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
