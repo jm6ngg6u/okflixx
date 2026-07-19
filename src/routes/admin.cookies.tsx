@@ -88,8 +88,8 @@ type BatchResult = { inserted: number; duplicates: number; invalid: number };
 type BulkKind = "all" | "invalid" | "freehold" | "dupes" | "selection";
 type SortKey = "created_at" | "last_checked_at" | "total_uses" | "success_count" | "fail_count" | "email";
 
-const LIVE_POLL_MS = 4000;   // background poll (realtime handles the fast path)
-const STATS_POLL_MS = 5000;
+const LIVE_POLL_MS = 2000;   // ≤2s SLA (realtime handles the fast path; paused when tab hidden)
+const STATS_POLL_MS = 2000;
 
 function fmtRel(iso: string | null | undefined): string {
   if (!iso) return "never";
