@@ -157,6 +157,20 @@ function AttemptsPage() {
   const lastRowIdRef = useRef<string | null>(null);
   useEffect(() => {
     setRtStatus("connecting");
+    const flash = (id: string) => {
+      setNewRowIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      window.setTimeout(() => {
+        setNewRowIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 2400);
+    };
     const channel = supabase
       .channel("attempts-log-realtime")
       .on(
@@ -165,20 +179,17 @@ function AttemptsPage() {
         (payload) => {
           const row = payload.new as Attempt;
           if (!row?.id) return;
-          setNewRowIds((prev) => {
-            const next = new Set(prev);
-            next.add(row.id);
-            return next;
-          });
-          // Clear the flash marker after the animation window
-          window.setTimeout(() => {
-            setNewRowIds((prev) => {
-              const next = new Set(prev);
-              next.delete(row.id);
-              return next;
-            });
-          }, 2400);
-          // Nudge react-query so the row actually appears (only if we'd normally poll)
+          flash(row.id);
+          if (shouldPoll) qc.invalidateQueries({ queryKey: ["attempts"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "activation_attempts" },
+        (payload) => {
+          const row = payload.new as Attempt;
+          if (!row?.id) return;
+          flash(row.id);
           if (shouldPoll) qc.invalidateQueries({ queryKey: ["attempts"] });
         },
       )
