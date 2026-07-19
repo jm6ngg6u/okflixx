@@ -179,7 +179,9 @@ function LoginPage() {
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
   const namePrefix = brand?.name_prefix ?? "EMBER";
   const nameSuffix = brand?.name_suffix ?? "LORD";
-  const heroLogo = brand?.logo_url || logo;
+  // Guard against a stale/broken persisted URL from an older default asset path.
+  const rawLogo = (brand?.logo_url || "").trim();
+  const heroLogo = rawLogo && !rawLogo.includes("48705337-395f-45fa-bb9b-b75a91db0e04") ? rawLogo : logo;
   const tagline1 = brand?.login_tagline_1 || "JOIN THE";
   const tagline2 = brand?.login_tagline_2 || "ELITE";
   const loginKicker = brand?.login_kicker || "Wield the trident";

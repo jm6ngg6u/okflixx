@@ -167,12 +167,16 @@ export function MaintenanceView({
               }}
             />
           )}
-          <img
-            src={b.logo_url}
-            alt={brandName}
-            className={`relative h-full w-full object-contain ${shine ? "maintenance-logo-shine" : ""}`}
-            style={{ filter: `drop-shadow(0 0 ${18 + 30 * intensity}px rgba(var(--brand-accent-rgb),${0.4 + 0.5 * intensity}))` }}
-          />
+          {b.logo_url ? (
+            <img
+              src={b.logo_url}
+              alt={brandName}
+              className={`relative h-full w-full object-contain ${shine ? "maintenance-logo-shine" : ""}`}
+              style={{ filter: `drop-shadow(0 0 ${18 + 30 * intensity}px rgba(var(--brand-accent-rgb),${0.4 + 0.5 * intensity}))` }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : null}
+
         </div>
 
         {/* Wordmark */}
