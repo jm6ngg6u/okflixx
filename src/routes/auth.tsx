@@ -112,9 +112,6 @@ function AuthPage() {
         "Password sign-in",
       );
       if (error) {
-        void logMfaEvent({
-          data: { event: "password_signin_fail", email: email.trim(), success: false, metadata: { reason: error.message } },
-        }).catch(() => {});
         setErrorMessage(error.message);
         toast.error(error.message);
         setStatus("");
