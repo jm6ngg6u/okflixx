@@ -974,7 +974,7 @@ function HomePage() {
 
       {/* HOW IT WORKS — STEP-BY-STEP GUIDE */}
       <section id="how-it-works" className="relative py-24 sm:py-28 px-4 sm:px-6 md:px-12">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
           <div className="text-center mb-12 sm:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_howto_kicker}</div>
             <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
