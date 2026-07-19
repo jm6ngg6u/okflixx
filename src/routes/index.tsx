@@ -824,7 +824,7 @@ function HomePage() {
         </div>
       </section>
 
-      {/* WHY EMBERLORD — system-owned, not editable in Branding Studio. */}
+      {/* FEATURES — editable via Branding Studio. Click a card to open its detail. */}
       <section id="features" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
         <div aria-hidden className="why-orb" />
         <div className="max-w-6xl mx-auto relative">
@@ -839,43 +839,87 @@ function HomePage() {
             <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
               {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
             </h2>
+            {b.section_features_sub ? (
+              <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+                {b.section_features_sub}
+              </p>
+            ) : null}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             {[
-              { i: b.why_card_1_index, t: b.why_card_1_title, d: b.why_card_1_desc, live: b.why_card_1_live },
-              { i: b.why_card_2_index, t: b.why_card_2_title, d: b.why_card_2_desc, live: b.why_card_2_live },
-              { i: b.why_card_3_index, t: b.why_card_3_title, d: b.why_card_3_desc, live: `${(successCount.data?.count ?? 0).toLocaleString()} ${b.why_card_3_live_suffix}` },
+              { n: 1, i: b.why_card_1_index, ic: b.why_card_1_icon, t: b.why_card_1_title, d: b.why_card_1_desc, mv: b.why_card_1_metric_value, ml: b.why_card_1_metric_label, det: b.why_card_1_detail },
+              { n: 2, i: b.why_card_2_index, ic: b.why_card_2_icon, t: b.why_card_2_title, d: b.why_card_2_desc, mv: b.why_card_2_metric_value, ml: b.why_card_2_metric_label, det: b.why_card_2_detail },
+              { n: 3, i: b.why_card_3_index, ic: b.why_card_3_icon, t: b.why_card_3_title, d: b.why_card_3_desc, mv: b.why_card_3_metric_value, ml: b.why_card_3_metric_label, det: b.why_card_3_detail },
+              { n: 4, i: b.why_card_4_index, ic: b.why_card_4_icon, t: b.why_card_4_title, d: b.why_card_4_desc, mv: b.why_card_4_metric_value, ml: b.why_card_4_metric_label, det: b.why_card_4_detail },
             ].map((f) => (
-              <article key={f.t} className="why-card reveal group">
-                <div className="why-card-inner">
-                  <div className="flex items-center justify-between mb-8">
+              <button
+                key={f.n}
+                type="button"
+                onClick={() => setOpenFeature(f.n)}
+                className="why-card reveal group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a]/60 rounded-2xl"
+                aria-label={`${f.t} — open details`}
+              >
+                <div className="why-card-inner h-full flex flex-col">
+                  <div className="flex items-center justify-between mb-6">
                     <div className="font-mono text-xs sm:text-sm text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
-                    <div className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/45">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-70" />
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#22c55e]" />
-                      </span>
-                      Live
-                    </div>
+                    <div className="text-2xl sm:text-3xl leading-none" aria-hidden>{f.ic}</div>
                   </div>
-                  <h3 className="font-display text-2xl sm:text-3xl md:text-[2rem] leading-[1.1] tracking-tight mb-4">
+                  <h3 className="font-display text-xl sm:text-2xl md:text-[1.6rem] leading-[1.15] tracking-tight mb-3">
                     {f.t}
                   </h3>
-                  <p className="text-white/60 text-sm sm:text-[15px] leading-relaxed">
+                  <p className="text-white/60 text-sm leading-relaxed flex-1">
                     {f.d}
                   </p>
-                  <div className="mt-8 pt-5 border-t border-white/[0.06]">
-                    <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-white/55 truncate block">
-                      {f.live}
+                  <div className="mt-6 pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
+                    <span className="font-display text-2xl sm:text-3xl text-white leading-none">{f.mv}</span>
+                    <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-white/55 text-right">
+                      {f.ml}
                     </span>
                   </div>
-
+                  <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.28em] text-[#ff2a3a]/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Tap to read more →
+                  </div>
                 </div>
-              </article>
+              </button>
             ))}
           </div>
         </div>
+
+        <Dialog open={openFeature !== null} onOpenChange={(o) => !o && setOpenFeature(null)}>
+          <DialogContent className="max-w-2xl bg-black/90 backdrop-blur-2xl border border-[#ff2a3a]/30 text-white">
+            {openFeature !== null && (() => {
+              const items = [
+                { i: b.why_card_1_index, ic: b.why_card_1_icon, t: b.why_card_1_title, mv: b.why_card_1_metric_value, ml: b.why_card_1_metric_label, det: b.why_card_1_detail },
+                { i: b.why_card_2_index, ic: b.why_card_2_icon, t: b.why_card_2_title, mv: b.why_card_2_metric_value, ml: b.why_card_2_metric_label, det: b.why_card_2_detail },
+                { i: b.why_card_3_index, ic: b.why_card_3_icon, t: b.why_card_3_title, mv: b.why_card_3_metric_value, ml: b.why_card_3_metric_label, det: b.why_card_3_detail },
+                { i: b.why_card_4_index, ic: b.why_card_4_icon, t: b.why_card_4_title, mv: b.why_card_4_metric_value, ml: b.why_card_4_metric_label, det: b.why_card_4_detail },
+              ];
+              const f = items[openFeature - 1];
+              return (
+                <>
+                  <DialogHeader>
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="text-4xl leading-none" aria-hidden>{f.ic}</div>
+                      <div>
+                        <div className="font-mono text-[11px] uppercase tracking-[0.32em] text-[#ff2a3a]">{f.i} · Feature</div>
+                        <DialogTitle className="font-display text-2xl sm:text-3xl leading-tight mt-1">{f.t}</DialogTitle>
+                      </div>
+                    </div>
+                  </DialogHeader>
+                  <DialogDescription className="text-white/70 text-[15px] leading-relaxed whitespace-pre-line">
+                    {f.det}
+                  </DialogDescription>
+                  <div className="mt-5 pt-5 border-t border-white/10 flex items-baseline justify-between">
+                    <span className="font-display text-3xl text-white leading-none">{f.mv}</span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.24em] text-white/60">{f.ml}</span>
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </section>
+
 
 
       {/* PLAN — SINGLE FREE PREMIUM */}
