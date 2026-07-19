@@ -44,9 +44,13 @@ const WINDOWS: { label: string; hours: number }[] = [
   { label: "ALL", hours: 24 * 365 * 5 },
 ];
 
-// With realtime pushing new rows the moment they land, we only need slow
-// background refetches to keep aggregates + pool + health warm.
-const AGG_REFRESH_MS = 10_000;
+// Aggregates poll fast enough to hit the ≤2s live-refresh SLA for KPIs,
+// pool counts, worker health, and admin-driven settings (proxy mode,
+// maintenance, gates). Realtime channels below push instant deltas on
+// row-level events so this is a safety net, not the primary path.
+const AGG_REFRESH_MS = 2_000;
+const SETTINGS_REFRESH_MS = 2_000;
+
 
 const RESULT_STYLE: Record<string, string> = {
   success: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
