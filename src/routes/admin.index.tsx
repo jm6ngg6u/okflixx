@@ -44,9 +44,13 @@ const WINDOWS: { label: string; hours: number }[] = [
   { label: "ALL", hours: 24 * 365 * 5 },
 ];
 
-// With realtime pushing new rows the moment they land, we only need slow
-// background refetches to keep aggregates + pool + health warm.
-const AGG_REFRESH_MS = 10_000;
+// Aggregates poll fast enough to hit the ≤2s live-refresh SLA for KPIs,
+// pool counts, worker health, and admin-driven settings (proxy mode,
+// maintenance, gates). Realtime channels below push instant deltas on
+// row-level events so this is a safety net, not the primary path.
+const AGG_REFRESH_MS = 2_000;
+const SETTINGS_REFRESH_MS = 2_000;
+
 
 const RESULT_STYLE: Record<string, string> = {
   success: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -114,7 +118,20 @@ function DashboardPage() {
   const doCheckAll = useServerFn(checkAllCookies);
   const qc = useQueryClient();
 
-  const aggInterval = paused ? false : AGG_REFRESH_MS;
+  // Pause polling when the tab is hidden so we don't burn DB QPS at 2s
+  // cadence on backgrounded windows. Realtime channels stay subscribed and
+  // will push any deltas immediately when the tab is refocused.
+  const [tabVisible, setTabVisible] = useState(() =>
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
+  useEffect(() => {
+    const onVis = () => setTabVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  const aggInterval = paused || !tabVisible ? false : AGG_REFRESH_MS;
+  const settingsInterval = paused || !tabVisible ? false : SETTINGS_REFRESH_MS;
 
   const stats = useQuery({
     queryKey: ["dashboard-stats", hours],
@@ -129,7 +146,8 @@ function DashboardPage() {
   const pool = useQuery({ queryKey: ["pool-summary"], queryFn: () => fetchPool(), refetchInterval: aggInterval });
   const health = useQuery({ queryKey: ["worker-health"], queryFn: () => fetchHealth(), refetchInterval: aggInterval });
   const activity = useQuery({ queryKey: ["recent-activity"], queryFn: () => fetchActivity(), refetchInterval: aggInterval });
-  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: aggInterval === false ? false : 15_000 });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: settingsInterval });
+
   // Seed the live ticker on mount / hours change; realtime keeps it fresh after.
   const initialAttempts = useQuery({
     queryKey: ["dashboard-live-attempts-seed"],
@@ -148,11 +166,13 @@ function DashboardPage() {
     }
   }, [initialAttempts.data]);
 
-  // Supabase Realtime — instant push on new attempts
+  // Supabase Realtime — instant push on new attempts, plus fast invalidation
+  // for admin-driven config (app_settings) and pool mutations (cookie_pool /
+  // proxy_pool) so config propagation and pool KPIs beat the 2s SLA.
   useEffect(() => {
     setRtStatus("connecting");
     const channel = supabase
-      .channel("dashboard-attempts")
+      .channel("dashboard-live")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "activation_attempts" },
@@ -166,12 +186,28 @@ function DashboardPage() {
           setPulseKey((k) => k + 1);
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings" },
+        () => { qc.invalidateQueries({ queryKey: ["admin-settings"] }); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cookie_pool" },
+        () => { qc.invalidateQueries({ queryKey: ["pool-summary"] }); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "proxy_pool" },
+        () => { qc.invalidateQueries({ queryKey: ["pool-summary"] }); },
+      )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") setRtStatus("live");
         else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setRtStatus("offline");
       });
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [qc]);
+
 
   const proxyOn = settingsQ.data?.settings?.proxy_mode === "1";
   const maintOn = settingsQ.data?.settings?.maintenance_enabled === "1";

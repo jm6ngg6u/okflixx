@@ -223,7 +223,7 @@ function AdminLayout() {
       <div className="md:hidden relative z-30 flex items-center justify-between px-4 py-3 border-b border-white/10 backdrop-blur bg-black/40">
         <Link to="/admin" className="flex items-center gap-2">
           <img src={logo} alt="" data-wave-origin className="h-7 w-7 logo-shine" />
-          <span className="font-display text-sm">EMBER<span className="text-[#ff2a3a]">LORD</span> · Admin</span>
+          <span className="font-display text-sm">OK<span className="text-[#ff2a3a]">FLIX</span> · Admin</span>
         </Link>
         <button onClick={() => setMobileOpen((v) => !v)} className="p-2 rounded-md border border-white/10">
           {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -235,7 +235,7 @@ function AdminLayout() {
           <Link to="/admin" className="hidden md:flex items-center gap-3 mb-8 group">
             <img src={logo} alt="" data-wave-origin className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
             <div>
-              <div className="font-display text-base leading-none">EMBER<span className="text-[#ff2a3a]">LORD</span></div>
+              <div className="font-display text-base leading-none">OK<span className="text-[#ff2a3a]">FLIX</span></div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-white/40 mt-1">Control room</div>
             </div>
           </Link>
