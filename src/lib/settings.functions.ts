@@ -400,7 +400,8 @@ export const listCronSchedules = createServerFn({ method: "GET" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!isAdmin && !isMod) throw new Error("Forbidden");
-    const { data, error } = await supabase.rpc("list_cron_schedules");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.rpc("list_cron_schedules");
     if (error) throw error;
     return { rows: (data ?? []) as Array<{ jobname: string; schedule: string; active: boolean }> };
   });
