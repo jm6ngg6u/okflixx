@@ -136,12 +136,31 @@ function LoginPage() {
     // Browser is navigating away — nothing else to do.
   }
 
+  function reportError(rawMsg: string) {
+    const { kind, title, hint } = classifyOAuthError(rawMsg);
+    setErrorKind(kind);
+    setErrorMessage(title);
+    setErrorHint(hint);
+    logDiag("OAuth error", "fail", `${kind}: ${rawMsg}`);
+    toast.error(title, { description: hint });
+    setBusy(false);
+  }
+
   async function handleGoogle(opts?: { forceRedirect?: boolean }) {
     if (busy) return;
     setBusy(true);
     setErrorMessage(null);
+    setErrorKind(null);
+    setErrorHint(null);
+    setRetryCount((n) => n + 1);
     stashRedirect(search.redirect ?? null);
     logDiag(opts?.forceRedirect ? "Sign-in start · redirect mode" : "Sign-in start · popup mode", "info");
+
+    // Offline guard — save a wasted round-trip.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      reportError("network offline");
+      return;
+    }
 
     // Pre-flight popup probe. MUST run synchronously in the click handler so
     // the browser attributes the resulting popup to the user gesture.
@@ -180,11 +199,7 @@ function LoginPage() {
       });
       if (result.error) {
         window.clearTimeout(stuck);
-        const msg = result.error.message ?? "Google sign-in failed.";
-        logDiag("OAuth error", "fail", msg);
-        setErrorMessage(msg);
-        toast.error(msg);
-        setBusy(false);
+        reportError(result.error.message ?? "Google sign-in failed.");
         return;
       }
       if (result.redirected) {
@@ -198,13 +213,10 @@ function LoginPage() {
       navigate({ to: target, replace: true });
     } catch (err: any) {
       window.clearTimeout(stuck);
-      const msg = err?.message ?? "Google sign-in failed.";
-      logDiag("Exception", "fail", msg);
-      setErrorMessage(msg);
-      toast.error(msg);
-      setBusy(false);
+      reportError(err?.message ?? "Google sign-in failed.");
     }
   }
+
 
 
   const brandName = `${brand?.name_prefix ?? "EMBER"}${brand?.name_suffix ?? "LORD"}`;
