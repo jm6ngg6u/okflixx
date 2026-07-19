@@ -1,0 +1,156 @@
+[
+  {
+    "viewport": "mobile",
+    "size": "390x844",
+    "checks": [
+      {
+        "ok": true,
+        "label": "no horizontal scroll",
+        "detail": "overflow=0px"
+      },
+      {
+        "ok": false,
+        "label": "kicker dots >= 5",
+        "detail": "count=0"
+      },
+      {
+        "ok": true,
+        "label": "#features title font-size in [28,56]",
+        "detail": "px=32"
+      },
+      {
+        "ok": true,
+        "label": "#how-it-works title font-size in [28,56]",
+        "detail": "px=32"
+      },
+      {
+        "ok": true,
+        "label": "#faq title font-size in [28,56]",
+        "detail": "px=32"
+      },
+      {
+        "ok": true,
+        "label": "#live title font-size in [28,56]",
+        "detail": "px=32"
+      },
+      {
+        "ok": true,
+        "label": "FAQ trigger >= 44px (mobile)",
+        "detail": "min=52.890625"
+      },
+      {
+        "ok": true,
+        "label": "Primary CTA >= 44px (mobile)",
+        "detail": "h=49.71875"
+      }
+    ]
+  },
+  {
+    "viewport": "tablet",
+    "size": "834x1194",
+    "checks": [
+      {
+        "ok": true,
+        "label": "no horizontal scroll",
+        "detail": "overflow=0px"
+      },
+      {
+        "ok": false,
+        "label": "kicker dots >= 5",
+        "detail": "count=0"
+      },
+      {
+        "ok": true,
+        "label": "#features title font-size in [40,88]",
+        "detail": "px=46.704"
+      },
+      {
+        "ok": true,
+        "label": "#how-it-works title font-size in [40,88]",
+        "detail": "px=46.704"
+      },
+      {
+        "ok": true,
+        "label": "#faq title font-size in [40,88]",
+        "detail": "px=46.704"
+      },
+      {
+        "ok": true,
+        "label": "#live title font-size in [40,88]",
+        "detail": "px=46.704"
+      }
+    ]
+  },
+  {
+    "viewport": "desktop",
+    "size": "1440x900",
+    "checks": [
+      {
+        "ok": true,
+        "label": "no horizontal scroll",
+        "detail": "overflow=0px"
+      },
+      {
+        "ok": false,
+        "label": "kicker dots >= 5",
+        "detail": "count=0"
+      },
+      {
+        "ok": true,
+        "label": "#features title font-size in [56,100]",
+        "detail": "px=76"
+      },
+      {
+        "ok": true,
+        "label": "#how-it-works title font-size in [56,100]",
+        "detail": "px=76"
+      },
+      {
+        "ok": true,
+        "label": "#faq title font-size in [56,100]",
+        "detail": "px=76"
+      },
+      {
+        "ok": true,
+        "label": "#live title font-size in [56,100]",
+        "detail": "px=76"
+      }
+    ]
+  },
+  {
+    "viewport": "tv",
+    "size": "1920x1080",
+    "checks": [
+      {
+        "ok": true,
+        "label": "no horizontal scroll",
+        "detail": "overflow=0px"
+      },
+      {
+        "ok": false,
+        "label": "kicker dots >= 5",
+        "detail": "count=0"
+      },
+      {
+        "ok": true,
+        "label": "#features title font-size in [60,110]",
+        "detail": "px=80.64"
+      },
+      {
+        "ok": true,
+        "label": "#how-it-works title font-size in [60,110]",
+        "detail": "px=80.64"
+      },
+      {
+        "ok": true,
+        "label": "#faq title font-size in [60,110]",
+        "detail": "px=80.64"
+      },
+      {
+        "ok": true,
+        "label": "#live title font-size in [60,110]",
+        "detail": "px=80.64"
+      }
+    ]
+  }
+]
