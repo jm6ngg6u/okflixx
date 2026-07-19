@@ -9,8 +9,8 @@ import { z } from "zod";
 
 export const BRANDING_DEFAULTS = {
   // Identity
-  name_prefix: "EMBER",
-  name_suffix: "LORD",
+  name_prefix: "OK",
+  name_suffix: "FLIX",
   tagline: "Command Netflix on any TV",
   browser_title: "OKFLIX — Activate Netflix on any TV",
   logo_url: "/__l5e/assets-v1/48705337-395f-45fa-bb9b-b75a91db0e04/okflix-logo.png",
