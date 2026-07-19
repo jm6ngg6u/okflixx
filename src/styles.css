@@ -1184,3 +1184,13 @@ html, body {
   .tap-44 { min-height: 44px; }
 }
 
+
+/* Honeypot — invisible bot trap. Class avoids SSR/client inline-style hydration mismatch. */
+.okflix-honeypot {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
