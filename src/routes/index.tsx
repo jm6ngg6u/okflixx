@@ -1058,14 +1058,16 @@ function HomePage() {
 
       {/* FAQ — editable via Branding Studio. Accordion opens on click. */}
       <section id="faq" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
-        <div className="max-w-4xl mx-auto glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12 sm:mb-16 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker text-[11px] sm:text-xs">
               {b.section_faq_kicker}
             </div>
-            <h2 className="font-display brand-section-title">
-              {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
-            </h2>
+            <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+              <h2 className="font-display brand-section-title">
+                {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
+              </h2>
+            </div>
             {b.section_faq_sub ? (
               <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2 text-base sm:text-lg leading-relaxed">
                 {b.section_faq_sub}
