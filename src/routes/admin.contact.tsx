@@ -187,7 +187,10 @@ function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, ha
         </div>
         <div className="space-y-1">
           <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">
-            {kind === "whatsapp" ? "Phone number (with country code)" : "Username"}
+            {kind === "whatsapp" ? "Phone number (with country code)"
+              : kind === "email" ? "Email address"
+              : kind === "discord" ? "Invite code or URL"
+              : "Username"}
           </label>
           <Input placeholder={handlePlaceholder} value={local[handleKey] ?? ""}
             onChange={(e) => set(handleKey, e.target.value)}
@@ -205,7 +208,12 @@ function ContactRow({ icon: Icon, label, kind, enableKey, nameKey, handleKey, ha
             ) : invalid ? (
               <span className="text-red-300">Invalid — check the format</span>
             ) : (
-              <span className="text-white/30">{kind === "whatsapp" ? "Digits only, include country code" : "@ and URL prefix are stripped automatically"}</span>
+              <span className="text-white/30">
+                {kind === "whatsapp" ? "Digits only, include country code"
+                  : kind === "email" ? "user@domain.tld"
+                  : kind === "discord" ? "Just the invite code — URL prefix is stripped"
+                  : "@ and URL prefix are stripped automatically"}
+              </span>
             )}
           </div>
         </div>
