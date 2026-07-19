@@ -109,13 +109,28 @@ function AttemptsPage() {
   const [rtStatus, setRtStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [modalAttempt, setModalAttempt] = useState<Attempt | null>(null);
   const [newRowIds, setNewRowIds] = useState<Set<string>>(new Set());
+  const [tabVisible, setTabVisible] = useState(
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
 
   const fetchList = useServerFn(listAttempts);
   const qc = useQueryClient();
 
-  // Only auto-refresh while on page 0 with no scroll interaction — otherwise
-  // 2-second refetches would yank the user's reading position around.
-  const shouldPoll = !paused && page === 0;
+  // Pause polling when tab is hidden — protects DB QPS with 2000+ concurrent admins.
+  // Resume immediately on refocus with a forced refetch (no duplicate rows, react-query
+  // dedupes on queryKey).
+  useEffect(() => {
+    const onVis = () => {
+      const visible = document.visibilityState === "visible";
+      setTabVisible(visible);
+      if (visible) qc.invalidateQueries({ queryKey: ["attempts"] });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qc]);
+
+  // Only auto-refresh while on page 0, tab visible, and not manually paused.
+  const shouldPoll = !paused && page === 0 && tabVisible;
 
   const query = useQuery({
     queryKey: ["attempts", page, selectedResults.join(","), country, q, sinceMinutes ?? "all"],
@@ -142,6 +157,20 @@ function AttemptsPage() {
   const lastRowIdRef = useRef<string | null>(null);
   useEffect(() => {
     setRtStatus("connecting");
+    const flash = (id: string) => {
+      setNewRowIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      window.setTimeout(() => {
+        setNewRowIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 2400);
+    };
     const channel = supabase
       .channel("attempts-log-realtime")
       .on(
@@ -150,20 +179,17 @@ function AttemptsPage() {
         (payload) => {
           const row = payload.new as Attempt;
           if (!row?.id) return;
-          setNewRowIds((prev) => {
-            const next = new Set(prev);
-            next.add(row.id);
-            return next;
-          });
-          // Clear the flash marker after the animation window
-          window.setTimeout(() => {
-            setNewRowIds((prev) => {
-              const next = new Set(prev);
-              next.delete(row.id);
-              return next;
-            });
-          }, 2400);
-          // Nudge react-query so the row actually appears (only if we'd normally poll)
+          flash(row.id);
+          if (shouldPoll) qc.invalidateQueries({ queryKey: ["attempts"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "activation_attempts" },
+        (payload) => {
+          const row = payload.new as Attempt;
+          if (!row?.id) return;
+          flash(row.id);
           if (shouldPoll) qc.invalidateQueries({ queryKey: ["attempts"] });
         },
       )
