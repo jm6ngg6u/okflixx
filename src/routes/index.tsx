@@ -895,6 +895,37 @@ function HomePage() {
         </div>
       </section>
 
+      {/* COMPATIBILITY STRIP — system-owned. Not editable in Branding Studio.
+          Trust badges + continuously scrolling device marquee. */}
+      <section aria-label="Compatible devices and trust indicators" className="compat-strip">
+        <div className="compat-badges">
+          <span className="cb">99.99% Uptime</span>
+          <span className="cb">AES-256 Encrypted</span>
+          <span className="cb">24/7 Support</span>
+          <span className="cb">4K · HDR · Dolby</span>
+        </div>
+        <div className="compat-marquee" role="marquee" aria-live="off">
+          <div className="compat-track">
+            {(() => {
+              const brands = [
+                "Samsung Tizen", "Smart TV", "Apple TV", "Roku",
+                "Fire TV", "Chromecast", "LG WebOS", "Android TV",
+                "Nvidia Shield", "PS5", "Xbox Series X", "Vizio SmartCast",
+                "TCL Google TV", "Hisense VIDAA", "Panasonic My Home",
+              ];
+              const loop = [...brands, ...brands];
+              return loop.map((name, i) => (
+                <span className="compat-item" key={`${name}-${i}`}>
+                  <span className="dot" aria-hidden />
+                  {name}
+                </span>
+              ));
+            })()}
+          </div>
+        </div>
+      </section>
+
+
       {/* LIVE ACTIVATIONS — system-owned realtime count. Not editable in Branding Studio. */}
       <section id="reviews" className="relative py-20 sm:py-24 md:py-28 px-4 sm:px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
