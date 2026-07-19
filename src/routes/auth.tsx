@@ -126,9 +126,7 @@ function AuthPage() {
         return;
       }
       setStatus("Checking authenticator…");
-      void logMfaEvent({
-        data: { event: "password_signin_ok", email: email.trim(), success: true },
-      }).catch(() => {});
+
 
       const { data: factors, error: factorsError } = await withTimeout(
         supabase.auth.mfa.listFactors(),
