@@ -62,9 +62,71 @@ function RotationPage() {
   const simulate = useServerFn(simulateCookieSelection);
   const qc = useQueryClient();
 
-  const q = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings() });
-  const statsQ = useQuery({ queryKey: ["cookie-pool-stats"], queryFn: () => fetchStats(), refetchInterval: 10_000 });
-  const eligQ = useQuery({ queryKey: ["cookie-eligibility"], queryFn: () => fetchElig() });
+  // Live-refresh SLA: ≤2s polling, paused when tab hidden, augmented by Realtime.
+  const [visible, setVisible] = useState(
+    typeof document === "undefined" ? true : document.visibilityState !== "hidden",
+  );
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVis = () => {
+      const v = document.visibilityState !== "hidden";
+      setVisible(v);
+      if (v) {
+        qc.invalidateQueries({ queryKey: ["admin-settings"] });
+        qc.invalidateQueries({ queryKey: ["cookie-pool-stats"] });
+        qc.invalidateQueries({ queryKey: ["cookie-eligibility"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qc]);
+
+  const q = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => fetchSettings(),
+    refetchInterval: visible ? 2000 : false,
+    refetchIntervalInBackground: false,
+  });
+  const statsQ = useQuery({
+    queryKey: ["cookie-pool-stats"],
+    queryFn: () => fetchStats(),
+    refetchInterval: visible ? 2000 : false,
+    refetchIntervalInBackground: false,
+  });
+  const eligQ = useQuery({
+    queryKey: ["cookie-eligibility"],
+    queryFn: () => fetchElig(),
+    refetchInterval: visible ? 2000 : false,
+    refetchIntervalInBackground: false,
+  });
+
+  // Realtime: cross-tab policy sync + live pool/attempt counters.
+  useEffect(() => {
+    const ch = supabase
+      .channel("admin-rotation-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "app_settings", filter: "key=eq.cookie_rotation_policy" },
+        () => qc.invalidateQueries({ queryKey: ["admin-settings"] }),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cookie_pool" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["cookie-pool-stats"] });
+          qc.invalidateQueries({ queryKey: ["cookie-eligibility"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "activation_attempts" },
+        () => qc.invalidateQueries({ queryKey: ["cookie-pool-stats"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
 
   const [current, setCurrent] = useState<Policy>("round_robin");
   useEffect(() => {
