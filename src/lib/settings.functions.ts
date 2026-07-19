@@ -7,6 +7,24 @@ function plainRecord(value: unknown): Record<string, any> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
 }
 
+/**
+ * Per-admin write rate limit: cap mutating setting writes at 30 / 60s per admin.
+ * Uses `admin_activity_log` as the ledger — no extra table needed. Prevents
+ * audit-log spam and hostile automation. Throws on breach.
+ */
+async function enforceSettingsRateLimit(supabaseAdmin: any, adminId: string) {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("admin_activity_log")
+    .select("id", { count: "exact", head: true })
+    .eq("admin_id", adminId)
+    .in("action", ["settings.update", "settings.toggle_proxy_mode", "settings.maintenance"])
+    .gte("created_at", windowStart);
+  if ((count ?? 0) >= 30) {
+    throw new Error("Rate limit: too many settings changes — slow down (max 30/min).");
+  }
+}
+
 /** Return every setting as a plain map. Publicly readable subset only for anon,
  *  but this fn requires staff so all keys are returned. */
 export const listSettings = createServerFn({ method: "GET" })
@@ -35,6 +53,7 @@ export const setSetting = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceSettingsRateLimit(supabaseAdmin, userId);
     const { error } = await supabaseAdmin
       .from("app_settings")
       .upsert({ key: data.key, value: data.value, updated_at: new Date().toISOString(), updated_by: userId })
@@ -57,12 +76,21 @@ export const toggleProxyMode = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceSettingsRateLimit(supabaseAdmin, userId);
     const { data: cur } = await supabaseAdmin
       .from("app_settings")
       .select("value")
       .eq("key", "proxy_mode")
       .maybeSingle();
     const next = cur?.value === "1" ? "0" : "1";
+    // Interlock: refuse to enable strict proxy mode if zero usable proxies exist.
+    if (next === "1") {
+      const { data: stats } = await supabaseAdmin.rpc("get_proxy_stats");
+      const usable = (stats as any)?.valid ?? 0;
+      if (!usable || usable <= 0) {
+        throw new Error("Cannot enable strict proxy mode: no usable proxies in the pool.");
+      }
+    }
     await supabaseAdmin
       .from("app_settings")
       .upsert({ key: "proxy_mode", value: next, updated_at: new Date().toISOString(), updated_by: userId });
@@ -110,6 +138,7 @@ export const setMaintenance = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceSettingsRateLimit(supabaseAdmin, userId);
     const nowIso = new Date().toISOString();
     const rows: Array<{ key: string; value: string; updated_at: string; updated_by: string }> = [];
     if (typeof data.enabled === "boolean") {
