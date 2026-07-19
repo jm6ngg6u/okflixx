@@ -1037,11 +1037,11 @@ html, body {
 .why-card-inner {
   position: relative;
   border-radius: 19px;
-  padding: clamp(24px, 3vw, 36px);
+  padding: clamp(18px, 3.2vw, 36px);
   background:
     radial-gradient(120% 90% at 100% 0%, rgba(var(--brand-accent-rgb), 0.08) 0%, transparent 55%),
     linear-gradient(180deg, rgba(18,18,22,0.92) 0%, rgba(10,10,12,0.94) 100%);
-  min-height: 260px;
+  min-height: clamp(210px, 30vw, 280px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1119,4 +1119,27 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .faq-card,
   .faq-card::before { transition: none; }
+}
+
+/* Fluid, device-consistent section sizing (mobile → tablet → desktop → TV) */
+.section-pad-y { padding-top: clamp(3.5rem, 7vw, 8rem); padding-bottom: clamp(3.5rem, 7vw, 8rem); }
+.section-pad-x { padding-left: clamp(1rem, 3vw, 3rem); padding-right: clamp(1rem, 3vw, 3rem); }
+.section-title-fluid {
+  font-size: clamp(2rem, 5.6vw, 4.75rem);
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+}
+.section-sub-fluid {
+  font-size: clamp(0.95rem, 1.2vw, 1.125rem);
+  line-height: 1.65;
+}
+.section-kicker-fluid { font-size: clamp(0.68rem, 0.9vw, 0.78rem); }
+.metric-fluid {
+  font-size: clamp(2.75rem, 7.5vw, 4.25rem);
+  line-height: 1;
+}
+/* Ultra-wide / TV boost so hero titles keep presence at 1440px+ */
+@media (min-width: 1600px) {
+  .section-title-fluid { font-size: clamp(3.5rem, 4.2vw, 5.5rem); }
+  .metric-fluid { font-size: clamp(3.75rem, 4.6vw, 5.25rem); }
 }

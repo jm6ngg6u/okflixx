@@ -878,27 +878,27 @@ function HomePage() {
       </section>
 
       {/* FEATURES — editable via Branding Studio. Click a card to open its detail. */}
-      <section id="features" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+      <section id="features" className="relative section-pad-y section-pad-x">
         <div aria-hidden className="why-orb" />
         <div className="max-w-6xl mx-auto relative">
-          <div className="text-center mb-14 md:mb-20 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs">
+          <div className="text-center mb-10 sm:mb-14 md:mb-20 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_features_kicker}
             </div>
-            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+            <h2 className="font-display section-title-fluid tracking-tight">
               {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
             </h2>
             {b.section_features_sub ? (
-              <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_features_sub}
               </p>
             ) : null}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {[
               { n: 1, i: b.why_card_1_index, ic: b.why_card_1_icon, t: b.why_card_1_title, d: b.why_card_1_desc, mv: b.why_card_1_metric_value, ml: b.why_card_1_metric_label, det: b.why_card_1_detail },
               { n: 2, i: b.why_card_2_index, ic: b.why_card_2_icon, t: b.why_card_2_title, d: b.why_card_2_desc, mv: b.why_card_2_metric_value, ml: b.why_card_2_metric_label, det: b.why_card_2_detail },
@@ -913,18 +913,18 @@ function HomePage() {
                 aria-label={`${f.t} — open details`}
               >
                 <div className="why-card-inner h-full flex flex-col">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="font-mono text-xs sm:text-sm text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
-                    <div className="text-2xl sm:text-3xl leading-none" aria-hidden>{f.ic}</div>
+                  <div className="flex items-center justify-between mb-4 sm:mb-6">
+                    <div className="font-mono text-[10px] sm:text-xs text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
+                    <div className="leading-none" style={{ fontSize: "clamp(1.5rem, 3.2vw, 2rem)" }} aria-hidden>{f.ic}</div>
                   </div>
-                  <h3 className="font-display text-xl sm:text-2xl md:text-[1.6rem] leading-[1.15] tracking-tight mb-3">
+                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
                     {f.t}
                   </h3>
-                  <p className="text-white/60 text-sm leading-relaxed flex-1">
+                  <p className="text-white/60 text-[13px] sm:text-sm leading-relaxed flex-1">
                     {f.d}
                   </p>
-                  <div className="mt-6 pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
-                    <span className="font-display text-2xl sm:text-3xl text-white leading-none">{f.mv}</span>
+                  <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
+                    <span className="font-display text-white leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)" }}>{f.mv}</span>
                     <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-white/55 text-right">
                       {f.ml}
                     </span>
@@ -973,21 +973,21 @@ function HomePage() {
 
 
       {/* HOW IT WORKS — STEP-BY-STEP GUIDE */}
-      <section id="how-it-works" className="relative py-24 sm:py-28 px-4 sm:px-6 md:px-12">
+      <section id="how-it-works" className="relative section-pad-y section-pad-x">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">
+          <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_howto_kicker}
             </div>
-            <h2 className="font-display brand-section-title">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
-            <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
+            <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <p className="mt-4 sm:mt-5 text-white/60 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
-          <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+          <ol className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {[1, 2, 3, 4, 5].map((n) => {
               const icon = b[`howto_step_${n}_icon` as keyof typeof b];
               const title = b[`howto_step_${n}_title` as keyof typeof b];
@@ -1001,17 +1001,18 @@ function HomePage() {
                     className="why-card reveal group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a]/60 rounded-2xl"
                   >
                     <div className="why-card-inner h-full flex flex-col">
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-3 mb-3 sm:mb-4">
                         <span
                           aria-hidden
-                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                          className="grid shrink-0 place-items-center rounded-full font-mono font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                          style={{ width: "clamp(2rem, 4.5vw, 2.4rem)", height: "clamp(2rem, 4.5vw, 2.4rem)", fontSize: "clamp(0.8rem, 1.4vw, 0.95rem)" }}
                         >
                           {n}
                         </span>
-                        <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
+                        <span aria-hidden className="leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 1.9rem)" }}>{icon}</span>
                       </div>
-                      <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
-                      <p className="text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
+                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-white" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
+                      <p className="text-[13px] sm:text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
                 </li>
@@ -1059,21 +1060,21 @@ function HomePage() {
 
 
       {/* FAQ — editable via Branding Studio. Accordion opens on click. */}
-      <section id="faq" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+      <section id="faq" className="relative section-pad-y section-pad-x">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker text-[11px] sm:text-xs">
+          <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_faq_kicker}
             </div>
-            <h2 className="font-display brand-section-title">
+            <h2 className="font-display section-title-fluid">
               {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
             </h2>
             {b.section_faq_sub ? (
-              <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2 text-base sm:text-lg leading-relaxed">
+              <p className="mt-4 sm:mt-5 text-white/60 max-w-2xl mx-auto px-2 section-sub-fluid">
                 {b.section_faq_sub}
               </p>
             ) : null}
@@ -1090,18 +1091,18 @@ function HomePage() {
                   value={`faq-${n}`}
                   className="faq-card border-0"
                 >
-                  <div className="faq-card-inner px-5 sm:px-6">
-                    <AccordionTrigger className="hover:no-underline py-5 sm:py-6 gap-4 text-left">
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
-                        <span className="font-mono text-[11px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
+                  <div className="faq-card-inner px-4 sm:px-6">
+                    <AccordionTrigger className="hover:no-underline py-4 sm:py-6 gap-3 sm:gap-4 text-left">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                        <span className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
                           {String(n).padStart(2, "0")}
                         </span>
-                        <span className="font-display text-base sm:text-lg md:text-xl leading-snug text-white">
+                        <span className="font-display leading-snug text-white" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
                           {q}
                         </span>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="text-white/70 text-[15px] leading-relaxed pb-6 pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
+                    <AccordionContent className="text-white/70 text-[14px] sm:text-[15px] leading-relaxed pb-5 sm:pb-6 pl-[calc(0.5rem+2rem)] sm:pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
                       {a}
                     </AccordionContent>
                   </div>
@@ -1115,21 +1116,21 @@ function HomePage() {
 
 
       {/* LIVE ACTIVATION FEED — system-owned realtime metrics. Copy editable in Branding Studio. */}
-      <section id="live" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+      <section id="live" className="relative section-pad-y section-pad-x">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 md:mb-16 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.3em] text-[#ff2a3a] text-[11px] sm:text-xs">
+          <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.3em] text-[#ff2a3a] section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_live_kicker}
             </div>
-            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+            <h2 className="font-display section-title-fluid tracking-tight">
               {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
             </h2>
             {b.section_live_sub ? (
-              <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_live_sub}
               </p>
             ) : null}
@@ -1194,9 +1195,9 @@ function HomePage() {
                             {String(i + 1).padStart(2, "0")}
                           </div>
                         </div>
-                        <div className="font-display leading-none tabular-nums text-5xl sm:text-6xl md:text-[4rem] text-white">
+                        <div className="font-display metric-fluid tabular-nums text-white">
                           <span className="text-live">{t.v}</span>
-                          {t.suffix ? <span className="text-white/70 text-3xl sm:text-4xl ml-1">{t.suffix}</span> : null}
+                          {t.suffix ? <span className="text-white/70 ml-1" style={{ fontSize: "0.55em" }}>{t.suffix}</span> : null}
                         </div>
                         <div className="mt-6 pt-5 border-t border-white/[0.06]">
                           <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/70">
@@ -1229,26 +1230,26 @@ function HomePage() {
 
 
       {/* CTA */}
-      <section className="relative py-32 px-6 md:px-12">
+      <section className="relative section-pad-y section-pad-x">
         <div className="relative max-w-3xl mx-auto text-center reveal">
-          <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs">
+          <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] section-kicker-fluid">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
             </span>
             Final step
           </div>
-          <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">
+          <h2 className="font-display section-title-fluid">
             {b.section_cta_title_1} <span className="text-shine">{b.section_cta_title_2}</span>
           </h2>
-          <p className="mt-6 text-white/65 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
+          <p className="mt-5 sm:mt-6 text-white/65 section-sub-fluid max-w-xl mx-auto">
             Point your TV to <span className="text-white font-mono">netflix.com/tv8</span>, type the 8-character code on screen, and we'll pair a verified Premium session to your device in seconds — 4K where supported, zero setup, no card required.
           </p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
+          <div className="mt-7 sm:mt-9 flex flex-wrap justify-center gap-3">
             <a href="#activate" className="btn-red">Activate my TV →</a>
             <a href="#how-it-works" className="btn-ghost">How it works</a>
           </div>
-          <p className="mt-6 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.28em] text-white/40">
+          <p className="mt-5 sm:mt-6 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.28em] text-white/40">
             Instant pairing · Premium tier · No sign-up card
           </p>
         </div>
