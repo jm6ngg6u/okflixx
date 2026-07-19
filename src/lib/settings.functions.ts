@@ -496,3 +496,27 @@ export const requestJobControl = createServerFn({ method: "POST" })
     return { ok: true, action: data.action };
   });
 
+
+/**
+ * Log an admin panel access attempt. Called on route mount from `admin.tsx`.
+ * Wrapped in a server fn so the underlying `log_admin_access_attempt` RPC
+ * can be revoked from the authenticated role (linter 0029).
+ */
+export const logAdminAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ allowed: z.boolean(), path: z.string().max(200) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as any;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.rpc("log_admin_access_attempt", { _allowed: data.allowed, _path: data.path });
+    // Note: RPC uses auth.uid() which is null under service_role; supplement with an explicit row so the
+    // actor is preserved.
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      actor_label: userId,
+      action: "admin_access_attempt",
+      target: data.path,
+      details: { allowed: data.allowed, path: data.path, user_id: userId },
+    });
+    return { ok: true };
+  });
