@@ -173,8 +173,14 @@ function HomePage() {
       .channel("activation-success")
       .on("broadcast", { event: "tick" }, () => {
         qc.setQueryData(["success-activation-count"], (old: any) => {
-          if (!old || typeof old.count !== "number") return old;
-          return { ...old, ok: true, count: old.count + 1 };
+          if (!old) return old;
+          return {
+            ...old,
+            ok: true,
+            count: (old.count ?? 0) + 1,
+            totalSuccess: (old.totalSuccess ?? old.count ?? 0) + 1,
+            todaySuccess: (old.todaySuccess ?? 0) + 1,
+          };
         });
         qc.invalidateQueries({ queryKey: ["success-activation-count"] });
       })
