@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Shuffle, Repeat, Sparkles, CheckCircle2, Loader2, RefreshCw, Filter, Save, RotateCcw, FlaskConical, Trophy, Cookie, XCircle, Lock, Ban, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/rotation")({
   head: () => ({ meta: [{ title: "Rotation Policy — OKFLIX Admin" }, { name: "robots", content: "noindex" }] }),
