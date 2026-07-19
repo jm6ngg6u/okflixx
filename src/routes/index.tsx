@@ -1080,7 +1080,7 @@ function HomePage() {
 
           {(() => {
             const today = successCount.data?.todaySuccess ?? 0;
-            const total = successCount.data?.totalSuccess ?? successCount.data?.count ?? 0;
+            const total = successCount.data?.totalSuccess ?? 0;
             const rate = successCount.data?.successRate ?? 0;
             const tiles = [
               { v: today.toLocaleString(), l: b.section_live_today_label, h: b.section_live_today_hint, suffix: null as string | null },
