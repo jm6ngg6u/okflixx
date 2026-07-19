@@ -8,7 +8,7 @@
     "typecheck": "tsgo --noEmit",
     "prebuild": "tsc --noEmit || echo \"typecheck skipped\"",
     "build": "vite build",
-    "start": "HOST=0.0.0.0 node .output/server/index.mjs",
+    "start": "HOST=0.0.0.0 sh -c 'if [ -f .output/server/index.mjs ]; then node .output/server/index.mjs; else node dist/server/index.mjs; fi'",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
