@@ -54,27 +54,30 @@ function ProxiesPage() {
   const [filters, setFilters] = useState<Filters>({ status: "all", scheme: "all", search: "" });
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Stats
+  // Stats — ≤2s SLA, paused when tab hidden
   const { data: stats } = useQuery({
     queryKey: ["proxy-stats"],
     queryFn: () => getStats({}),
-    refetchInterval: 15_000,
+    refetchInterval: () => (typeof document !== "undefined" && document.visibilityState === "hidden" ? false : 2_000),
   });
 
-  // Active job
+  // Active job — 1s while running, 2s while idle (realtime also refreshes)
   const { data: job } = useQuery<any>({
     queryKey: ["proxy-job"],
     queryFn: () => getJob({}),
     refetchInterval: (q) => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return false;
       const p = (q.state.data as any)?.progress;
-      return p?.phase === "running" || p?.phase === "starting" ? 1000 : 8000;
+      return p?.phase === "running" || p?.phase === "starting" ? 1000 : 2000;
     },
   });
 
-  // Rows
+  // Rows — ≤2s SLA, paused when tab hidden
   const { data, isLoading } = useQuery({
     queryKey: ["proxies", page, filters],
     queryFn: () => list({ data: { page, pageSize, status: filters.status, scheme: filters.scheme, search: filters.search } }),
+    refetchInterval: () => (typeof document !== "undefined" && document.visibilityState === "hidden" ? false : 2_000),
+    placeholderData: (prev) => prev,
   });
 
   // Realtime: any proxy_pool or job_runs change → refetch
@@ -90,6 +93,19 @@ function ProxiesPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+
+  // Refetch immediately when the tab regains focus (polling is paused while hidden)
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["proxies"] });
+        qc.invalidateQueries({ queryKey: ["proxy-stats"] });
+        qc.invalidateQueries({ queryKey: ["proxy-job"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [qc]);
 
   const uploadMut = useMutation({
