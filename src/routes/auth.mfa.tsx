@@ -193,6 +193,31 @@ function MfaPage() {
     }
   }
 
+  async function submitRecovery(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const code = recoveryCode.trim();
+    if (code.length < 6) return toast.error("Enter a recovery code");
+    setBusy(true);
+    try {
+      const res = await redeemRecoveryCode({ data: { code } });
+      if (!res.ok) {
+        const msg = res.reason === "already_used" ? "This recovery code was already used."
+                  : res.reason === "invalid" ? "Invalid recovery code."
+                  : "Could not verify code.";
+        setErrorMessage(msg); toast.error(msg); setBusy(false); return;
+      }
+      toast.success(`Signed in. ${res.remaining} code${res.remaining === 1 ? "" : "s"} left. Re-enroll a new authenticator now.`);
+      navigate({ to: "/auth/mfa", search: { mode: "enroll" } as any });
+    } catch (err: any) {
+      setErrorMessage(err?.message ?? "Recovery failed");
+      toast.error(err?.message ?? "Recovery failed");
+      setBusy(false);
+    }
+  }
+
+
+
   function copyCodes() {
     navigator.clipboard.writeText(codes.join("\n"));
     toast.success("Recovery codes copied");
