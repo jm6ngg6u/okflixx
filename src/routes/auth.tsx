@@ -182,14 +182,13 @@ function AuthPage() {
         "Authenticator verification",
       );
       if (vErr) {
-        void logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
         setErrorMessage(vErr.message);
         toast.error(vErr.message);
         setStatus("");
         setBusy(false);
         return;
       }
-      void logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
+
       setStatus("Opening admin panel…");
       toast.success("Verified");
       navigate({ to: "/admin" });
