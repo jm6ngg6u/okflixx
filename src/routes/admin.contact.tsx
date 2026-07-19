@@ -288,6 +288,8 @@ function ContactServerCheck({ local }: { local: Record<string, string> }) {
     { kind: "telegram", enableKey: "contact_tg_enabled", handleKey: "contact_tg_username" },
     { kind: "instagram", enableKey: "contact_ig_enabled", handleKey: "contact_ig_username" },
     { kind: "whatsapp", enableKey: "contact_wa_enabled", handleKey: "contact_wa_number" },
+    { kind: "email", enableKey: "contact_em_enabled", handleKey: "contact_em_address" },
+    { kind: "discord", enableKey: "contact_dc_enabled", handleKey: "contact_dc_invite" },
   ];
   const mismatches: string[] = [];
   if (dbg) {
