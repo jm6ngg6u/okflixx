@@ -235,7 +235,7 @@ function AdminLayout() {
           <Link to="/admin" className="hidden md:flex items-center gap-3 mb-8 group">
             <img src={logo} alt="" data-wave-origin className="h-9 w-9 logo-shine group-hover:scale-110 transition" />
             <div>
-              <div className="font-display text-base leading-none">EMBER<span className="text-[#ff2a3a]">LORD</span></div>
+              <div className="font-display text-base leading-none">OK<span className="text-[#ff2a3a]">FLIX</span></div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-white/40 mt-1">Control room</div>
             </div>
           </Link>
