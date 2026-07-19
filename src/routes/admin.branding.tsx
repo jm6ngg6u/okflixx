@@ -76,6 +76,9 @@ const FOOTER_ROWS: Row[] = [
   { key: "footer_link_legal_3_label", label: "Legal link 3 — label (blank = hide)" },
   { key: "footer_link_legal_3_href", label: "Legal link 3 — href" },
   { key: "footer_disclaimer", label: "Bottom-right disclaimer", multiline: true },
+];
+
+
 
 
 const HOME_MESSAGES: Row[] = [
