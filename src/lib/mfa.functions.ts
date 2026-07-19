@@ -133,15 +133,8 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const row = Array.isArray(res) ? res[0] : res;
 
-    await supabaseAdmin.from("auth_audit_log").insert({
-      user_id: userId,
-      event: "recovery_code_redeemed",
-      email: null,
-      ip_hash: ipHash,
-      user_agent: getRequestHeader("user-agent") ?? null,
-      success: !!row?.ok,
-      metadata: { reason: row?.reason ?? "unknown", remaining: row?.remaining ?? 0 },
-    });
+
+
 
     if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "invalid" };
 
