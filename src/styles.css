@@ -1065,3 +1065,58 @@ html, body {
   .why-card:hover { transform: none; }
   .why-card::before { transition: none; }
 }
+
+/* FAQ accordion — matches .why-card red-glow border when expanded. */
+.faq-card {
+  position: relative;
+  border-radius: 20px;
+  padding: 1px;
+  background: linear-gradient(
+    145deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.02) 45%,
+    rgba(var(--brand-accent-rgb), 0.10) 100%
+  );
+  isolation: isolate;
+  transition: filter 320ms ease;
+}
+.faq-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 20px;
+  padding: 1px;
+  background: conic-gradient(
+    from 220deg,
+    rgba(var(--brand-accent-rgb), 0) 0deg,
+    rgba(var(--brand-accent-rgb), 0.55) 90deg,
+    rgba(255,255,255,0.35) 140deg,
+    rgba(var(--brand-accent-rgb), 0.55) 200deg,
+    rgba(var(--brand-accent-rgb), 0) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+  z-index: 2;
+}
+.faq-card[data-state="open"]::before,
+.faq-card:hover::before { opacity: 1; }
+.faq-card[data-state="open"] {
+  filter: drop-shadow(0 22px 40px rgba(var(--brand-accent-rgb), 0.20));
+}
+.faq-card-inner {
+  position: relative;
+  border-radius: 19px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(var(--brand-accent-rgb), 0.08) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(18,18,22,0.92) 0%, rgba(10,10,12,0.94) 100%);
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-card,
+  .faq-card::before { transition: none; }
+}
