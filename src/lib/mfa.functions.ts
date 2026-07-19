@@ -149,32 +149,3 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
 
     return { ok: true as const, remaining: row.remaining as number };
   });
-
-// ---------------------------------------------------------------------------
-// Audit helpers for the auth flow
-// ---------------------------------------------------------------------------
-
-const AuditInput = z.object({
-  event: z.string().max(64),
-  email: z.string().email().optional().nullable(),
-  success: z.boolean().default(true),
-  metadata: z.record(z.string(), z.any()).optional().nullable(),
-});
-
-export const logMfaEvent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => AuditInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("auth_audit_log").insert({
-      user_id: userId,
-      event: data.event,
-      email: data.email ?? null,
-      ip_hash: await sha256Hex(readIp()),
-      user_agent: getRequestHeader("user-agent") ?? null,
-      success: data.success,
-      metadata: data.metadata ?? null,
-    });
-    return { ok: true };
-  });
