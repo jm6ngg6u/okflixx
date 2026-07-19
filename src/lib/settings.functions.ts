@@ -141,28 +141,9 @@ export const setMaintenance = createServerFn({ method: "POST" })
   });
 
 
-/** Public getter for anon-safe subset (used by the landing page banner). */
-/** Public contact channels (Telegram / Instagram / WhatsApp). Anon-safe. Only
- *  returns entries with a non-empty handle, and only when the master toggle
- *  is on. Empty channels are omitted so the UI hides them automatically. */
-export const getPublicContacts = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const keys = [
-    "contact_tg_enabled", "contact_tg_name", "contact_tg_username",
-    "contact_ig_enabled", "contact_ig_name", "contact_ig_username",
-    "contact_wa_enabled", "contact_wa_name", "contact_wa_number",
-    "contact_em_enabled", "contact_em_name", "contact_em_address",
-    "contact_dc_enabled", "contact_dc_name", "contact_dc_invite",
-  ];
-  const { data } = await supabaseAdmin.from("app_settings").select("key,value,updated_at").in("key", keys);
-  const m: Record<string, string> = {};
-  let updatedAt = 0;
-  for (const r of data ?? []) {
-    m[r.key] = r.value;
-    const t = (r as any).updated_at ? Date.parse((r as any).updated_at) : 0;
-    if (t > updatedAt) updatedAt = t;
-  }
-  // Per-channel enable: default ON when key absent (backward compat).
+// Shared normalizers + builder for public contact channels. Used by both the
+// anon-safe public getter and the admin-only debug getter so they never drift.
+function buildContactChannels(m: Record<string, string>) {
   const tgOn = (m.contact_tg_enabled ?? "1") === "1";
   const igOn = (m.contact_ig_enabled ?? "1") === "1";
   const waOn = (m.contact_wa_enabled ?? "1") === "1";
@@ -194,35 +175,80 @@ export const getPublicContacts = createServerFn({ method: "GET" }).handler(async
   const em = normEmail(m.contact_em_address ?? "");
   const dc = normDiscord(m.contact_dc_invite ?? "");
 
-  const all = [
+  return [
     { kind: "telegram", enabled: tgOn, name: (m.contact_tg_name ?? "").trim(), raw: m.contact_tg_username ?? "", handleNorm: tg, handle: tg ? `@${tg}` : "", href: tg ? `https://t.me/${tg}` : "" },
     { kind: "instagram", enabled: igOn, name: (m.contact_ig_name ?? "").trim(), raw: m.contact_ig_username ?? "", handleNorm: ig, handle: ig ? `@${ig}` : "", href: ig ? `https://instagram.com/${ig}` : "" },
     { kind: "whatsapp", enabled: waOn, name: (m.contact_wa_name ?? "").trim(), raw: m.contact_wa_number ?? "", handleNorm: wa, handle: wa ? `+${wa}` : "", href: wa ? `https://wa.me/${wa}` : "" },
     { kind: "email", enabled: emOn, name: (m.contact_em_name ?? "").trim(), raw: m.contact_em_address ?? "", handleNorm: em, handle: em, href: em ? `mailto:${em}` : "" },
     { kind: "discord", enabled: dcOn, name: (m.contact_dc_name ?? "").trim(), raw: m.contact_dc_invite ?? "", handleNorm: dc, handle: dc ? `discord.gg/${dc}` : "", href: dc ? `https://discord.gg/${dc}` : "" },
   ];
-  const channels = all
+}
+
+const CONTACT_KEYS = [
+  "contact_tg_enabled", "contact_tg_name", "contact_tg_username",
+  "contact_ig_enabled", "contact_ig_name", "contact_ig_username",
+  "contact_wa_enabled", "contact_wa_name", "contact_wa_number",
+  "contact_em_enabled", "contact_em_name", "contact_em_address",
+  "contact_dc_enabled", "contact_dc_name", "contact_dc_invite",
+];
+
+/** Public contact channels. Anon-safe. Only returns entries with a valid
+ *  handle and the channel toggled on. Disabled/empty channels are omitted so
+ *  no internal state (raw handles, timestamps, off-channels) leaks publicly. */
+export const getPublicContacts = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("app_settings").select("key,value").in("key", CONTACT_KEYS);
+  const m: Record<string, string> = {};
+  for (const r of data ?? []) m[r.key] = r.value;
+  const channels = buildContactChannels(m)
     .filter((c) => c.enabled && !!c.handleNorm)
     .map(({ kind, name, handle, href }) => ({ kind, name, handle, href }));
-
-  return {
-    enabled: channels.length > 0,
-    channels,
-    debug: {
-      updatedAt: updatedAt || null,
-      channels: all.map((c) => ({
-        kind: c.kind,
-        enabled: c.enabled,
-        rawHandle: c.raw,
-        normalizedHandle: c.handleNorm,
-        display: c.handle,
-        href: c.href,
-        visible: c.enabled && !!c.handleNorm,
-        reason: !c.enabled ? "channel_off" : !c.handleNorm ? "empty_or_invalid_handle" : "ok",
-      })),
-    },
-  };
+  return { enabled: channels.length > 0, channels };
 });
+
+/** Admin/moderator-only mirror that also returns the drift-diagnosis payload. */
+export const getPublicContactsDebug = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: a }, { data: mod }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
+    ]);
+    if (!a && !mod) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("app_settings").select("key,value,updated_at").in("key", CONTACT_KEYS);
+    const map: Record<string, string> = {};
+    let updatedAt = 0;
+    for (const r of data ?? []) {
+      map[r.key] = r.value;
+      const t = (r as any).updated_at ? Date.parse((r as any).updated_at) : 0;
+      if (t > updatedAt) updatedAt = t;
+    }
+    const all = buildContactChannels(map);
+    const channels = all
+      .filter((c) => c.enabled && !!c.handleNorm)
+      .map(({ kind, name, handle, href }) => ({ kind, name, handle, href }));
+    return {
+      enabled: channels.length > 0,
+      channels,
+      debug: {
+        updatedAt: updatedAt || null,
+        channels: all.map((c) => ({
+          kind: c.kind,
+          enabled: c.enabled,
+          rawHandle: c.raw,
+          normalizedHandle: c.handleNorm,
+          display: c.handle,
+          href: c.href,
+          visible: c.enabled && !!c.handleNorm,
+          reason: !c.enabled ? "channel_off" : !c.handleNorm ? "empty_or_invalid_handle" : "ok",
+        })),
+      },
+    };
+  });
 
 
 /**

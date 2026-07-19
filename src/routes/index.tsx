@@ -1367,7 +1367,6 @@ function ContactStrip() {
     staleTime: 0,
   });
   const channels = q.data?.channels ?? [];
-  const debugOn = typeof window !== "undefined" && /(?:^|[?&])debug=contacts(?:&|$)/.test(window.location.search);
 
   const iconFor = (kind: string) => {
     if (kind === "telegram") return Send;
@@ -1377,25 +1376,7 @@ function ContactStrip() {
     return Phone;
   };
 
-  if (!q.data?.enabled || channels.length === 0) {
-    if (!debugOn) return null;
-    return (
-      <div className="mx-auto max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-100 text-xs font-mono p-3 space-y-2">
-        <div className="uppercase tracking-widest text-[10px] text-amber-300">// Contact debug (?debug=contacts)</div>
-        <div>Channels visible: <b>{String(channels.length)}</b></div>
-        {(q.data?.debug?.channels ?? []).map((c: any) => (
-          <div key={c.kind} className="flex flex-wrap gap-x-2">
-            <span className="text-amber-300">{c.kind}:</span>
-            <span>enabled={String(c.enabled)}</span>
-            <span>raw=&quot;{c.rawHandle || "—"}&quot;</span>
-            <span>norm=&quot;{c.normalizedHandle || "—"}&quot;</span>
-            <span>visible={String(c.visible)}</span>
-            <span>reason={c.reason}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
+  if (!q.data?.enabled || channels.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">
@@ -1424,11 +1405,6 @@ function ContactStrip() {
           </a>
         );
       })}
-      {debugOn && q.data?.debug && (
-        <div className="w-full mx-auto max-w-2xl rounded-md border border-white/10 bg-black/60 text-[10px] text-white/60 font-mono p-2">
-          debug: {q.data.debug.channels.filter((c: any) => c.visible).map((c: any) => `${c.kind}=${c.display}`).join(" · ")}
-        </div>
-      )}
     </div>
   );
 }
