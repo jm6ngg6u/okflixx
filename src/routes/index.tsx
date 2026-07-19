@@ -168,25 +168,64 @@ function HomePage() {
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
   // Live activation counter: system-owned, driven only by successful activation records.
+  // Auto-reconnects on network drop / tab wake / channel error with exponential backoff.
   useEffect(() => {
-    const ch = supabase
-      .channel("activation-success")
-      .on("broadcast", { event: "tick" }, () => {
-        qc.setQueryData(["success-activation-count"], (old: any) => {
-          if (!old) return old;
-          return {
-            ...old,
-            ok: true,
-            count: (old.count ?? 0) + 1,
-            totalSuccess: (old.totalSuccess ?? old.count ?? 0) + 1,
-            todaySuccess: (old.todaySuccess ?? 0) + 1,
-          };
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    let retry = 0;
+    let retryTimer: number | null = null;
+    let cancelled = false;
+
+    const onTick = () => {
+      qc.setQueryData(["success-activation-count"], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          ok: true,
+          count: (old.count ?? 0) + 1,
+          totalSuccess: (old.totalSuccess ?? old.count ?? 0) + 1,
+          todaySuccess: (old.todaySuccess ?? 0) + 1,
+        };
+      });
+      qc.invalidateQueries({ queryKey: ["success-activation-count"] });
+    };
+
+    const connect = () => {
+      if (cancelled) return;
+      if (ch) supabase.removeChannel(ch);
+      ch = supabase
+        .channel(`activation-success-${Date.now()}`)
+        .on("broadcast", { event: "tick" }, onTick)
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            retry = 0;
+            // Reconciliation refetch — catches any ticks missed while offline.
+            qc.invalidateQueries({ queryKey: ["success-activation-count"] });
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            if (cancelled) return;
+            retry = Math.min(retry + 1, 6);
+            const delay = Math.min(30_000, 1000 * 2 ** (retry - 1));
+            if (retryTimer) window.clearTimeout(retryTimer);
+            retryTimer = window.setTimeout(connect, delay);
+          }
         });
-        qc.invalidateQueries({ queryKey: ["success-activation-count"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    };
+
+    connect();
+
+    const onOnline = () => { retry = 0; connect(); };
+    const onVisible = () => { if (document.visibilityState === "visible") connect(); };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (ch) supabase.removeChannel(ch);
+    };
   }, [qc]);
+
 
   // Auto-tick every 30s so a scheduled window flips on/off in-place without user action.
   useEffect(() => {
