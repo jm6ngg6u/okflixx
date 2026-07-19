@@ -23,14 +23,21 @@ All require header `X-Worker-Token: <shared secret>`.
 
 ## Deploy on Railway
 
-1. Push this `worker/` folder to a GitHub repo (or the whole project — Railway
-   only builds files that change).
-2. In Railway → New Project → Deploy from repo → point to this folder.
-3. Set the env var `WORKER_TOKEN` to a long random string.
-4. Once deployed, copy the public URL (e.g. `https://foo.up.railway.app`).
-5. In the Lovable project set:
+1. Create a **separate Railway service** for the worker. Do not reuse the
+   website service.
+2. If deploying this full repo, set Railway **Root Directory** to `worker`.
+3. If Railway has **Config-as-code → Railway Config File**, set it to
+   `worker/railway.json`.
+4. Set **Healthcheck Path** to `/health`.
+5. Set the env var `WORKER_TOKEN` to a long random string.
+6. Once deployed, copy the public URL (e.g. `https://foo.up.railway.app`).
+7. In the Lovable project set:
    - `NETFLIX_WORKER_URL` = that URL (no trailing slash)
    - `NETFLIX_WORKER_TOKEN` = the same `WORKER_TOKEN`
+
+If the deploy says `bun` is missing, Railway is still building the website
+instead of this Python worker. Re-check the service's **Root Directory** and
+**Railway Config File** settings above.
 
 ## Deploy anywhere else
 
