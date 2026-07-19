@@ -15,6 +15,7 @@ import { KeyRound, Lock, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader
 import logo from "@/assets/brand-logo.png";
 import { useBrand } from "@/lib/branding-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 function Wordmark() {
   const b = useBrand();
