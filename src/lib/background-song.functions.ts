@@ -136,6 +136,9 @@ export const logBackgroundSongEvent = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data }) => {
+    if (!acceptPublicEvent(data.sessionHash)) {
+      return { ok: true, throttled: true };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("background_song_events").insert({
       event_type: data.event,
