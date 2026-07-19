@@ -1143,3 +1143,44 @@ html, body {
   .section-title-fluid { font-size: clamp(3.5rem, 4.2vw, 5.5rem); }
   .metric-fluid { font-size: clamp(3.75rem, 4.6vw, 5.25rem); }
 }
+
+/* Kicker pulsing red dot — fluid, consistent across breakpoints. */
+.kicker-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  width: clamp(6px, 0.7vw, 10px);
+  height: clamp(6px, 0.7vw, 10px);
+  flex: none;
+}
+.kicker-dot-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #ff2a3a;
+  opacity: 0.75;
+  animation: kicker-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.kicker-dot {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: #ff2a3a;
+}
+@keyframes kicker-ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kicker-dot-ping { animation: none; opacity: 0.35; }
+}
+
+/* Fluid icon sizing for cards, badges, CTAs. */
+.icon-fluid { width: clamp(20px, 2.4vw, 32px); height: clamp(20px, 2.4vw, 32px); }
+.icon-fluid-lg { width: clamp(28px, 3vw, 44px); height: clamp(28px, 3vw, 44px); }
+
+/* Minimum 44x44 tap target on touch devices — WCAG 2.5.5. */
+@media (max-width: 767px) {
+  .tap-44 { min-height: 44px; }
+}
+
