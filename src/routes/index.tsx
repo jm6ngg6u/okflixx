@@ -993,7 +993,7 @@ function HomePage() {
               </span>
               {b.section_howto_kicker}
             </div>
-            <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-shine">{b.section_howto_title_2}</span></h2>
             <p className="mt-4 sm:mt-5 text-white/70 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
