@@ -832,17 +832,17 @@ function HomePage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
-              // Why Emberlord
+              {b.section_features_kicker}
             </div>
             <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
-              Built for <span className="text-shine">2026 TVs</span>.
+              {b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
             {[
-              { i: "01", t: "Instant Sync",    d: "One code, every screen. Sub-second handshake on every activation.", live: "Handshake pipeline online" },
-              { i: "02", t: "Encrypted Vault", d: "AES-256 tunnel between your TV and Netflix. Nothing sniffable, ever.", live: "TLS 1.3 · AES-256-GCM" },
-              { i: "03", t: "Always Live",     d: "Redundant edge nodes worldwide. 99.99% real-world uptime.",           live: `${(successCount.data?.count ?? 0).toLocaleString()} activations served` },
+              { i: b.why_card_1_index, t: b.why_card_1_title, d: b.why_card_1_desc, live: b.why_card_1_live },
+              { i: b.why_card_2_index, t: b.why_card_2_title, d: b.why_card_2_desc, live: b.why_card_2_live },
+              { i: b.why_card_3_index, t: b.why_card_3_title, d: b.why_card_3_desc, live: `${(successCount.data?.count ?? 0).toLocaleString()} ${b.why_card_3_live_suffix}` },
             ].map((f) => (
               <article key={f.t} className="why-card reveal group">
                 <div className="why-card-inner">
