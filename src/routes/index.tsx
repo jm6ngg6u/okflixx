@@ -1256,24 +1256,73 @@ function HomePage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="relative border-t border-white/5 py-10 px-6 md:px-12 bg-black/40 backdrop-blur">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
-          <ContactStrip />
-          <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
+      <footer className="relative border-t border-white/5 mt-16 bg-black/50 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-6 md:px-12 py-14 grid gap-10 md:grid-cols-4">
+          {/* Brand column */}
+          <div className="md:col-span-1 space-y-4">
             <div className="flex items-center gap-2">
-              <img src={logo} alt="Emberlord" className="h-7 w-7 object-contain" width={28} height={28} loading="lazy" />
+              <img src={logo} alt="Emberlord" className="h-8 w-8 object-contain" width={32} height={32} loading="lazy" />
               <span className="font-display text-lg wordmark-pulse"><Wordmark /></span>
             </div>
-            <div className="font-mono text-xs uppercase tracking-widest text-white/40">{b.footer_legal}</div>
-            <div className="flex gap-6 text-xs text-white/40">
-              <a href="#" className="hover:text-white">Privacy</a>
-              <a href="#" className="hover:text-white">Terms</a>
-              <a href="#" className="hover:text-white">Help</a>
-            </div>
+            <p className="text-white/50 text-sm leading-relaxed">Free Netflix TV activation. No card, no signup, no wait. Powered by a community-donated Premium pool.</p>
+            <ContactStrip />
+          </div>
+
+          {/* Quick links */}
+          <FooterCol title="Quick Links">
+            <FooterLink to="/" hash="activate">Activate</FooterLink>
+            <FooterLink to="/" hash="features">Features</FooterLink>
+            <FooterLink to="/" hash="how-it-works">Guide</FooterLink>
+            <FooterLink to="/" hash="faq">FAQ</FooterLink>
+            <FooterLink to="/" hash="live">Live</FooterLink>
+          </FooterCol>
+
+          {/* Support */}
+          <FooterCol title="Support">
+            <FooterLink to="/help">Help Center</FooterLink>
+            <FooterLink to="/help" hash="topics">Troubleshooting</FooterLink>
+            <FooterLink to="/" hash="faq">FAQ</FooterLink>
+          </FooterCol>
+
+          {/* Legal */}
+          <FooterCol title="Legal">
+            <FooterLink to="/privacy">Privacy Policy</FooterLink>
+            <FooterLink to="/terms">Terms of Service</FooterLink>
+          </FooterCol>
+        </div>
+
+        <div className="border-t border-white/5">
+          <div className="max-w-6xl mx-auto px-6 md:px-12 py-5 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/40">{b.footer_legal}</div>
+            <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/30">Not affiliated with Netflix, Inc.</div>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+function FooterCol({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#ff2a3a]">{title}</div>
+      <ul className="space-y-2 text-sm">{children}</ul>
+    </div>
+  );
+}
+
+function FooterLink({ to, hash, children }: { to: string; hash?: string; children: React.ReactNode }) {
+  return (
+    <li>
+      <Link
+        to={to}
+        {...(hash ? { hash } : {})}
+        className="text-white/60 hover:text-white transition inline-flex items-center gap-1.5 group"
+      >
+        <span className="w-1 h-1 rounded-full bg-white/20 group-hover:bg-[#ff2a3a] transition" />
+        {children}
+      </Link>
+    </li>
   );
 }
 
