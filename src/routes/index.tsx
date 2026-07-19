@@ -1405,11 +1405,6 @@ function ContactStrip() {
           </a>
         );
       })}
-      {debugOn && q.data?.debug && (
-        <div className="w-full mx-auto max-w-2xl rounded-md border border-white/10 bg-black/60 text-[10px] text-white/60 font-mono p-2">
-          debug: {q.data.debug.channels.filter((c: any) => c.visible).map((c: any) => `${c.kind}=${c.display}`).join(" · ")}
-        </div>
-      )}
     </div>
   );
 }
