@@ -15,6 +15,7 @@ import { KeyRound, Lock, UserCheck, CheckCircle2, RotateCcw, AlertCircle, Loader
 import logo from "@/assets/brand-logo.png";
 import { useBrand } from "@/lib/branding-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 function Wordmark() {
   const b = useBrand();
@@ -438,7 +439,7 @@ function HomePage() {
           <a href="#activate" className="hover:text-white transition">Activate</a>
           <a href="#features" className="hover:text-white transition">Features</a>
           <a href="#plans" className="hover:text-white transition">Access</a>
-          <a href="#devices" className="hover:text-white transition">Devices</a>
+          <a href="#faq" className="hover:text-white transition">FAQ</a>
           <a href="#reviews" className="hover:text-white transition">Reviews</a>
         </div>
         <div className="flex items-center gap-3">
@@ -1000,53 +1001,54 @@ function HomePage() {
 
 
 
-      {/* DEVICES */}
-      <section id="devices" className="relative py-28 px-6 md:px-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 reveal">
-            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_devices_kicker}</div>
-            <h2 className="font-display brand-section-title">{b.section_devices_title_1} <span className="text-shine">{b.section_devices_title_2}</span></h2>
+      {/* FAQ — editable via Branding Studio. Accordion opens on click. */}
+      <section id="faq" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16 reveal">
+            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker text-[11px] sm:text-xs">
+              {b.section_faq_kicker}
+            </div>
+            <h2 className="font-display brand-section-title">
+              {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
+            </h2>
+            {b.section_faq_sub ? (
+              <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2 text-base sm:text-lg leading-relaxed">
+                {b.section_faq_sub}
+              </p>
+            ) : null}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {["Smart TV", "Apple TV", "Roku", "Fire TV", "Chromecast", "PS5 / PS4", "Xbox", "Nvidia Shield"].map((d) => (
-              <div key={d} className="glass glass-hover p-6 text-center reveal">
-                <div className="font-display text-xl">{d}</div>
-                <div className="font-mono text-[10px] text-white/40 uppercase tracking-widest mt-2">Certified</div>
-              </div>
-            ))}
-          </div>
+
+          <Accordion type="single" collapsible className="w-full space-y-3 sm:space-y-4">
+            {[1, 2, 3, 4, 5, 6].map((n) => {
+              const q = b[`faq_${n}_q` as keyof typeof b] as string;
+              const a = b[`faq_${n}_a` as keyof typeof b] as string;
+              if (!q) return null;
+              return (
+                <AccordionItem
+                  key={n}
+                  value={`faq-${n}`}
+                  className="glass rounded-2xl border border-white/[0.06] px-5 sm:px-6 data-[state=open]:border-[#ff2a3a]/40 data-[state=open]:shadow-[0_0_28px_-8px_rgba(255,42,58,0.55)] transition-all"
+                >
+                  <AccordionTrigger className="hover:no-underline py-5 sm:py-6 gap-4 text-left">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <span className="font-mono text-[11px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
+                        {String(n).padStart(2, "0")}
+                      </span>
+                      <span className="font-display text-base sm:text-lg md:text-xl leading-snug text-white">
+                        {q}
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="text-white/70 text-[15px] leading-relaxed pb-6 pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
+                    {a}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
         </div>
       </section>
 
-      {/* COMPATIBILITY STRIP — system-owned. Not editable in Branding Studio.
-          Trust badges + continuously scrolling device marquee. */}
-      <section aria-label="Compatible devices and trust indicators" className="compat-strip">
-        <div className="compat-badges">
-          <span className="cb">99.99% Uptime</span>
-          <span className="cb">AES-256 Encrypted</span>
-          <span className="cb">24/7 Support</span>
-          <span className="cb">4K · HDR · Dolby</span>
-        </div>
-        <div className="compat-marquee" role="marquee" aria-live="off">
-          <div className="compat-track">
-            {(() => {
-              const brands = [
-                "Samsung Tizen", "Smart TV", "Apple TV", "Roku",
-                "Fire TV", "Chromecast", "LG WebOS", "Android TV",
-                "Nvidia Shield", "PS5", "Xbox Series X", "Vizio SmartCast",
-                "TCL Google TV", "Hisense VIDAA", "Panasonic My Home",
-              ];
-              const loop = [...brands, ...brands];
-              return loop.map((name, i) => (
-                <span className="compat-item" key={`${name}-${i}`}>
-                  <span className="dot" aria-hidden />
-                  {name}
-                </span>
-              ));
-            })()}
-          </div>
-        </div>
-      </section>
 
 
       {/* LIVE ACTIVATIONS — system-owned realtime count. Not editable in Branding Studio. */}
