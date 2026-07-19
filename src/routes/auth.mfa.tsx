@@ -362,25 +362,72 @@ function MfaPage() {
           )}
 
           {phase === "challenge" && (
-            <form onSubmit={verifyChallenge} className="space-y-3">
+            <>
+              <form onSubmit={verifyChallenge} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-white/70 text-xs uppercase tracking-wider">6-digit code</Label>
+                  <Input
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    autoFocus
+                    autoComplete="one-time-code"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    className="bg-[#0b0b0d] border-white/10 text-white h-14 text-center text-2xl tracking-[0.5em] font-mono"
+                    placeholder="000000"
+                    aria-label="6-digit code"
+                  />
+                </div>
+                <Button type="submit" disabled={busy || otp.length !== 6} className="w-full h-11 btn-red font-medium">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                </Button>
+              </form>
+              <button
+                type="button"
+                onClick={() => { setErrorMessage(null); setPhase("recovery"); }}
+                className="w-full text-center text-xs text-white/60 hover:text-white underline underline-offset-4 mt-2"
+              >
+                Use a recovery code instead
+              </button>
+            </>
+          )}
+
+          {phase === "recovery" && (
+            <form onSubmit={submitRecovery} className="space-y-3">
+              <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 flex gap-2 text-xs text-white/70">
+                <KeyRound className="h-4 w-4 flex-shrink-0 mt-0.5 text-[#ff2a3a]" />
+                <p>Enter one of your one-time recovery codes. It will be marked used and your existing authenticator will be removed so you can re-enroll.</p>
+              </div>
               <div className="space-y-1.5">
-                <Label className="text-white/70 text-xs uppercase tracking-wider">6-digit code</Label>
+                <Label className="text-white/70 text-xs uppercase tracking-wider">Recovery code</Label>
                 <Input
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
                   autoFocus
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  className="bg-[#0b0b0d] border-white/10 text-white h-14 text-center text-2xl tracking-[0.5em] font-mono"
-                  placeholder="000000"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
+                  className="bg-[#0b0b0d] border-white/10 text-white h-12 text-center text-lg tracking-[0.25em] font-mono"
+                  placeholder="XXXX-XXXX-XXXX"
+                  aria-label="Recovery code"
                 />
               </div>
-              <Button type="submit" disabled={busy || otp.length !== 6} className="w-full h-11 btn-red font-medium">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+              {errorMessage && (
+                <div className="text-xs text-red-300">{errorMessage}</div>
+              )}
+              <Button type="submit" disabled={busy || recoveryCode.trim().length < 6} className="w-full h-11 btn-red font-medium">
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Use recovery code"}
               </Button>
+              <button
+                type="button"
+                onClick={() => { setErrorMessage(null); setRecoveryCode(""); setPhase("challenge"); }}
+                className="w-full text-center text-xs text-white/60 hover:text-white underline underline-offset-4"
+              >
+                Back to authenticator code
+              </button>
             </form>
           )}
+
         </CardContent>
       </Card>
     </div>
