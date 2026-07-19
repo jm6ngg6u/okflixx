@@ -47,10 +47,12 @@ function MfaPage() {
   const [qr, setQr] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
-  const [phase, setPhase] = useState<"loading" | "enroll" | "codes" | "challenge" | "error">("loading");
+  const [phase, setPhase] = useState<"loading" | "enroll" | "codes" | "challenge" | "recovery" | "error">("loading");
   const [codes, setCodes] = useState<string[]>([]);
   const [status, setStatus] = useState("Preparing secure verification…");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState("");
+
 
   async function startMfaFlow() {
     setPhase("loading");
