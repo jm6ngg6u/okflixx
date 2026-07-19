@@ -882,26 +882,31 @@ function HomePage() {
           <div className="text-center mb-12 reveal">
             <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_plan_kicker}</div>
             <h2 className="font-display brand-section-title">{b.section_plan_title_1} <span className="text-live">{b.section_plan_title_2}</span></h2>
-            <p className="mt-5 text-white/60 max-w-xl mx-auto">Premium UHD unlocked for every activated TV — every country, every device. No card, no trial, no catch.</p>
+            <p className="mt-5 text-white/60 max-w-xl mx-auto">{b.section_plan_sub}</p>
           </div>
 
           <div className="glass glow-ring-anim p-10 md:p-12 reveal text-center">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-[#ff2a3a] mb-4">◆ Premium UHD · Global</div>
-            <div className="font-display brand-card-title mb-2">Emberlord Premium</div>
+            <div className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.32em] text-[#ff2a3a] mb-5">
+              <span aria-hidden>◆</span>
+              {b.plan_badge}
+            </div>
+            <div className="font-display brand-card-title mb-2">{b.plan_name}</div>
             <div className="flex items-baseline justify-center gap-2 mb-8">
-              <span className="font-display text-7xl text-shine">$0</span>
-              <span className="text-white/40 text-sm">/ forever</span>
+              <span className="font-display text-7xl text-shine">{b.plan_price}</span>
+              <span className="text-white/40 text-sm">{b.plan_price_period}</span>
             </div>
             <ul className="grid sm:grid-cols-2 gap-3 text-sm text-white/75 text-left max-w-md mx-auto">
-              <li>◆ 4K UHD + HDR + Dolby Vision</li>
-              <li>◆ Dolby Atmos surround</li>
-              <li>◆ Unlimited screens</li>
-              <li>◆ Every country unlocked</li>
-              <li>◆ Full Netflix catalog</li>
-              <li>◆ Zero ads, zero fees</li>
+              {[b.plan_feature_1, b.plan_feature_2, b.plan_feature_3, b.plan_feature_4, b.plan_feature_5, b.plan_feature_6]
+                .filter(Boolean)
+                .map((feat, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span aria-hidden className="text-[#ff2a3a]">◆</span>
+                    <span>{feat}</span>
+                  </li>
+                ))}
             </ul>
-            <a href="#activate" className="btn-red mt-10 inline-block">Activate Free Premium →</a>
-            <div className="mt-6 font-mono text-[10px] uppercase tracking-widest text-white/40">No credit card · No subscription · No expiry</div>
+            <a href="#activate" className="btn-red mt-10 inline-block">{b.plan_cta}</a>
+            <div className="mt-6 font-mono text-[10px] uppercase tracking-widest text-white/40">{b.plan_footnote}</div>
           </div>
         </div>
       </section>
