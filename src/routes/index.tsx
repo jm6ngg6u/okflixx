@@ -880,7 +880,7 @@ function HomePage() {
       {/* FEATURES — editable via Branding Studio. Click a card to open its detail. */}
       <section id="features" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
         <div aria-hidden className="why-orb" />
-        <div className="max-w-6xl mx-auto relative">
+        <div className="max-w-6xl mx-auto relative glow-border rounded-[32px] p-6 sm:p-10 md:p-14">
           <div className="text-center mb-14 md:mb-20 reveal">
             <div className="font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs mb-5 inline-flex items-center gap-3">
               <span className="relative flex h-1.5 w-1.5">
