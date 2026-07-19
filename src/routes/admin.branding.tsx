@@ -45,8 +45,40 @@ const IDENTITY: Row[] = [
   { key: "tagline", label: "Tagline" },
   { key: "browser_title", label: "Browser tab title" },
   { key: "meta_description", label: "Meta description (SEO)", multiline: true },
-  { key: "footer_legal", label: "Footer legal line" },
+  { key: "footer_legal", label: "Footer legal line (bottom-left)" },
 ];
+
+const FOOTER_ROWS: Row[] = [
+  { key: "footer_blurb", label: "Brand blurb (under wordmark)", multiline: true },
+  { key: "footer_col_quick_title", label: "Column 1 — heading" },
+  { key: "footer_link_quick_1_label", label: "Quick link 1 — label" },
+  { key: "footer_link_quick_1_href", label: "Quick link 1 — href", placeholder: "/#activate" },
+  { key: "footer_link_quick_2_label", label: "Quick link 2 — label" },
+  { key: "footer_link_quick_2_href", label: "Quick link 2 — href" },
+  { key: "footer_link_quick_3_label", label: "Quick link 3 — label" },
+  { key: "footer_link_quick_3_href", label: "Quick link 3 — href" },
+  { key: "footer_link_quick_4_label", label: "Quick link 4 — label" },
+  { key: "footer_link_quick_4_href", label: "Quick link 4 — href" },
+  { key: "footer_link_quick_5_label", label: "Quick link 5 — label (blank = hide)" },
+  { key: "footer_link_quick_5_href", label: "Quick link 5 — href" },
+  { key: "footer_col_support_title", label: "Column 2 — heading" },
+  { key: "footer_link_support_1_label", label: "Support link 1 — label" },
+  { key: "footer_link_support_1_href", label: "Support link 1 — href" },
+  { key: "footer_link_support_2_label", label: "Support link 2 — label" },
+  { key: "footer_link_support_2_href", label: "Support link 2 — href" },
+  { key: "footer_link_support_3_label", label: "Support link 3 — label (blank = hide)" },
+  { key: "footer_link_support_3_href", label: "Support link 3 — href" },
+  { key: "footer_col_legal_title", label: "Column 3 — heading" },
+  { key: "footer_link_legal_1_label", label: "Legal link 1 — label" },
+  { key: "footer_link_legal_1_href", label: "Legal link 1 — href" },
+  { key: "footer_link_legal_2_label", label: "Legal link 2 — label" },
+  { key: "footer_link_legal_2_href", label: "Legal link 2 — href" },
+  { key: "footer_link_legal_3_label", label: "Legal link 3 — label (blank = hide)" },
+  { key: "footer_link_legal_3_href", label: "Legal link 3 — href" },
+  { key: "footer_disclaimer", label: "Bottom-right disclaimer", multiline: true },
+];
+
+
 
 
 const HOME_MESSAGES: Row[] = [
@@ -176,14 +208,14 @@ const MAINT_MESSAGES: Row[] = [
   { key: "maint_contacts_label", label: "Contacts kicker" },
 ];
 
-const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES, ...MAINT_MESSAGES];
+const MESSAGES: Row[] = [...HOME_MESSAGES, ...FOOTER_ROWS, ...LOGIN_MESSAGES, ...MAINT_MESSAGES];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
 // Map every branding key → human label so toasts / progress read cleanly.
 const KEY_LABELS: Partial<Record<BrandingKey, string>> = (() => {
   const m: Partial<Record<BrandingKey, string>> = {};
-  for (const r of [...IDENTITY, ...MESSAGES]) m[r.key] = r.label;
+  for (const r of [...IDENTITY, ...FOOTER_ROWS, ...MESSAGES]) m[r.key] = r.label;
   m.font_display = "Display font";
   m.font_body = "Body font";
   m.font_mono = "Mono font";
@@ -381,9 +413,12 @@ function BrandingStudio() {
         </TabsContent>
 
 
-        <TabsContent value="identity" className="mt-4">
+        <TabsContent value="identity" className="mt-4 space-y-6">
           <Section title="Site identity" desc="Wordmark parts, browser tab title, SEO description and footer. Tab title updates in every open browser tab.">
             <FieldGrid rows={IDENTITY} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
+          </Section>
+          <Section title="Footer" desc="Florzin-style multi-column footer. Every heading, label and href is editable and applies live within ~2s. Leave a label blank to hide that row. Use /path, /path#hash, #hash, or an https:// URL for the href.">
+            <FieldGrid rows={FOOTER_ROWS} values={values} stage={stage} commit={commit} resetOne={resetOne.mutate} />
           </Section>
         </TabsContent>
 
