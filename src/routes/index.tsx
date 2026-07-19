@@ -1264,7 +1264,7 @@ function HomePage() {
               <img src={logo} alt="" className="h-9 w-9 object-contain" width={36} height={36} loading="lazy" />
               <span className="font-display text-xl wordmark-pulse tracking-tight"><Wordmark /></span>
             </Link>
-            <p className="text-white/55 text-sm leading-relaxed max-w-md">{b.footer_blurb}</p>
+            
             <div className="pt-1"><ContactStrip /></div>
           </div>
 
