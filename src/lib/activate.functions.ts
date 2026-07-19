@@ -482,10 +482,23 @@ export const submitActivation = createServerFn({ method: "POST" })
       // 5f. Terminal decisions.
       if (success) {
         // Broadcast a realtime tick so all live homepages bump the counter instantly.
+        // Supabase Realtime requires the channel to be SUBSCRIBED before `.send()`
+        // will actually deliver a broadcast to other clients.
         try {
-          const ch = supabaseAdmin.channel("activation-success");
+          const ch = supabaseAdmin.channel("activation-success", {
+            config: { broadcast: { self: false, ack: true } },
+          });
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => resolve(), 1500);
+            ch.subscribe((status) => {
+              if (status === "SUBSCRIBED") {
+                clearTimeout(timeout);
+                resolve();
+              }
+            });
+          });
           await ch.send({ type: "broadcast", event: "tick", payload: { at: Date.now() } });
-          supabaseAdmin.removeChannel(ch);
+          await supabaseAdmin.removeChannel(ch);
         } catch {}
         // Fetch stored account metadata for the success screen.
         const { data: meta } = await supabaseAdmin
