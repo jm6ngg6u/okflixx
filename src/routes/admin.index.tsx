@@ -118,7 +118,20 @@ function DashboardPage() {
   const doCheckAll = useServerFn(checkAllCookies);
   const qc = useQueryClient();
 
-  const aggInterval = paused ? false : AGG_REFRESH_MS;
+  // Pause polling when the tab is hidden so we don't burn DB QPS at 2s
+  // cadence on backgrounded windows. Realtime channels stay subscribed and
+  // will push any deltas immediately when the tab is refocused.
+  const [tabVisible, setTabVisible] = useState(() =>
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
+  useEffect(() => {
+    const onVis = () => setTabVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  const aggInterval = paused || !tabVisible ? false : AGG_REFRESH_MS;
+  const settingsInterval = paused || !tabVisible ? false : SETTINGS_REFRESH_MS;
 
   const stats = useQuery({
     queryKey: ["dashboard-stats", hours],
@@ -133,7 +146,8 @@ function DashboardPage() {
   const pool = useQuery({ queryKey: ["pool-summary"], queryFn: () => fetchPool(), refetchInterval: aggInterval });
   const health = useQuery({ queryKey: ["worker-health"], queryFn: () => fetchHealth(), refetchInterval: aggInterval });
   const activity = useQuery({ queryKey: ["recent-activity"], queryFn: () => fetchActivity(), refetchInterval: aggInterval });
-  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: aggInterval === false ? false : 15_000 });
+  const settingsQ = useQuery({ queryKey: ["admin-settings"], queryFn: () => fetchSettings(), refetchInterval: settingsInterval });
+
   // Seed the live ticker on mount / hours change; realtime keeps it fresh after.
   const initialAttempts = useQuery({
     queryKey: ["dashboard-live-attempts-seed"],
