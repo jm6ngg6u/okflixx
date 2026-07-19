@@ -474,50 +474,60 @@ function HomePage() {
       <ClickRipple />
       <BackgroundSong />
 
-      {/* NAV */}
-      <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 py-5 max-w-7xl mx-auto">
-        <Link to="/" className="flex items-center gap-3 group">
-          <img src={logo} alt="Emberlord" data-wave-origin className="h-10 w-10 object-contain logo-shine group-hover:scale-110 transition" width={40} height={40} />
-          <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse"><Wordmark /></span>
-        </Link>
-        <div className="hidden md:flex gap-8 text-sm text-white/70">
-          <a href="#activate" className="hover:text-white transition">Activate</a>
-          <a href="#features" className="hover:text-white transition">Features</a>
-          <a href="#how-it-works" className="hover:text-white transition">Guide</a>
-          <a href="#faq" className="hover:text-white transition">FAQ</a>
-          <a href="#live" className="hover:text-white transition inline-flex items-center gap-1.5">
-            <span className="kicker-dot-wrap">
-              <span className="kicker-dot-ping" />
-              <span className="kicker-dot" />
-            </span>
-            {b.nav_link_live}
-          </a>
-        </div>
-        <div className="flex items-center gap-3">
-          {authUserId ? (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-[11px] uppercase tracking-widest text-emerald-100/90">
-              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <Link to="/account" className="font-mono normal-case tracking-normal hover:text-white transition" title="My activations">
-                {authEmail}
+      {/* NAV — floating pill (Florzin-style) */}
+      <div className="relative z-20 px-3 sm:px-6 md:px-10 pt-4">
+        <nav className="max-w-7xl mx-auto rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl shadow-[0_20px_60px_-30px_rgba(255,42,58,0.35)] px-3 md:px-4 py-2 flex items-center justify-between gap-3">
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0 pl-1 pr-2">
+            <img src={logo} alt="Emberlord" data-wave-origin className="h-9 w-9 object-contain logo-shine group-hover:scale-110 transition" width={36} height={36} />
+            <span className="font-display brand-wordmark-nav tracking-tight wordmark-pulse hidden xs:inline sm:inline"><Wordmark /></span>
+          </Link>
+
+          {/* Center pill */}
+          <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-1.5 py-1.5 text-sm text-white/70">
+            <a href="#activate" className="px-4 py-1.5 rounded-full bg-white/10 text-white transition hover:bg-white/15">Activate</a>
+            <a href="#features" className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5">Features</a>
+            <a href="#how-it-works" className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5">Guide</a>
+            <a href="#faq" className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5">FAQ</a>
+            <a href="#live" className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5 inline-flex items-center gap-1.5">
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
+              </span>
+              {b.nav_link_live}
+            </a>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {authUserId ? (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-[11px] uppercase tracking-widest text-emerald-100/90">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <Link to="/account" className="font-mono normal-case tracking-normal hover:text-white transition max-w-[140px] truncate" title="My activations">
+                  {authEmail}
+                </Link>
+                <button
+                  type="button"
+                  onClick={async () => { await supabase.auth.signOut(); }}
+                  className="ml-1 text-white/40 hover:text-white transition"
+                  title="Sign out"
+                >
+                  ×
+                </button>
+              </div>
+            ) : gate.data?.loginRequired ? (
+              <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-xs uppercase tracking-widest text-white/85 transition">
+                <Lock className="w-3.5 h-3.5" />
+                Sign in
               </Link>
-              <button
-                type="button"
-                onClick={async () => { await supabase.auth.signOut(); }}
-                className="ml-1 text-white/40 hover:text-white transition"
-                title="Sign out"
-              >
-                ×
-              </button>
-            </div>
-          ) : gate.data?.loginRequired ? (
-            <Link to="/login" className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] text-[11px] uppercase tracking-widest text-white/80 transition">
-              <Lock className="w-3.5 h-3.5" />
-              Sign in
-            </Link>
-          ) : null}
-          <a href="#activate" className="btn-red text-sm">Activate →</a>
-        </div>
-      </nav>
+            ) : null}
+            <a href="#activate" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black text-xs uppercase tracking-widest font-semibold hover:bg-white/90 transition shadow-[0_6px_20px_-6px_rgba(255,255,255,0.35)]">
+              Activate <span aria-hidden>↗</span>
+            </a>
+          </div>
+        </nav>
+      </div>
+
 
       {/* MAINTENANCE BANNER — visible while admin has maintenance ON */}
       {gate.data?.maintenance && (
