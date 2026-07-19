@@ -88,8 +88,8 @@ type BatchResult = { inserted: number; duplicates: number; invalid: number };
 type BulkKind = "all" | "invalid" | "freehold" | "dupes" | "selection";
 type SortKey = "created_at" | "last_checked_at" | "total_uses" | "success_count" | "fail_count" | "email";
 
-const LIVE_POLL_MS = 4000;   // background poll (realtime handles the fast path)
-const STATS_POLL_MS = 5000;
+const LIVE_POLL_MS = 2000;   // ≤2s SLA (realtime handles the fast path; paused when tab hidden)
+const STATS_POLL_MS = 2000;
 
 function fmtRel(iso: string | null | undefined): string {
   if (!iso) return "never";
@@ -194,7 +194,7 @@ function CookiePoolPage() {
   const { data, isLoading, isFetching, dataUpdatedAt, error, isError, refetch } = useQuery({
     queryKey: ["cookies", page, status, country, q, sort, sortDir, stuckOnly],
     queryFn: () => logAdminFetch("listCookies", listArgs, () => list({ data: listArgs })),
-    refetchInterval: (query) => (query.state.error ? false : (isAnyChecking ? 2_000 : LIVE_POLL_MS)),
+    refetchInterval: (query) => (query.state.error || (typeof document !== "undefined" && document.visibilityState === "hidden") ? false : (isAnyChecking ? 2_000 : LIVE_POLL_MS)),
     placeholderData: (prev) => prev,
     retry: 1,
   });
@@ -202,7 +202,7 @@ function CookiePoolPage() {
   const { data: stats, error: statsError } = useQuery({
     queryKey: ["cookie-stats"],
     queryFn: () => logAdminFetch("getCookiePoolStats", {}, () => statsFn({})),
-    refetchInterval: (query) => (query.state.error ? false : STATS_POLL_MS),
+    refetchInterval: (query) => (query.state.error || (typeof document !== "undefined" && document.visibilityState === "hidden") ? false : STATS_POLL_MS),
     retry: 1,
   });
 
@@ -241,6 +241,18 @@ function CookiePoolPage() {
     const id = setInterval(() => setNextTickIn((v) => (v <= 1 ? Math.round(interval / 1000) : v - 1)), 1000);
     return () => clearInterval(id);
   }, [dataUpdatedAt, isAnyChecking]);
+
+  // -------- Pause polling when tab hidden; refetch on refocus (QPS guard) --------
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["cookies"] });
+        qc.invalidateQueries({ queryKey: ["cookie-stats"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qc]);
 
   // Clear stale selections when rows change
   useEffect(() => {
