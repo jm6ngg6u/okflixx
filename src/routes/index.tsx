@@ -483,7 +483,7 @@ function HomePage() {
         <div className="hidden md:flex gap-8 text-sm text-white/70">
           <a href="#activate" className="hover:text-white transition">Activate</a>
           <a href="#features" className="hover:text-white transition">Features</a>
-          <a href="#plans" className="hover:text-white transition">Access</a>
+          <a href="#how-it-works" className="hover:text-white transition">Guide</a>
           <a href="#faq" className="hover:text-white transition">FAQ</a>
           <a href="#live" className="hover:text-white transition inline-flex items-center gap-1.5">
             <span className="relative flex h-1.5 w-1.5">
