@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -40,6 +41,11 @@ import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api
 import { Route as ApiPublicHooksBgsHeartbeatRouteImport } from './routes/api/public/hooks/bgs-heartbeat'
 import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/privacy'
+    | '/terms'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/privacy'
+    | '/terms'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -365,6 +376,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/privacy'
+    | '/terms'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -398,6 +410,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   BgPreviewAuroraRoute: typeof BgPreviewAuroraRoute
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
@@ -412,6 +425,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
@@ -676,6 +696,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   BgPreviewAuroraRoute: BgPreviewAuroraRoute,
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
