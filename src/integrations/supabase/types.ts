@@ -333,45 +333,6 @@ export type Database = {
         }
         Relationships: []
       }
-      auth_audit_log: {
-        Row: {
-          created_at: string
-          email: string | null
-          event: string
-          id: string
-          ip_hash: string | null
-          metadata: Json
-          reason: string | null
-          success: boolean
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          event: string
-          id?: string
-          ip_hash?: string | null
-          metadata?: Json
-          reason?: string | null
-          success?: boolean
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          event?: string
-          id?: string
-          ip_hash?: string | null
-          metadata?: Json
-          reason?: string | null
-          success?: boolean
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       background_song_events: {
         Row: {
           created_at: string
@@ -654,30 +615,6 @@ export type Database = {
         }
         Relationships: []
       }
-      otp_attempts: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          ip_hash: string | null
-          kind: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          ip_hash?: string | null
-          kind?: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          ip_hash?: string | null
-          kind?: string
-        }
-        Relationships: []
-      }
       proxy_pool: {
         Row: {
           consecutive_failures: number
@@ -830,16 +767,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_otp_rate_limit: {
-        Args: {
-          _cooldown_seconds?: number
-          _email: string
-          _kind?: string
-          _max_per_window?: number
-          _window_minutes?: number
-        }
-        Returns: Json
-      }
       consume_access_key: {
         Args: {
           _code_hash: string
@@ -946,13 +873,8 @@ export type Database = {
           username: string
         }[]
       }
-      purge_auth_audit_log: { Args: { _days?: number }; Returns: number }
       purge_expired_access_sessions: { Args: never; Returns: number }
       reap_stuck_locks: { Args: never; Returns: Json }
-      record_otp_attempt: {
-        Args: { _email: string; _ip_hash?: string; _kind?: string }
-        Returns: undefined
-      }
       release_cookie: {
         Args: { _id: string; _outcome?: string; _success: boolean }
         Returns: undefined
