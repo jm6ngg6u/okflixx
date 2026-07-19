@@ -215,7 +215,7 @@ const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 // Map every branding key → human label so toasts / progress read cleanly.
 const KEY_LABELS: Partial<Record<BrandingKey, string>> = (() => {
   const m: Partial<Record<BrandingKey, string>> = {};
-  for (const r of [...IDENTITY, ...MESSAGES]) m[r.key] = r.label;
+  for (const r of [...IDENTITY, ...FOOTER_ROWS, ...MESSAGES]) m[r.key] = r.label;
   m.font_display = "Display font";
   m.font_body = "Body font";
   m.font_mono = "Mono font";
