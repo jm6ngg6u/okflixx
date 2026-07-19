@@ -913,18 +913,18 @@ function HomePage() {
                 aria-label={`${f.t} — open details`}
               >
                 <div className="why-card-inner h-full flex flex-col">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="font-mono text-xs sm:text-sm text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
-                    <div className="text-2xl sm:text-3xl leading-none" aria-hidden>{f.ic}</div>
+                  <div className="flex items-center justify-between mb-4 sm:mb-6">
+                    <div className="font-mono text-[10px] sm:text-xs text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
+                    <div className="leading-none" style={{ fontSize: "clamp(1.5rem, 3.2vw, 2rem)" }} aria-hidden>{f.ic}</div>
                   </div>
-                  <h3 className="font-display text-xl sm:text-2xl md:text-[1.6rem] leading-[1.15] tracking-tight mb-3">
+                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
                     {f.t}
                   </h3>
-                  <p className="text-white/60 text-sm leading-relaxed flex-1">
+                  <p className="text-white/60 text-[13px] sm:text-sm leading-relaxed flex-1">
                     {f.d}
                   </p>
-                  <div className="mt-6 pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
-                    <span className="font-display text-2xl sm:text-3xl text-white leading-none">{f.mv}</span>
+                  <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-white/[0.06] flex items-baseline justify-between gap-3">
+                    <span className="font-display text-white leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)" }}>{f.mv}</span>
                     <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-white/55 text-right">
                       {f.ml}
                     </span>
