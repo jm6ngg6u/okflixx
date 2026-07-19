@@ -208,7 +208,7 @@ const MAINT_MESSAGES: Row[] = [
   { key: "maint_contacts_label", label: "Contacts kicker" },
 ];
 
-const MESSAGES: Row[] = [...HOME_MESSAGES, ...LOGIN_MESSAGES, ...MAINT_MESSAGES];
+const MESSAGES: Row[] = [...HOME_MESSAGES, ...FOOTER_ROWS, ...LOGIN_MESSAGES, ...MAINT_MESSAGES];
 
 const WEIGHTS = ["300", "400", "500", "600", "700", "800"];
 
