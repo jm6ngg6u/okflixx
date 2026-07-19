@@ -234,6 +234,8 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
   push("telegram", "contact_tg_enabled", "contact_tg_name", "contact_tg_username", Send);
   push("instagram", "contact_ig_enabled", "contact_ig_name", "contact_ig_username", Instagram);
   push("whatsapp", "contact_wa_enabled", "contact_wa_name", "contact_wa_number", Phone);
+  push("email", "contact_em_enabled", "contact_em_name", "contact_em_address", Mail);
+  push("discord", "contact_dc_enabled", "contact_dc_name", "contact_dc_invite", Hash);
   return (
     <div className="rounded-md border border-white/10 bg-black/40 p-4">
       <div className="flex items-center justify-between mb-3">
