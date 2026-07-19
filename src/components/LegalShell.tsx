@@ -1,7 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { LiveBackground } from "@/components/LiveBackground";
-import { Wordmark } from "@/components/Wordmark";
+import { useBrand } from "@/lib/branding-context";
 import logo from "@/assets/emberlord-logo.png";
+
+function Wordmark() {
+  const b = useBrand();
+  return (<>{b.name_prefix}<span className="text-brand-accent">{b.name_suffix}</span></>);
+}
 
 type Props = {
   kicker: string;
