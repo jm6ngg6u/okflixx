@@ -1255,46 +1255,45 @@ function HomePage() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="relative border-t border-white/5 mt-16 bg-black/50 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-6 md:px-12 py-14 grid gap-10 md:grid-cols-4">
+      {/* FOOTER — florzin-style multi-column, admin-editable via Branding Studio */}
+      <footer className="relative border-t border-white/10 mt-20 bg-gradient-to-b from-black/60 to-black/90 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-6 md:px-12 py-16 grid gap-12 md:gap-10 md:grid-cols-12">
           {/* Brand column */}
-          <div className="md:col-span-1 space-y-4">
-            <div className="flex items-center gap-2">
-              <img src={logo} alt="Emberlord" className="h-8 w-8 object-contain" width={32} height={32} loading="lazy" />
-              <span className="font-display text-lg wordmark-pulse"><Wordmark /></span>
-            </div>
-            <p className="text-white/50 text-sm leading-relaxed">Free Netflix TV activation. No card, no signup, no wait. Powered by a community-donated Premium pool.</p>
-            <ContactStrip />
+          <div className="md:col-span-5 space-y-5">
+            <Link to="/" className="flex items-center gap-2.5 group" data-wave-origin>
+              <img src={logo} alt="" className="h-9 w-9 object-contain" width={36} height={36} loading="lazy" />
+              <span className="font-display text-xl wordmark-pulse tracking-tight"><Wordmark /></span>
+            </Link>
+            <p className="text-white/55 text-sm leading-relaxed max-w-md">{b.footer_blurb}</p>
+            <div className="pt-1"><ContactStrip /></div>
           </div>
 
-          {/* Quick links */}
-          <FooterCol title="Quick Links">
-            <FooterLink to="/" hash="activate">Activate</FooterLink>
-            <FooterLink to="/" hash="features">Features</FooterLink>
-            <FooterLink to="/" hash="how-it-works">Guide</FooterLink>
-            <FooterLink to="/" hash="faq">FAQ</FooterLink>
-            <FooterLink to="/" hash="live">Live</FooterLink>
+          {/* Link columns */}
+          <FooterCol title={b.footer_col_quick_title} className="md:col-span-3">
+            <FooterHref href={b.footer_link_quick_1_href} label={b.footer_link_quick_1_label} />
+            <FooterHref href={b.footer_link_quick_2_href} label={b.footer_link_quick_2_label} />
+            <FooterHref href={b.footer_link_quick_3_href} label={b.footer_link_quick_3_label} />
+            <FooterHref href={b.footer_link_quick_4_href} label={b.footer_link_quick_4_label} />
+            <FooterHref href={b.footer_link_quick_5_href} label={b.footer_link_quick_5_label} />
           </FooterCol>
 
-          {/* Support */}
-          <FooterCol title="Support">
-            <FooterLink to="/help">Help Center</FooterLink>
-            <FooterLink to="/help" hash="topics">Troubleshooting</FooterLink>
-            <FooterLink to="/" hash="faq">FAQ</FooterLink>
+          <FooterCol title={b.footer_col_support_title} className="md:col-span-2">
+            <FooterHref href={b.footer_link_support_1_href} label={b.footer_link_support_1_label} />
+            <FooterHref href={b.footer_link_support_2_href} label={b.footer_link_support_2_label} />
+            <FooterHref href={b.footer_link_support_3_href} label={b.footer_link_support_3_label} />
           </FooterCol>
 
-          {/* Legal */}
-          <FooterCol title="Legal">
-            <FooterLink to="/privacy">Privacy Policy</FooterLink>
-            <FooterLink to="/terms">Terms of Service</FooterLink>
+          <FooterCol title={b.footer_col_legal_title} className="md:col-span-2">
+            <FooterHref href={b.footer_link_legal_1_href} label={b.footer_link_legal_1_label} />
+            <FooterHref href={b.footer_link_legal_2_href} label={b.footer_link_legal_2_label} />
+            <FooterHref href={b.footer_link_legal_3_href} label={b.footer_link_legal_3_label} />
           </FooterCol>
         </div>
 
-        <div className="border-t border-white/5">
-          <div className="max-w-6xl mx-auto px-6 md:px-12 py-5 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-6 md:px-12 py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/40">{b.footer_legal}</div>
-            <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/30">Not affiliated with Netflix, Inc.</div>
+            <div className="text-[11px] text-white/35 leading-relaxed md:text-right md:max-w-xl">{b.footer_disclaimer}</div>
           </div>
         </div>
       </footer>
@@ -1302,26 +1301,45 @@ function HomePage() {
   );
 }
 
-function FooterCol({ title, children }: { title: string; children: React.ReactNode }) {
+function FooterCol({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="space-y-3">
-      <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#ff2a3a]">{title}</div>
-      <ul className="space-y-2 text-sm">{children}</ul>
+    <div className={`space-y-4 ${className ?? ""}`}>
+      <div className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#ff2a3a]">{title}</div>
+      <ul className="space-y-2.5 text-sm">{children}</ul>
     </div>
   );
 }
 
-function FooterLink({ to, hash, children }: { to: string; hash?: string; children: React.ReactNode }) {
+function FooterHref({ href, label }: { href: string; label: string }) {
+  const l = (label ?? "").trim();
+  const h = (href ?? "").trim();
+  if (!l || !h) return null;
+  const isExternal = /^https?:\/\//i.test(h);
+  const inner = (
+    <span className="inline-flex items-center gap-2 group">
+      <span className="w-1 h-1 rounded-full bg-white/25 group-hover:bg-[#ff2a3a] transition" />
+      <span>{l}</span>
+    </span>
+  );
+  if (isExternal) {
+    return (
+      <li>
+        <a href={h} target="_blank" rel="noreferrer" className="text-white/60 hover:text-white transition">{inner}</a>
+      </li>
+    );
+  }
+  // Parse "/path#hash", "/path", "#hash"
+  let path = h;
+  let hash: string | undefined;
+  const hashIdx = h.indexOf("#");
+  if (hashIdx >= 0) {
+    hash = h.slice(hashIdx + 1) || undefined;
+    path = h.slice(0, hashIdx) || "/";
+  }
+  if (!path.startsWith("/")) path = "/" + path;
   return (
     <li>
-      <Link
-        to={to}
-        {...(hash ? { hash } : {})}
-        className="text-white/60 hover:text-white transition inline-flex items-center gap-1.5 group"
-      >
-        <span className="w-1 h-1 rounded-full bg-white/20 group-hover:bg-[#ff2a3a] transition" />
-        {children}
-      </Link>
+      <Link to={path} {...(hash ? { hash } : {})} className="text-white/60 hover:text-white transition">{inner}</Link>
     </li>
   );
 }
