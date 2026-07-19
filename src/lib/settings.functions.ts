@@ -53,6 +53,7 @@ export const setSetting = createServerFn({ method: "POST" })
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceSettingsRateLimit(supabaseAdmin, userId);
     const { error } = await supabaseAdmin
       .from("app_settings")
       .upsert({ key: data.key, value: data.value, updated_at: new Date().toISOString(), updated_by: userId })
