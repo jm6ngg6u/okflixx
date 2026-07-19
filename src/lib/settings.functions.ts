@@ -7,6 +7,24 @@ function plainRecord(value: unknown): Record<string, any> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, any> : {};
 }
 
+/**
+ * Per-admin write rate limit: cap mutating setting writes at 30 / 60s per admin.
+ * Uses `admin_activity_log` as the ledger — no extra table needed. Prevents
+ * audit-log spam and hostile automation. Throws on breach.
+ */
+async function enforceSettingsRateLimit(supabaseAdmin: any, adminId: string) {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("admin_activity_log")
+    .select("id", { count: "exact", head: true })
+    .eq("admin_id", adminId)
+    .in("action", ["settings.update", "settings.toggle_proxy_mode", "settings.maintenance"])
+    .gte("created_at", windowStart);
+  if ((count ?? 0) >= 30) {
+    throw new Error("Rate limit: too many settings changes — slow down (max 30/min).");
+  }
+}
+
 /** Return every setting as a plain map. Publicly readable subset only for anon,
  *  but this fn requires staff so all keys are returned. */
 export const listSettings = createServerFn({ method: "GET" })
