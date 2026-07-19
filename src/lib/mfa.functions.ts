@@ -156,7 +156,7 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => RedeemInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { userId, supabase } = context;
+    const { userId, supabase, claims } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const codeHash = await sha256Hex(normalizeCode(data.code));
     const ipHash = await sha256Hex(readIp());
@@ -168,20 +168,32 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     const row = Array.isArray(res) ? res[0] : res;
+    const actor = (claims as any)?.email ?? userId;
 
+    if (!row?.ok) {
+      await supabaseAdmin.from("admin_activity_log").insert({
+        admin_id: userId,
+        actor_label: actor,
+        action: "mfa.recovery_failed",
+        details: { reason: row?.reason ?? "invalid", ip_hash: ipHash },
+      });
+      return { ok: false as const, reason: row?.reason ?? "invalid" };
+    }
 
-
-
-    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "invalid" };
-
-    // Remove existing TOTP factors so the user must re-enroll a new device
     const { data: factors } = await supabase.auth.mfa.listFactors();
     for (const f of factors?.all ?? []) {
       if (f.factor_type === "totp") {
-        // Use admin client so we don't need aal2 to unenroll
         await supabaseAdmin.auth.admin.mfa.deleteFactor({ id: f.id, userId });
       }
     }
 
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      actor_label: actor,
+      action: "mfa.recovery_used",
+      details: { remaining: row.remaining, ip_hash: ipHash },
+    });
+
     return { ok: true as const, remaining: row.remaining as number };
   });
+
