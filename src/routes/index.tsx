@@ -1126,51 +1126,124 @@ function HomePage() {
           </div>
 
           {(() => {
-            const today = successCount.data?.todaySuccess ?? 0;
-            const total = successCount.data?.totalSuccess ?? 0;
-            const rate = successCount.data?.successRate ?? 0;
+            const d = successCount.data;
+            const today = d?.todaySuccess ?? 0;
+            const total = d?.totalSuccess ?? 0;
+            const rate = d?.successRate ?? 0;
+            const wrong = d?.totalWrongCode ?? 0;
+            const expired = d?.totalExpiredCode ?? 0;
+            const wrongToday = d?.todayWrongCode ?? 0;
+            const expiredToday = d?.todayExpiredCode ?? 0;
+            const hasAny = total + wrong + expired > 0;
+            const loading = successCount.isLoading && !d;
+
+            // Empty state — no successful activations recorded yet.
+            if (!loading && !hasAny) {
+              return (
+                <div className="why-card reveal">
+                  <div className="why-card-inner h-full flex flex-col items-center text-center py-14 sm:py-20">
+                    <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2 mb-6">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                      </span>
+                      STANDING BY
+                    </div>
+                    <h3 className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-white max-w-xl">
+                      Waiting for the first activation
+                    </h3>
+                    <p className="mt-4 text-white/55 text-sm sm:text-base max-w-lg leading-relaxed">
+                      The moment a viewer links their TV, this feed lights up in real time — success count, daily total, and system success rate all update live.
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
             const tiles = [
               { v: today.toLocaleString(), l: b.section_live_today_label, h: b.section_live_today_hint, suffix: null as string | null },
               { v: total.toLocaleString(), l: b.section_live_total_label, h: b.section_live_total_hint, suffix: null },
               { v: rate.toFixed(1), l: b.section_live_rate_label, h: b.section_live_rate_hint, suffix: "%" },
             ];
+            const breakdown = [
+              { label: "Successful", value: total, today: today, tone: "text-emerald-400", dot: "bg-emerald-400" },
+              { label: "Wrong code", value: wrong, today: wrongToday, tone: "text-amber-300", dot: "bg-amber-300" },
+              { label: "Expired code", value: expired, today: expiredToday, tone: "text-white/70", dot: "bg-white/60" },
+            ];
             return (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                {tiles.map((t, i) => (
-                  <div key={i} className="why-card reveal">
-                    <div className="why-card-inner h-full flex flex-col">
-                      <div className="flex items-center justify-between mb-6">
-                        <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2">
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
-                          </span>
-                          {b.section_live_pulse_label}
-                        </div>
-                        <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/40">
-                          {String(i + 1).padStart(2, "0")}
-                        </div>
-                      </div>
-                      <div className="font-display leading-none tabular-nums text-5xl sm:text-6xl md:text-[4rem] text-white">
-                        <span className="text-live">{t.v}</span>
-                        {t.suffix ? <span className="text-white/70 text-3xl sm:text-4xl ml-1">{t.suffix}</span> : null}
-                      </div>
-                      <div className="mt-6 pt-5 border-t border-white/[0.06]">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/70">
-                          {t.l}
-                        </div>
-                        {t.h ? (
-                          <div className="mt-1.5 text-sm text-white/50 leading-relaxed">
-                            {t.h}
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                  {tiles.map((t, i) => (
+                    <div key={i} className="why-card reveal">
+                      <div className="why-card-inner h-full flex flex-col">
+                        <div className="flex items-center justify-between mb-6">
+                          <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                            </span>
+                            {b.section_live_pulse_label}
                           </div>
-                        ) : null}
+                          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/40">
+                            {String(i + 1).padStart(2, "0")}
+                          </div>
+                        </div>
+                        <div className="font-display leading-none tabular-nums text-5xl sm:text-6xl md:text-[4rem] text-white">
+                          <span className="text-live">{t.v}</span>
+                          {t.suffix ? <span className="text-white/70 text-3xl sm:text-4xl ml-1">{t.suffix}</span> : null}
+                        </div>
+                        <div className="mt-6 pt-5 border-t border-white/[0.06]">
+                          <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/70">
+                            {t.l}
+                          </div>
+                          {t.h ? (
+                            <div className="mt-1.5 text-sm text-white/50 leading-relaxed">
+                              {t.h}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Outcome breakdown — success rate = success / (success + wrong + expired). */}
+                <div className="mt-6 sm:mt-8 reveal">
+                  <div className="why-card">
+                    <div className="why-card-inner py-6 sm:py-7">
+                      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                        <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-white/60 uppercase">
+                          Outcome breakdown
+                        </div>
+                        <div className="font-mono text-[10px] tracking-[0.22em] text-white/40 uppercase">
+                          All-time · today
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {breakdown.map((row) => (
+                          <div key={row.label} className="flex items-center gap-3 rounded-xl bg-white/[0.03] border border-white/[0.05] px-4 py-3">
+                            <span className={`h-2 w-2 rounded-full ${row.dot} shrink-0`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/60">
+                                {row.label}
+                              </div>
+                              <div className={`font-display tabular-nums text-2xl sm:text-3xl ${row.tone} leading-tight`}>
+                                {row.value.toLocaleString()}
+                                <span className="ml-2 text-xs sm:text-sm text-white/40 font-mono tracking-wide">
+                                  +{row.today.toLocaleString()} today
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              </>
             );
           })()}
+
 
           {b.section_live_footnote ? (
             <p className="mt-10 text-center text-sm text-white/45 max-w-3xl mx-auto leading-relaxed reveal">
