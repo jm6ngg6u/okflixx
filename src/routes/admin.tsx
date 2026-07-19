@@ -8,7 +8,7 @@ import { LiveBackground } from "@/components/LiveBackground";
 import { ClickRipple } from "@/components/ClickRipple";
 import {
   LayoutDashboard, Cookie, Globe2, ScrollText, Settings, Users, LogOut,
-  Shield, ShieldAlert, KeyRound, Menu, X, Music4, Shuffle, FileClock, MessageCircle,
+  Shield, ShieldAlert, KeyRound, Menu, X, Music4, Shuffle, MessageCircle,
   Palette,
 } from "lucide-react";
 
@@ -198,7 +198,6 @@ function AdminLayout() {
     { to: "/admin/proxies", label: "Proxy pool", icon: Globe2, adminOnly: true },
     { to: "/admin/rotation", label: "Rotation policy", icon: Shuffle, adminOnly: true },
     { to: "/admin/access", label: "Access gates", icon: KeyRound, adminOnly: true },
-    { to: "/admin/audit", label: "Auth audit", icon: FileClock },
 
 
 

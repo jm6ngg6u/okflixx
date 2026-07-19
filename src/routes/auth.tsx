@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Shield, KeyRound, Loader2, AlertTriangle } from "lucide-react";
-import { logMfaEvent } from "@/lib/mfa.functions";
+
 import { useBrand } from "@/lib/branding-context";
 import logo from "@/assets/brand-logo.png";
 
@@ -112,9 +112,6 @@ function AuthPage() {
         "Password sign-in",
       );
       if (error) {
-        void logMfaEvent({
-          data: { event: "password_signin_fail", email: email.trim(), success: false, metadata: { reason: error.message } },
-        }).catch(() => {});
         setErrorMessage(error.message);
         toast.error(error.message);
         setStatus("");
@@ -129,9 +126,7 @@ function AuthPage() {
         return;
       }
       setStatus("Checking authenticator…");
-      void logMfaEvent({
-        data: { event: "password_signin_ok", email: email.trim(), success: true },
-      }).catch(() => {});
+
 
       const { data: factors, error: factorsError } = await withTimeout(
         supabase.auth.mfa.listFactors(),
@@ -187,14 +182,13 @@ function AuthPage() {
         "Authenticator verification",
       );
       if (vErr) {
-        void logMfaEvent({ data: { event: "totp_challenge_fail", success: false, metadata: { reason: vErr.message } } }).catch(() => {});
         setErrorMessage(vErr.message);
         toast.error(vErr.message);
         setStatus("");
         setBusy(false);
         return;
       }
-      void logMfaEvent({ data: { event: "totp_challenge_ok", success: true } }).catch(() => {});
+
       setStatus("Opening admin panel…");
       toast.success("Verified");
       navigate({ to: "/admin" });

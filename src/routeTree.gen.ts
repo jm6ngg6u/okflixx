@@ -32,7 +32,6 @@ import { Route as AdminCookiesRouteImport } from './routes/admin.cookies'
 import { Route as AdminContactRouteImport } from './routes/admin.contact'
 import { Route as AdminBrandingRouteImport } from './routes/admin.branding'
 import { Route as AdminBackgroundSongRouteImport } from './routes/admin.background-song'
-import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminAttemptsRouteImport } from './routes/admin.attempts'
 import { Route as AdminAccessRouteImport } from './routes/admin.access'
 import { Route as ApiPublicBackgroundSongAudioRouteImport } from './routes/api/public/background-song-audio'
@@ -157,11 +156,6 @@ const AdminBackgroundSongRoute = AdminBackgroundSongRouteImport.update({
   path: '/background-song',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminAuditRoute = AdminAuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminAttemptsRoute = AdminAttemptsRouteImport.update({
   id: '/attempts',
   path: '/attempts',
@@ -220,7 +214,6 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
-  '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/branding': typeof AdminBrandingRoute
   '/admin/contact': typeof AdminContactRoute
@@ -253,7 +246,6 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
-  '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/branding': typeof AdminBrandingRoute
   '/admin/contact': typeof AdminContactRoute
@@ -288,7 +280,6 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
-  '/admin/audit': typeof AdminAuditRoute
   '/admin/background-song': typeof AdminBackgroundSongRoute
   '/admin/branding': typeof AdminBrandingRoute
   '/admin/contact': typeof AdminContactRoute
@@ -324,7 +315,6 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/access'
     | '/admin/attempts'
-    | '/admin/audit'
     | '/admin/background-song'
     | '/admin/branding'
     | '/admin/contact'
@@ -357,7 +347,6 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/access'
     | '/admin/attempts'
-    | '/admin/audit'
     | '/admin/background-song'
     | '/admin/branding'
     | '/admin/contact'
@@ -391,7 +380,6 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/access'
     | '/admin/attempts'
-    | '/admin/audit'
     | '/admin/background-song'
     | '/admin/branding'
     | '/admin/contact'
@@ -599,13 +587,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBackgroundSongRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/audit': {
-      id: '/admin/audit'
-      path: '/audit'
-      fullPath: '/admin/audit'
-      preLoaderRoute: typeof AdminAuditRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/attempts': {
       id: '/admin/attempts'
       path: '/attempts'
@@ -668,7 +649,6 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAccessRoute: typeof AdminAccessRoute
   AdminAttemptsRoute: typeof AdminAttemptsRoute
-  AdminAuditRoute: typeof AdminAuditRoute
   AdminBackgroundSongRoute: typeof AdminBackgroundSongRoute
   AdminBrandingRoute: typeof AdminBrandingRoute
   AdminContactRoute: typeof AdminContactRoute
@@ -684,7 +664,6 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccessRoute: AdminAccessRoute,
   AdminAttemptsRoute: AdminAttemptsRoute,
-  AdminAuditRoute: AdminAuditRoute,
   AdminBackgroundSongRoute: AdminBackgroundSongRoute,
   AdminBrandingRoute: AdminBrandingRoute,
   AdminContactRoute: AdminContactRoute,
