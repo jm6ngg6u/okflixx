@@ -81,10 +81,9 @@ export const getMyMfaStatus = createServerFn({ method: "GET" })
 export const generateRecoveryCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    const { userId, claims } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Invalidate old unused codes
     await supabaseAdmin
       .from("admin_recovery_codes")
       .update({ used_at: new Date().toISOString() })
@@ -93,7 +92,7 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
 
     const codes: string[] = [];
     const rows: { user_id: string; code_hash: string }[] = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       const code = makeCode();
       codes.push(code);
       rows.push({ user_id: userId, code_hash: await sha256Hex(normalizeCode(code)) });
@@ -102,11 +101,48 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("admin_recovery_codes").insert(rows);
     if (error) throw new Error(error.message);
 
-
-
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      actor_label: (claims as any)?.email ?? userId,
+      action: "mfa.recovery_generated",
+      details: { count: codes.length },
+    });
 
     return { codes };
   });
+
+// ---------------------------------------------------------------------------
+// Read-only summary of recovery codes for the current user (no plaintext)
+// ---------------------------------------------------------------------------
+
+export const listRecoveryCodes = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ count: total }, { count: used }, { data: last }] = await Promise.all([
+      supabaseAdmin
+        .from("admin_recovery_codes")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      supabaseAdmin
+        .from("admin_recovery_codes")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .not("used_at", "is", null),
+      supabaseAdmin
+        .from("admin_recovery_codes")
+        .select("created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const t = total ?? 0;
+    const u = used ?? 0;
+    return { total: t, used: u, remaining: Math.max(0, t - u), createdAt: last?.created_at ?? null };
+  });
+
 
 // ---------------------------------------------------------------------------
 // Redeem a recovery code (used when the authenticator app is lost)
@@ -120,7 +156,7 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => RedeemInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { userId, supabase } = context;
+    const { userId, supabase, claims } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const codeHash = await sha256Hex(normalizeCode(data.code));
     const ipHash = await sha256Hex(readIp());
@@ -132,20 +168,32 @@ export const redeemRecoveryCode = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     const row = Array.isArray(res) ? res[0] : res;
+    const actor = (claims as any)?.email ?? userId;
 
+    if (!row?.ok) {
+      await supabaseAdmin.from("admin_activity_log").insert({
+        admin_id: userId,
+        actor_label: actor,
+        action: "mfa.recovery_failed",
+        details: { reason: row?.reason ?? "invalid", ip_hash: ipHash },
+      });
+      return { ok: false as const, reason: row?.reason ?? "invalid" };
+    }
 
-
-
-    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "invalid" };
-
-    // Remove existing TOTP factors so the user must re-enroll a new device
     const { data: factors } = await supabase.auth.mfa.listFactors();
     for (const f of factors?.all ?? []) {
       if (f.factor_type === "totp") {
-        // Use admin client so we don't need aal2 to unenroll
         await supabaseAdmin.auth.admin.mfa.deleteFactor({ id: f.id, userId });
       }
     }
 
+    await supabaseAdmin.from("admin_activity_log").insert({
+      admin_id: userId,
+      actor_label: actor,
+      action: "mfa.recovery_used",
+      details: { remaining: row.remaining, ip_hash: ipHash },
+    });
+
     return { ok: true as const, remaining: row.remaining as number };
   });
+
