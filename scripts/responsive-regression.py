@@ -39,8 +39,9 @@ async def audit(page, vp):
     name = vp["name"]
     await page.set_viewport_size({"width": vp["w"], "height": vp["h"]})
     await page.goto(BASE, wait_until="networkidle")
-    await page.wait_for_selector(".kicker-dot", timeout=8000)
+    await page.wait_for_selector(".kicker-dot", state="attached", timeout=8000)
     await page.wait_for_timeout(800)
+
 
 
     findings = {"viewport": name, "size": f"{vp['w']}x{vp['h']}", "checks": []}
