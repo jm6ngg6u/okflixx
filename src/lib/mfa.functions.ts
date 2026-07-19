@@ -102,16 +102,8 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("admin_recovery_codes").insert(rows);
     if (error) throw new Error(error.message);
 
-    // Audit
-    await supabaseAdmin.from("auth_audit_log").insert({
-      user_id: userId,
-      event: "recovery_codes_generated",
-      email: null,
-      ip_hash: await sha256Hex(readIp()),
-      user_agent: getRequestHeader("user-agent") ?? null,
-      success: true,
-      metadata: { count: codes.length },
-    });
+
+
 
     return { codes };
   });
