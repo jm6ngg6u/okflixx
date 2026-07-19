@@ -822,28 +822,59 @@ function HomePage() {
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section id="features" className="relative py-28 px-6 md:px-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16 reveal">
-            <div className="font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker">{b.section_features_kicker}</div>
-            <h2 className="font-display brand-section-title">{b.section_features_title_1} <span className="text-shine">{b.section_features_title_2}</span>.</h2>
+      {/* WHY EMBERLORD — system-owned, not editable in Branding Studio. */}
+      <section id="features" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+        <div aria-hidden className="why-orb" />
+        <div className="max-w-6xl mx-auto relative">
+          <div className="text-center mb-14 md:mb-20 reveal">
+            <div className="font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs mb-5 inline-flex items-center gap-3">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              </span>
+              // Why Emberlord
+            </div>
+            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+              Built for <span className="text-shine">2026 TVs</span>.
+            </h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
             {[
-              { t: "Instant Sync", d: "One code, every screen. Sub-second handshake on every activation.", i: "01" },
-              { t: "Encrypted Vault", d: "AES-256 tunnel between your TV and Netflix. Nothing sniffable, ever.", i: "02" },
-              { t: "Always Live", d: "Redundant edge nodes worldwide. 99.99% real-world uptime.", i: "03" },
+              { i: "01", t: "Instant Sync",    d: "One code, every screen. Sub-second handshake on every activation.", live: "Handshake pipeline online" },
+              { i: "02", t: "Encrypted Vault", d: "AES-256 tunnel between your TV and Netflix. Nothing sniffable, ever.", live: "TLS 1.3 · AES-256-GCM" },
+              { i: "03", t: "Always Live",     d: "Redundant edge nodes worldwide. 99.99% real-world uptime.",           live: `${(successCount.data?.count ?? 0).toLocaleString()} activations served` },
             ].map((f) => (
-              <div key={f.t} className="glass glass-hover p-8 reveal">
-                <div className="font-mono text-xs text-[#ff2a3a] mb-6">/{f.i}</div>
-                <div className="font-display brand-card-title mb-3">{f.t}</div>
-                <p className="text-white/60 text-sm leading-relaxed">{f.d}</p>
-              </div>
+              <article key={f.t} className="why-card reveal group">
+                <div className="why-card-inner">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="font-mono text-xs sm:text-sm text-[#ff2a3a] tracking-widest">/{f.i}</div>
+                    <div className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/45">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-70" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#22c55e]" />
+                      </span>
+                      Live
+                    </div>
+                  </div>
+                  <h3 className="font-display text-2xl sm:text-3xl md:text-[2rem] leading-[1.1] tracking-tight mb-4">
+                    {f.t}
+                  </h3>
+                  <p className="text-white/60 text-sm sm:text-[15px] leading-relaxed">
+                    {f.d}
+                  </p>
+                  <div className="mt-8 pt-5 border-t border-white/[0.06] flex items-center justify-between gap-3">
+                    <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-white/50 truncate">
+                      {f.live}
+                    </span>
+                    <span aria-hidden className="text-[#ff2a3a]/70 text-lg leading-none translate-y-[-1px] transition-transform group-hover:translate-x-1">→</span>
+                  </div>
+                </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
+
 
       {/* PLAN — SINGLE FREE PREMIUM */}
       <section id="plans" className="relative py-28 px-6 md:px-12">
