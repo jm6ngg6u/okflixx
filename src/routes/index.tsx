@@ -1116,21 +1116,21 @@ function HomePage() {
 
 
       {/* LIVE ACTIVATION FEED — system-owned realtime metrics. Copy editable in Branding Studio. */}
-      <section id="live" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+      <section id="live" className="relative section-pad-y section-pad-x">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 md:mb-16 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.3em] text-[#ff2a3a] text-[11px] sm:text-xs">
+          <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.3em] text-[#ff2a3a] section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_live_kicker}
             </div>
-            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.02] tracking-tight">
+            <h2 className="font-display section-title-fluid tracking-tight">
               {b.section_live_title_1} <span className="text-shine">{b.section_live_title_2}</span>
             </h2>
             {b.section_live_sub ? (
-              <p className="mt-6 text-white/60 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+              <p className="mt-5 sm:mt-6 text-white/60 section-sub-fluid max-w-2xl mx-auto">
                 {b.section_live_sub}
               </p>
             ) : null}
