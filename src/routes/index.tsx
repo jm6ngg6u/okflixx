@@ -927,7 +927,7 @@ function HomePage() {
                     <div className="font-mono text-[10px] sm:text-xs text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
                     <div className="leading-none" style={{ fontSize: "clamp(1.5rem, 3.2vw, 2rem)" }} aria-hidden>{f.ic}</div>
                   </div>
-                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
+                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3 text-shine" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
                     {f.t}
                   </h3>
                   <p className="text-white/70 text-[13px] sm:text-sm leading-relaxed flex-1">
@@ -993,7 +993,7 @@ function HomePage() {
               </span>
               {b.section_howto_kicker}
             </div>
-            <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-live">{b.section_howto_title_2}</span></h2>
+            <h2 className="font-display section-title-fluid">{b.section_howto_title_1} <span className="text-shine">{b.section_howto_title_2}</span></h2>
             <p className="mt-4 sm:mt-5 text-white/70 section-sub-fluid max-w-2xl mx-auto px-2">{b.section_howto_sub}</p>
           </div>
 
@@ -1021,7 +1021,7 @@ function HomePage() {
                         </span>
                         <span aria-hidden className="leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 1.9rem)" }}>{icon}</span>
                       </div>
-                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-white" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
+                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-shine" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
                       <p className="text-[13px] sm:text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
@@ -1107,7 +1107,7 @@ function HomePage() {
                         <span className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
                           {String(n).padStart(2, "0")}
                         </span>
-                        <span className="font-display leading-snug text-white" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
+                        <span className="font-display leading-snug text-shine" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
                           {q}
                         </span>
                       </div>

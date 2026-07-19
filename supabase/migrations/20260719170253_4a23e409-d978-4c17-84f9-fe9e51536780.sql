@@ -1,0 +1,1 @@
+DELETE FROM public.app_settings WHERE key IN ('branding_section_features_title_1','branding_section_features_title_2','branding_section_cta_title_1','branding_section_cta_title_2') AND (value IS NULL OR value = '');
