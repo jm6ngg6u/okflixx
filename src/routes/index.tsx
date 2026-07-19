@@ -486,9 +486,9 @@ function HomePage() {
           <a href="#how-it-works" className="hover:text-white transition">Guide</a>
           <a href="#faq" className="hover:text-white transition">FAQ</a>
           <a href="#live" className="hover:text-white transition inline-flex items-center gap-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+            <span className="kicker-dot-wrap">
+              <span className="kicker-dot-ping" />
+              <span className="kicker-dot" />
             </span>
             {b.nav_link_live}
           </a>
@@ -883,9 +883,9 @@ function HomePage() {
         <div className="max-w-6xl mx-auto relative">
           <div className="text-center mb-10 sm:mb-14 md:mb-20 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_features_kicker}
             </div>
@@ -977,9 +977,9 @@ function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_howto_kicker}
             </div>
@@ -1064,9 +1064,9 @@ function HomePage() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_faq_kicker}
             </div>
@@ -1120,9 +1120,9 @@ function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
             <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.3em] text-[#ff2a3a] section-kicker-fluid">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+              <span className="kicker-dot-wrap">
+                <span className="kicker-dot-ping" />
+                <span className="kicker-dot" />
               </span>
               {b.section_live_kicker}
             </div>
@@ -1154,9 +1154,9 @@ function HomePage() {
                 <div className="why-card reveal">
                   <div className="why-card-inner h-full flex flex-col items-center text-center py-14 sm:py-20">
                     <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2 mb-6">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                      <span className="kicker-dot-wrap">
+                        <span className="kicker-dot-ping" />
+                        <span className="kicker-dot" />
                       </span>
                       STANDING BY
                     </div>
@@ -1185,9 +1185,9 @@ function HomePage() {
                       <div className="why-card-inner h-full flex flex-col">
                         <div className="flex items-center justify-between mb-6">
                           <div className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] inline-flex items-center gap-2">
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+                            <span className="kicker-dot-wrap">
+                              <span className="kicker-dot-ping" />
+                              <span className="kicker-dot" />
                             </span>
                             {b.section_live_pulse_label}
                           </div>
@@ -1233,9 +1233,9 @@ function HomePage() {
       <section className="relative section-pad-y section-pad-x">
         <div className="relative max-w-3xl mx-auto text-center reveal">
           <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 mb-5 font-mono uppercase tracking-[0.32em] text-[#ff2a3a] section-kicker-fluid">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+            <span className="kicker-dot-wrap">
+              <span className="kicker-dot-ping" />
+              <span className="kicker-dot" />
             </span>
             Final step
           </div>
