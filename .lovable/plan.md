@@ -1,63 +1,53 @@
-# Responsive & Consistency Hardening Plan
 
-Five issues, tackled one by one. No skipped items.
+# OKFLIX Launch Readiness Deep Audit — Execution Plan
 
-## 1. Fluid icon + red-dot sizing (src/styles.css, src/routes/index.tsx)
+Scope: Deliver the full Phase 1–6 audit exactly as specified in the uploaded brief. No item skipped. Evidence-based (file:line, SQL, RPC invocation, Playwright). Order strictly Phase 1 → 6.
 
-Problem: red pulsing dot and card icons are hardcoded (`h-1.5 w-1.5`, fixed SVG sizes) so they don't scale with the kicker/text at TV or small mobile widths.
+## Phase 1 — Discovery (systems 1–37)
+For each of the 37 systems (Public 1–9, Admin 10–24, Server fns 25–32, DB 33–37) perform:
+- 1a static read (imports, side effects, module-scope `process.env`, timers, AbortControllers)
+- 1b data-flow trace of every await/RPC/realtime
+- 1c state matrix (loading/empty/partial/error/offline/rate-limited/unauth/maintenance/job-*/gate-*/reduced-motion/hidden-tab)
+- 1d secret hygiene grep across `src/lib/*.functions.ts`
+- 1e schema snapshot per table (columns, policies, grants, indexes)
+- 1f RPC hygiene (SECURITY DEFINER, `search_path=public`, EXECUTE grants)
+- 1g cron audit (`cron.job` + `cron.job_run_details`)
 
-- Add utility classes in `src/styles.css`:
-  - `.kicker-dot` — width/height `clamp(6px, 0.7vw, 10px)` for the solid dot; wrapper matches for the `animate-ping` layer.
-  - `.icon-fluid` — `width/height: clamp(20px, 2.4vw, 32px)` for card icons (why-card, step icons, faq numerals).
-  - `.icon-fluid-lg` — `clamp(28px, 3vw, 44px)` for hero/CTA icons.
-- Swap all hardcoded `h-1.5 w-1.5` dot spans in `index.tsx` to `.kicker-dot`.
-- Swap fixed `w-6 h-6` / `w-8 h-8` icon classes inside `.why-card`, step cards, FAQ number badges, and Final Step CTA to `.icon-fluid` / `.icon-fluid-lg`.
+Batched in parallel where independent: reads of files, SQL introspection queries, `supabase--linter`, grep sweeps.
 
-## 2. Consistent pulsing red dot on ALL kickers (src/routes/index.tsx)
+## Phase 2 — Defect Log
+Enumerate every finding as F### with severity P0/P1/P2 across categories:
+A. Correctness · B. Concurrency/Races · C. Error handling · D. Security (RLS/GRANT/service-role/captcha residue/AAL2/OAuth redirect/rate-limit gate rule) · E. Performance @ 2000 users + required indexes · F. Data integrity (uniqueness, FKs, stuck-lock reaper, override drift) · G. UX/a11y (dropdown opacity, reduced motion, focus trap, tap targets) · H. Observability (job_runs, admin_activity_log, structured logs, quiet hours) · I. Cloudflare Workers runtime · J. Regression matrix toggles.
 
-Currently: Features, Step-by-Step Guide, and FAQ have the dot. Missing on **Live Activation Feed** and **Final Step** kickers (and re-verify Features).
+No fixes yet. Each finding cites file:line / table.column / rpc name.
 
-- Insert the same `<span className="relative flex kicker-dot">…animate-ping…</span>` pattern into the LIVE and FINAL STEP kicker pills so all five kickers are visually identical.
+## Phase 3 — Fix Plan
+Every F### gets: severity, location, root cause, minimal-diff strategy, exact verification command, rollback. Ordered P0-security → P0-crash → P1 → P2 with dependency ordering (fix RLS before RPC that traverses it).
 
-## 3. Grid density tuning (src/routes/index.tsx, src/styles.css)
+## Phase 4 — Implement
+One finding at a time. Minimal diff. Run the exact verification before advancing. Re-run `supabase--linter` after every migration. Revert before re-patching if a prior fix was wrong.
 
-Problem: awkward wrapping — Features jumps 1→2→4 with no tablet step; Step-by-Step is 2→3→5 but the 3-col row on `md` leaves 2 orphan cards; FAQ list is single-column even on desktop where 2-col reads better.
+## Phase 5 — End-to-End Verification Matrix
+Execute all 37 scenarios in the brief's table. Record pass/fail with evidence link (screenshot path / SQL result / server-function log line). Playwright drives interactive scenarios; SQL + `stack_modern--invoke-server-function` drives server-side ones.
 
-- Features grid: `grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4` (unchanged if already good) — verify gutters use `gap-4 sm:gap-6 lg:gap-8`.
-- Step-by-Step: switch to `grid-cols-1 sm:grid-cols-2 lg:grid-cols-5` (drop the awkward 3-col md tier); on `md` keep 2-col but widen container.
-- FAQ: `grid-cols-1 lg:grid-cols-2 gap-4` so long question list doesn't run 6-deep on desktop.
-- Tighten `.why-card-inner` min-height on tablet with a mid clamp so tablet doesn't show excessive whitespace under short copy.
+## Phase 6 — Final Report
+1. Executive summary + launch verdict (ship / ship-with-caveats / hold)
+2. Full defect log with status
+3. Diff summary (files, ±lines, migrations)
+4. Verification evidence table
+5. Residual risks + monitoring alerts (job failures, worker_error rate >5%, realtime disconnect, stuck locks >10)
+6. Production launch checklist (all 17 items ticked)
 
-## 4. Accessibility: contrast + touch targets (src/styles.css, src/routes/index.tsx)
+## Rules of engagement (enforced throughout)
+- Read before edit. Never guess.
+- No edits to auto-generated files (`src/integrations/supabase/*` except non-generated, `.env`, `supabase/config.toml`, `routeTree.gen.ts`, `_authenticated/route.tsx`).
+- Preserve design tokens: uppercase headers, opaque dropdowns, Work Sans + Sora, `.text-shine`/`.text-live`/`.glow-border`/`.why-card`/`.faq-card`, red-gradient hover.
+- No emojis in code. No stray `console.log`. Structured logs only.
+- Never mark fixed without the exact listed verification. Revert before re-patching.
+- Surface conflicts with prior memories (no captcha, no admin maintenance bypass, uppercase kickers) before proceeding.
 
-Audit and fix Features + Live Activation Feed:
-- Body copy currently `text-white/60` on near-black — bump muted card text to `text-white/70` (WCAG AA at these sizes).
-- Kicker `text-[#ff2a3a]` on `#0a0a0c` passes AA large; keep — but add `text-shadow: 0 0 12px rgba(255,42,58,0.35)` only when reduced-motion is off.
-- Ensure every interactive element (FAQ accordion trigger, feed row, CTA button) has `min-height: 44px` via a `.tap-44` utility applied on mobile.
-- Add `focus-visible` ring using existing red token for accordion triggers and CTA links.
+## Deliverable cadence
+Begin at Phase 1 / System 1 (`src/routes/index.tsx`) and proceed sequentially through all 37. Progress reported in-line as each phase completes; no Phase 6 summary until Phases 1–5 are done.
 
-## 5. Playwright responsive regression suite (scripts/responsive-regression.py)
-
-New script covering four viewports:
-- Mobile 390×844, Tablet 834×1194, Desktop 1440×900, TV 1920×1080.
-- For each viewport: navigate to `/`, screenshot full sections (`#features`, `#how-it-works`, `#faq`, `#live`, `#final-step`), and assert:
-  - kicker dot rendered on all five sections (`document.querySelectorAll('.kicker-dot').length >= 5`)
-  - no horizontal scroll (`document.documentElement.scrollWidth <= innerWidth + 1`)
-  - card min-height within tolerance per breakpoint
-  - computed font-size of section titles within expected clamp range
-  - tap targets ≥ 44px on mobile only (query buttons + accordion triggers)
-- Write `scripts/screenshots/responsive/` PNGs and `report.json` with pass/fail per assertion. Exit non-zero on failure so it can gate future changes.
-
-## Verification
-
-Run in this order after each fix:
-1. Typecheck (auto by harness).
-2. `python3 scripts/responsive-regression.py` — inspect `report.json` and the four screenshot sets.
-3. Manual spot-check: kicker dots identical on all five sections, no orphan grid rows on tablet, FAQ reads as 2-col on desktop, muted body text passes visual contrast.
-
-## Files touched
-- `src/styles.css` — fluid icon utilities, tap target utility, muted text bump.
-- `src/routes/index.tsx` — kicker dot on LIVE + FINAL STEP, class swaps, grid tier changes.
-- `scripts/responsive-regression.py` — new.
-
-Approve to start.
+## Estimated size
+Large. Expect dozens of file reads, ~30–60 SQL introspection queries, one or more migrations for missing indexes / stuck-lock reaper / cron prefix rename if `emberlord-*` still active, targeted Playwright runs for scenarios 12, 17–23, 27–29, 32, 36.
