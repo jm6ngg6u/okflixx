@@ -71,6 +71,37 @@ function AccessAdminPage() {
     refetchInterval: REFRESH_MS,
   });
 
+  // ─── Realtime + visibility gating ────────────────────────────────────
+  // Postgres_changes on app_settings (gate flags) and access_keys (row edits)
+  // push updates cross-tab within ≤2s. The 2s polling is the safety net.
+  // When the tab is hidden we pause polling to protect DB QPS at scale.
+  useEffect(() => {
+    const ch = supabase
+      .channel("admin-access-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, () => {
+        qc.invalidateQueries({ queryKey: ["gate-config"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "access_keys" }, () => {
+        qc.invalidateQueries({ queryKey: ["access-keys"] });
+        qc.invalidateQueries({ queryKey: ["access-stats"] });
+      })
+      .subscribe();
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["gate-config"] });
+        qc.invalidateQueries({ queryKey: ["access-keys"] });
+        qc.invalidateQueries({ queryKey: ["access-stats"] });
+        qc.invalidateQueries({ queryKey: ["access-redemptions"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      supabase.removeChannel(ch);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [qc]);
+
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toUpperCase();
     const rows = keys.data?.rows ?? [];
