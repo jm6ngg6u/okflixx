@@ -1195,9 +1195,9 @@ function HomePage() {
                             {String(i + 1).padStart(2, "0")}
                           </div>
                         </div>
-                        <div className="font-display leading-none tabular-nums text-5xl sm:text-6xl md:text-[4rem] text-white">
+                        <div className="font-display metric-fluid tabular-nums text-white">
                           <span className="text-live">{t.v}</span>
-                          {t.suffix ? <span className="text-white/70 text-3xl sm:text-4xl ml-1">{t.suffix}</span> : null}
+                          {t.suffix ? <span className="text-white/70 ml-1" style={{ fontSize: "0.55em" }}>{t.suffix}</span> : null}
                         </div>
                         <div className="mt-6 pt-5 border-t border-white/[0.06]">
                           <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/70">
