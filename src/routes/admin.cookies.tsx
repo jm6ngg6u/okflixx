@@ -242,6 +242,18 @@ function CookiePoolPage() {
     return () => clearInterval(id);
   }, [dataUpdatedAt, isAnyChecking]);
 
+  // -------- Pause polling when tab hidden; refetch on refocus (QPS guard) --------
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["cookies"] });
+        qc.invalidateQueries({ queryKey: ["cookie-stats"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qc]);
+
   // Clear stale selections when rows change
   useEffect(() => {
     setSelection((prev) => {
