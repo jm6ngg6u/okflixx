@@ -157,9 +157,8 @@ function AdminLayout() {
     if (auditedAccessRef.current === auditKey) return;
     auditedAccessRef.current = auditKey;
     const allowed = !role.error && !!role.data?.isStaff;
-    supabase
-      .rpc("log_admin_access_attempt", { _allowed: allowed, _path: pathname })
-      .then(({ error }) => { if (error) console.warn("audit failed", error.message); });
+    logAdminAccess({ data: { allowed, path: pathname } })
+      .catch((error) => console.warn("audit failed", error?.message ?? error));
   }, [authed, pathname, role.data?.isStaff, role.error, role.isFetching, role.isLoading, userId]);
 
   async function signOut() {
