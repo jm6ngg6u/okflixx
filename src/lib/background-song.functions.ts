@@ -41,6 +41,42 @@ async function requireAdmin(context: any) {
   if (!isAdmin) throw new Error("Forbidden");
   return { userId: userId as string };
 }
+
+// Per-admin rate limit: cap background-song mutations at 30 / 60s.
+// Uses admin_activity_log as the ledger so no extra table is needed.
+async function enforceBgSongRateLimit(supabaseAdmin: any, adminId: string) {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("admin_activity_log")
+    .select("id", { count: "exact", head: true })
+    .eq("admin_id", adminId)
+    .like("action", "background_song.%")
+    .gte("created_at", windowStart);
+  if ((count ?? 0) >= 30) {
+    throw new Error("Rate limit: too many background-song changes — slow down (max 30/min).");
+  }
+}
+
+// In-worker rate limit for anonymous public event inserts.
+// Caps 60 events / min per session_hash and 200 / min globally per worker.
+const eventBucket: { count: number; resetAt: number } = { count: 0, resetAt: 0 };
+const eventBySession = new Map<string, number[]>();
+function acceptPublicEvent(sessionHash: string | null | undefined): boolean {
+  const now = Date.now();
+  if (now > eventBucket.resetAt) { eventBucket.resetAt = now + 60_000; eventBucket.count = 0; }
+  if (eventBucket.count >= 200) return false;
+  const key = (sessionHash || "anon").slice(0, 64);
+  const cutoff = now - 60_000;
+  const arr = (eventBySession.get(key) ?? []).filter((t) => t >= cutoff);
+  if (arr.length >= 60) { eventBySession.set(key, arr); return false; }
+  arr.push(now);
+  eventBySession.set(key, arr);
+  eventBucket.count++;
+  if (eventBySession.size > 5000) {
+    for (const [k, ts] of eventBySession) if (!ts.some((t) => t >= cutoff)) eventBySession.delete(k);
+  }
+  return true;
+}
 async function loadSettings() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
