@@ -546,8 +546,9 @@ export const submitActivation = createServerFn({ method: "POST" })
 
 // Public live feed of activation stats. No auth, no PII — just scalars.
 // `count` (all-time success) is retained for backward compatibility.
-// Success-rate excludes user-typo outcomes (`invalid_code`, `expired_code`)
-// from the denominator so a burst of test codes doesn't sink the number.
+// Success rate = success / (success + wrong_code + expired_code). Only the
+// three publicly-shown outcomes count toward the denominator, so bot noise
+// and transient infra errors don't distort the number visitors see.
 export const getSuccessActivationCount = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -555,15 +556,29 @@ export const getSuccessActivationCount = createServerFn({ method: "GET" }).handl
     startOfToday.setHours(0, 0, 0, 0);
     const startIso = startOfToday.toISOString();
 
-    const [totalSuccess, todaySuccess, genuineAttempts] = await Promise.all([
-      supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).eq("result", "success"),
-      supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).eq("result", "success").gte("created_at", startIso),
-      supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).not("result", "in", "(invalid_code,expired_code)"),
+    const q = (result: string, since?: string) => {
+      let b = supabaseAdmin.from("activation_attempts").select("id", { count: "exact", head: true }).eq("result", result);
+      if (since) b = b.gte("created_at", since);
+      return b;
+    };
+
+    const [totalSuccess, todaySuccess, totalWrong, todayWrong, totalExpired, todayExpired] = await Promise.all([
+      q("success"),
+      q("success", startIso),
+      q("invalid_code"),
+      q("invalid_code", startIso),
+      q("expired_code"),
+      q("expired_code", startIso),
     ]);
 
     const total = totalSuccess.count ?? 0;
     const today = todaySuccess.count ?? 0;
-    const denom = genuineAttempts.count ?? 0;
+    const wrong = totalWrong.count ?? 0;
+    const wrongToday = todayWrong.count ?? 0;
+    const expired = totalExpired.count ?? 0;
+    const expiredToday = todayExpired.count ?? 0;
+
+    const denom = total + wrong + expired;
     const rate = denom > 0 ? Math.max(0, Math.min(100, (total / denom) * 100)) : 0;
 
     return {
@@ -571,9 +586,24 @@ export const getSuccessActivationCount = createServerFn({ method: "GET" }).handl
       count: total,
       totalSuccess: total,
       todaySuccess: today,
+      totalWrongCode: wrong,
+      todayWrongCode: wrongToday,
+      totalExpiredCode: expired,
+      todayExpiredCode: expiredToday,
       successRate: Number(rate.toFixed(1)),
     };
   } catch {
-    return { ok: false as const, count: 0, totalSuccess: 0, todaySuccess: 0, successRate: 0 };
+    return {
+      ok: false as const,
+      count: 0,
+      totalSuccess: 0,
+      todaySuccess: 0,
+      totalWrongCode: 0,
+      todayWrongCode: 0,
+      totalExpiredCode: 0,
+      todayExpiredCode: 0,
+      successRate: 0,
+    };
   }
 });
+
