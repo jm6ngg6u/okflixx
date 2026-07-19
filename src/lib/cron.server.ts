@@ -1,16 +1,49 @@
-// Shared cron auth: the anon/publishable key in an `apikey` header.
-// Public /api/public/* bypasses edge auth, so we still gate against noise here.
+// Shared cron auth: require a dedicated high-entropy CRON_SECRET, never the
+// public anon/publishable key (which ships in the client bundle).
+// The secret is stored in app_settings (admin-only) so pg_cron and the
+// server route can read the same source of truth. Env CRON_SECRET is used
+// as a fallback / override for local dev.
+// Public /api/public/* bypasses edge auth, so this header check is the only gate.
 
-export function verifyCronRequest(request: Request): boolean {
+let cachedSecret: { value: string; expires: number } | null = null;
+
+async function loadCronSecret(): Promise<string> {
+  const envSecret = process.env.CRON_SECRET;
+  if (envSecret) return envSecret;
+  if (cachedSecret && cachedSecret.expires > Date.now()) return cachedSecret.value;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "cron_secret")
+      .maybeSingle();
+    const v = (data?.value as string | undefined) ?? "";
+    cachedSecret = { value: v, expires: Date.now() + 60_000 };
+    return v;
+  } catch {
+    return "";
+  }
+}
+
+export async function verifyCronRequest(request: Request): Promise<boolean> {
+  const expected = await loadCronSecret();
+  if (!expected) {
+    return process.env.NODE_ENV !== "production";
+  }
   const provided =
-    request.headers.get("apikey") ??
     request.headers.get("x-cron-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
     "";
-  const expected = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
-  if (!expected) return true; // dev fallback
-  return provided === expected;
+  if (!provided || provided.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
+  }
+  return diff === 0;
 }
+
+
 
 export async function recordJobStart(job: string): Promise<string | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
