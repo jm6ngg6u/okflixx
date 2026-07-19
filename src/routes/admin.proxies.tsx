@@ -95,6 +95,19 @@ function ProxiesPage() {
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
 
+  // Refetch immediately when the tab regains focus (polling is paused while hidden)
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["proxies"] });
+        qc.invalidateQueries({ queryKey: ["proxy-stats"] });
+        qc.invalidateQueries({ queryKey: ["proxy-job"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qc]);
+
   const uploadMut = useMutation({
     mutationFn: async () => upload({ data: { text } }),
     onSuccess: (r) => {
