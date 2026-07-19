@@ -276,7 +276,7 @@ function ContactPreview({ local }: { local: Record<string, string> }) {
 }
 
 function ContactServerCheck({ local }: { local: Record<string, string> }) {
-  const fetchPublic = useServerFn(getPublicContacts);
+  const fetchPublic = useServerFn(getPublicContactsDebug);
   const q = useQuery({
     queryKey: ["public-contacts", "admin-check"],
     queryFn: () => fetchPublic(),
