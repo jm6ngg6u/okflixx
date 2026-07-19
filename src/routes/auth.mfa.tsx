@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ShieldCheck, Loader2, Copy, Download, AlertTriangle } from "lucide-react";
-import { generateRecoveryCodes } from "@/lib/mfa.functions";
+import { ShieldCheck, Loader2, Copy, Download, AlertTriangle, KeyRound } from "lucide-react";
+import { generateRecoveryCodes, redeemRecoveryCode } from "@/lib/mfa.functions";
+
 
 const searchSchema = z.object({
   mode: z.enum(["enroll", "challenge"]).default("enroll"),
