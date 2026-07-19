@@ -1,4 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { getPublicContacts } from "@/lib/settings.functions";
+import { Send, Instagram, Phone, Mail, Hash } from "lucide-react";
 import { LegalShell } from "@/components/LegalShell";
 
 export const Route = createFileRoute("/help")({
