@@ -202,7 +202,7 @@ function CookiePoolPage() {
   const { data: stats, error: statsError } = useQuery({
     queryKey: ["cookie-stats"],
     queryFn: () => logAdminFetch("getCookiePoolStats", {}, () => statsFn({})),
-    refetchInterval: (query) => (query.state.error ? false : STATS_POLL_MS),
+    refetchInterval: (query) => (query.state.error || (typeof document !== "undefined" && document.visibilityState === "hidden") ? false : STATS_POLL_MS),
     retry: 1,
   });
 
