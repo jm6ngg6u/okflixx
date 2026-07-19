@@ -438,7 +438,7 @@ function HomePage() {
           <a href="#activate" className="hover:text-white transition">Activate</a>
           <a href="#features" className="hover:text-white transition">Features</a>
           <a href="#plans" className="hover:text-white transition">Access</a>
-          <a href="#devices" className="hover:text-white transition">Devices</a>
+          <a href="#faq" className="hover:text-white transition">FAQ</a>
           <a href="#reviews" className="hover:text-white transition">Reviews</a>
         </div>
         <div className="flex items-center gap-3">
