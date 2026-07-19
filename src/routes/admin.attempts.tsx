@@ -109,13 +109,28 @@ function AttemptsPage() {
   const [rtStatus, setRtStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [modalAttempt, setModalAttempt] = useState<Attempt | null>(null);
   const [newRowIds, setNewRowIds] = useState<Set<string>>(new Set());
+  const [tabVisible, setTabVisible] = useState(
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
 
   const fetchList = useServerFn(listAttempts);
   const qc = useQueryClient();
 
-  // Only auto-refresh while on page 0 with no scroll interaction — otherwise
-  // 2-second refetches would yank the user's reading position around.
-  const shouldPoll = !paused && page === 0;
+  // Pause polling when tab is hidden — protects DB QPS with 2000+ concurrent admins.
+  // Resume immediately on refocus with a forced refetch (no duplicate rows, react-query
+  // dedupes on queryKey).
+  useEffect(() => {
+    const onVis = () => {
+      const visible = document.visibilityState === "visible";
+      setTabVisible(visible);
+      if (visible) qc.invalidateQueries({ queryKey: ["attempts"] });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [qc]);
+
+  // Only auto-refresh while on page 0, tab visible, and not manually paused.
+  const shouldPoll = !paused && page === 0 && tabVisible;
 
   const query = useQuery({
     queryKey: ["attempts", page, selectedResults.join(","), country, q, sinceMinutes ?? "all"],
