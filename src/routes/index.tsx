@@ -1361,6 +1361,8 @@ function ContactStrip() {
   const iconFor = (kind: string) => {
     if (kind === "telegram") return Send;
     if (kind === "instagram") return Instagram;
+    if (kind === "email") return Mail;
+    if (kind === "discord") return Hash;
     return Phone;
   };
 
