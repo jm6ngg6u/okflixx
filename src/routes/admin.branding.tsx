@@ -133,6 +133,20 @@ const HOME_MESSAGES: Row[] = [
   { key: "section_cta_title_2", label: "Bottom CTA — line B (accent)" },
   { key: "success_kicker", label: "Success overlay — kicker" },
   { key: "success_title", label: "Success overlay — title" },
+  // Live activation dashboard (metrics are system-owned; copy is editable)
+  { key: "nav_link_live", label: "Nav — Live link label" },
+  { key: "section_live_kicker", label: "Live feed — kicker" },
+  { key: "section_live_title_1", label: "Live feed — title A" },
+  { key: "section_live_title_2", label: "Live feed — title B (accent)" },
+  { key: "section_live_sub", label: "Live feed — subtitle", multiline: true },
+  { key: "section_live_pulse_label", label: "Live feed — pulse pill label" },
+  { key: "section_live_today_label", label: "Live tile 1 — label (today)" },
+  { key: "section_live_today_hint", label: "Live tile 1 — hint" },
+  { key: "section_live_total_label", label: "Live tile 2 — label (total)" },
+  { key: "section_live_total_hint", label: "Live tile 2 — hint" },
+  { key: "section_live_rate_label", label: "Live tile 3 — label (rate)" },
+  { key: "section_live_rate_hint", label: "Live tile 3 — hint" },
+  { key: "section_live_footnote", label: "Live feed — footnote", multiline: true },
 ];
 
 const LOGIN_MESSAGES: Row[] = [
