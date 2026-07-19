@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/public/hooks/auto-cleanup")({
         const { verifyCronRequest, recordJobStart, recordJobFinish } = await import(
           "@/lib/cron.server"
         );
-        if (!verifyCronRequest(request))
+        if (!(await verifyCronRequest(request)))
           return new Response("Unauthorized", { status: 401 });
         const jobId = await recordJobStart("auto-cleanup");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
