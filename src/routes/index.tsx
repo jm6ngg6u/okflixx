@@ -1228,7 +1228,7 @@ function HomePage() {
 
       {/* CTA */}
       <section className="relative py-32 px-6 md:px-12">
-        <div className="relative max-w-3xl mx-auto text-center reveal glow-border rounded-[32px] p-8 sm:p-12 md:p-16">
+        <div className="relative max-w-3xl mx-auto text-center reveal">
           <div className="font-mono uppercase tracking-[0.32em] text-[#ff2a3a] text-[11px] sm:text-xs mb-5 inline-flex items-center gap-3">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
@@ -1236,9 +1236,11 @@ function HomePage() {
             </span>
             Final step
           </div>
-          <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">
-            {b.section_cta_title_1} <span className="text-shine">{b.section_cta_title_2}</span>
-          </h2>
+          <div className="glow-border rounded-2xl inline-block px-6 py-4 sm:px-10 sm:py-5">
+            <h2 className="font-display text-5xl md:text-7xl leading-[0.98]">
+              {b.section_cta_title_1} <span className="text-shine">{b.section_cta_title_2}</span>
+            </h2>
+          </div>
           <p className="mt-6 text-white/65 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
             Point your TV to <span className="text-white font-mono">netflix.com/tv8</span>, type the 8-character code on screen, and we'll pair a verified Premium session to your device in seconds — 4K where supported, zero setup, no card required.
           </p>
