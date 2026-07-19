@@ -9,7 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
@@ -39,9 +42,24 @@ import { Route as ApiPublicHooksCookiesAutocheckRouteImport } from './routes/api
 import { Route as ApiPublicHooksBgsHeartbeatRouteImport } from './routes/api/public/hooks/bgs-heartbeat'
 import { Route as ApiPublicHooksAutoCleanupRouteImport } from './routes/api/public/hooks/auto-cleanup'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -196,7 +214,10 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
+  '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -226,7 +247,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/auth': typeof AuthRouteWithChildren
+  '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -258,7 +282,10 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
+  '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/admin/access': typeof AdminAccessRoute
   '/admin/attempts': typeof AdminAttemptsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -291,7 +318,10 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/auth'
+    | '/help'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -321,7 +351,10 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/auth'
+    | '/help'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -352,7 +385,10 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/auth'
+    | '/help'
     | '/login'
+    | '/privacy'
+    | '/terms'
     | '/admin/access'
     | '/admin/attempts'
     | '/admin/audit'
@@ -384,7 +420,10 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
+  HelpRoute: typeof HelpRoute
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   BgPreviewAuroraRoute: typeof BgPreviewAuroraRoute
   BgPreviewNebulaRoute: typeof BgPreviewNebulaRoute
   BgPreviewParticlesRoute: typeof BgPreviewParticlesRoute
@@ -399,11 +438,32 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -654,7 +714,10 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
+  HelpRoute: HelpRoute,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   BgPreviewAuroraRoute: BgPreviewAuroraRoute,
   BgPreviewNebulaRoute: BgPreviewNebulaRoute,
   BgPreviewParticlesRoute: BgPreviewParticlesRoute,
