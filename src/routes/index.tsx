@@ -943,21 +943,20 @@ function HomePage() {
                     type="button"
                     onClick={() => setOpenStep(n)}
                     aria-label={`${title} — open details`}
-                    className="glass group relative flex flex-col p-5 sm:p-6 reveal h-full min-h-[220px] lg:min-h-[260px] text-left transition-transform hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a]/60 rounded-2xl"
+                    className="why-card reveal group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff2a3a]/60 rounded-2xl"
                   >
-                    <div className="flex items-center gap-3 mb-4">
-                      <span
-                        aria-hidden
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
-                      >
-                        {n}
-                      </span>
-                      <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
-                    </div>
-                    <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
-                    <p className="text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
-                    <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.28em] text-[#ff2a3a]/70 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Tap to read more →
+                    <div className="why-card-inner h-full flex flex-col">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span
+                          aria-hidden
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full font-mono text-sm font-bold text-white bg-[color:var(--brand-accent)] shadow-[0_0_18px_rgba(255,42,58,0.55)]"
+                        >
+                          {n}
+                        </span>
+                        <span aria-hidden className="text-2xl sm:text-3xl leading-none">{icon}</span>
+                      </div>
+                      <div className="font-display text-base sm:text-lg font-semibold mb-2 text-white">{title}</div>
+                      <p className="text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
                 </li>
