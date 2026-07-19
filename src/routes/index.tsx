@@ -440,7 +440,13 @@ function HomePage() {
           <a href="#features" className="hover:text-white transition">Features</a>
           <a href="#plans" className="hover:text-white transition">Access</a>
           <a href="#faq" className="hover:text-white transition">FAQ</a>
-          <a href="#reviews" className="hover:text-white transition">Reviews</a>
+          <a href="#live" className="hover:text-white transition inline-flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
+            </span>
+            {b.nav_link_live}
+          </a>
         </div>
         <div className="flex items-center gap-3">
           {authUserId ? (
