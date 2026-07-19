@@ -1,16 +1,26 @@
-// Shared cron auth: the anon/publishable key in an `apikey` header.
-// Public /api/public/* bypasses edge auth, so we still gate against noise here.
+// Shared cron auth: require a dedicated high-entropy CRON_SECRET, never the
+// public anon/publishable key (which ships in the client bundle).
+// Public /api/public/* bypasses edge auth, so this header check is the only gate.
 
 export function verifyCronRequest(request: Request): boolean {
+  const expected = process.env.CRON_SECRET ?? "";
+  if (!expected) {
+    // Fail closed in production; only allow when explicitly running locally without a secret.
+    return process.env.NODE_ENV !== "production";
+  }
   const provided =
-    request.headers.get("apikey") ??
     request.headers.get("x-cron-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
     "";
-  const expected = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
-  if (!expected) return true; // dev fallback
-  return provided === expected;
+  if (!provided || provided.length !== expected.length) return false;
+  // Constant-time compare.
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
+  }
+  return diff === 0;
 }
+
 
 export async function recordJobStart(job: string): Promise<string | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
