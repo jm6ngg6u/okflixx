@@ -74,6 +74,23 @@ export const Route = createFileRoute("/api/admin/upload-background-song")({
 
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+          // Per-admin upload rate limit: max 5 uploads / 5 min.
+          {
+            const windowStart = new Date(Date.now() - 5 * 60_000).toISOString();
+            const { count } = await supabaseAdmin
+              .from("admin_activity_log")
+              .select("id", { count: "exact", head: true })
+              .eq("admin_id", userId)
+              .eq("action", "background_song.upload")
+              .gte("created_at", windowStart);
+            if ((count ?? 0) >= 5) {
+              return Response.json(
+                { ok: false, error: "rate_limited", detail: "Too many uploads — max 5 per 5 minutes." },
+                { status: 429 },
+              );
+            }
+          }
+
           const buf = new Uint8Array(await file.arrayBuffer());
           const { error: upErr } = await supabaseAdmin.storage
             .from("site-audio")

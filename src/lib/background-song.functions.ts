@@ -41,6 +41,42 @@ async function requireAdmin(context: any) {
   if (!isAdmin) throw new Error("Forbidden");
   return { userId: userId as string };
 }
+
+// Per-admin rate limit: cap background-song mutations at 30 / 60s.
+// Uses admin_activity_log as the ledger so no extra table is needed.
+async function enforceBgSongRateLimit(supabaseAdmin: any, adminId: string) {
+  const windowStart = new Date(Date.now() - 60_000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("admin_activity_log")
+    .select("id", { count: "exact", head: true })
+    .eq("admin_id", adminId)
+    .like("action", "background_song.%")
+    .gte("created_at", windowStart);
+  if ((count ?? 0) >= 30) {
+    throw new Error("Rate limit: too many background-song changes — slow down (max 30/min).");
+  }
+}
+
+// In-worker rate limit for anonymous public event inserts.
+// Caps 60 events / min per session_hash and 200 / min globally per worker.
+const eventBucket: { count: number; resetAt: number } = { count: 0, resetAt: 0 };
+const eventBySession = new Map<string, number[]>();
+function acceptPublicEvent(sessionHash: string | null | undefined): boolean {
+  const now = Date.now();
+  if (now > eventBucket.resetAt) { eventBucket.resetAt = now + 60_000; eventBucket.count = 0; }
+  if (eventBucket.count >= 200) return false;
+  const key = (sessionHash || "anon").slice(0, 64);
+  const cutoff = now - 60_000;
+  const arr = (eventBySession.get(key) ?? []).filter((t) => t >= cutoff);
+  if (arr.length >= 60) { eventBySession.set(key, arr); return false; }
+  arr.push(now);
+  eventBySession.set(key, arr);
+  eventBucket.count++;
+  if (eventBySession.size > 5000) {
+    for (const [k, ts] of eventBySession) if (!ts.some((t) => t >= cutoff)) eventBySession.delete(k);
+  }
+  return true;
+}
 async function loadSettings() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
@@ -100,6 +136,9 @@ export const logBackgroundSongEvent = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data }) => {
+    if (!acceptPublicEvent(data.sessionHash)) {
+      return { ok: true, throttled: true };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("background_song_events").insert({
       event_type: data.event,
@@ -327,6 +366,7 @@ export const setBackgroundSongEnabled = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_enabled", value: data.enabled ? "true" : "false",
       updated_at: nowIso(), updated_by: userId,
@@ -343,6 +383,7 @@ export const setBackgroundSongReactive = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_reactive", value: data.reactive ? "true" : "false",
       updated_at: nowIso(), updated_by: userId,
@@ -367,6 +408,7 @@ export const setBackgroundSongSchedule = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     const ts = nowIso();
     await supabaseAdmin.from("app_settings").upsert([
       { key: "background_song_schedule_enabled", value: data.enabled ? "true" : "false", updated_at: ts, updated_by: userId },
@@ -386,6 +428,7 @@ export const setBackgroundSongIntensity = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_intensity", value: data.intensity.toFixed(2),
       updated_at: nowIso(), updated_by: userId,
@@ -399,6 +442,7 @@ export const setBackgroundSongSensitivity = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_sensitivity", value: data.sensitivity.toFixed(2),
       updated_at: nowIso(), updated_by: userId,
@@ -423,6 +467,7 @@ export const setBackgroundSongTrackTitle = createServerFn({ method: "POST" })
     const { userId } = await requireAdmin(context);
     const clean = normalizeTrackTitle(data.title);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     await supabaseAdmin.from("app_settings").upsert({
       key: "background_song_track_title", value: clean,
       updated_at: nowIso(), updated_by: userId,
@@ -439,6 +484,7 @@ export const removeBackgroundSong = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     const { data: cur } = await supabaseAdmin
       .from("app_settings").select("value").eq("key", "background_song_path").maybeSingle();
     const path = cur?.value;
@@ -465,6 +511,7 @@ export const restoreBackgroundSong = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
 
     const { data: row, error } = await supabaseAdmin
       .from("background_song_history")
@@ -499,6 +546,7 @@ export const deleteBackgroundSongVersion = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { userId } = await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforceBgSongRateLimit(supabaseAdmin, userId);
     const { data: row } = await supabaseAdmin
       .from("background_song_history")
       .select("id, path, is_current").eq("id", data.id).maybeSingle();
