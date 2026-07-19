@@ -847,7 +847,7 @@ function HomePage() {
               <article key={f.t} className="why-card reveal group">
                 <div className="why-card-inner">
                   <div className="flex items-center justify-between mb-8">
-                    <div className="font-mono text-xs sm:text-sm text-[#ff2a3a] tracking-widest">/{f.i}</div>
+                    <div className="font-mono text-xs sm:text-sm text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
                     <div className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/45">
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-70" />
@@ -862,12 +862,12 @@ function HomePage() {
                   <p className="text-white/60 text-sm sm:text-[15px] leading-relaxed">
                     {f.d}
                   </p>
-                  <div className="mt-8 pt-5 border-t border-white/[0.06] flex items-center justify-between gap-3">
-                    <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-white/50 truncate">
+                  <div className="mt-8 pt-5 border-t border-white/[0.06]">
+                    <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-white/55 truncate block">
                       {f.live}
                     </span>
-                    <span aria-hidden className="text-[#ff2a3a]/70 text-lg leading-none translate-y-[-1px] transition-transform group-hover:translate-x-1">→</span>
                   </div>
+
                 </div>
               </article>
             ))}
