@@ -1060,21 +1060,21 @@ function HomePage() {
 
 
       {/* FAQ — editable via Branding Studio. Accordion opens on click. */}
-      <section id="faq" className="relative py-24 sm:py-28 md:py-32 px-4 sm:px-6 md:px-12">
+      <section id="faq" className="relative section-pad-y section-pad-x">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16 reveal">
-            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker text-[11px] sm:text-xs">
+          <div className="text-center mb-10 sm:mb-14 md:mb-16 reveal">
+            <div className="glow-border rounded-full inline-flex items-center gap-3 px-4 py-2 font-mono uppercase tracking-[0.3em] text-brand-accent mb-4 brand-section-kicker section-kicker-fluid">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff2a3a] opacity-75" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#ff2a3a]" />
               </span>
               {b.section_faq_kicker}
             </div>
-            <h2 className="font-display brand-section-title">
+            <h2 className="font-display section-title-fluid">
               {b.section_faq_title_1} <span className="text-shine">{b.section_faq_title_2}</span>
             </h2>
             {b.section_faq_sub ? (
-              <p className="mt-5 text-white/60 max-w-2xl mx-auto px-2 text-base sm:text-lg leading-relaxed">
+              <p className="mt-4 sm:mt-5 text-white/60 max-w-2xl mx-auto px-2 section-sub-fluid">
                 {b.section_faq_sub}
               </p>
             ) : null}
@@ -1091,18 +1091,18 @@ function HomePage() {
                   value={`faq-${n}`}
                   className="faq-card border-0"
                 >
-                  <div className="faq-card-inner px-5 sm:px-6">
-                    <AccordionTrigger className="hover:no-underline py-5 sm:py-6 gap-4 text-left">
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
-                        <span className="font-mono text-[11px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
+                  <div className="faq-card-inner px-4 sm:px-6">
+                    <AccordionTrigger className="hover:no-underline py-4 sm:py-6 gap-3 sm:gap-4 text-left">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                        <span className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
                           {String(n).padStart(2, "0")}
                         </span>
-                        <span className="font-display text-base sm:text-lg md:text-xl leading-snug text-white">
+                        <span className="font-display leading-snug text-white" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
                           {q}
                         </span>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="text-white/70 text-[15px] leading-relaxed pb-6 pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
+                    <AccordionContent className="text-white/70 text-[14px] sm:text-[15px] leading-relaxed pb-5 sm:pb-6 pl-[calc(0.5rem+2rem)] sm:pl-[calc(0.75rem+2.5rem)] pr-2 whitespace-pre-line">
                       {a}
                     </AccordionContent>
                   </div>
