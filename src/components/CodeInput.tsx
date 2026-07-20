@@ -36,7 +36,7 @@ export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: strin
   };
 
   const handleChange = (i: number, val: string) => {
-    const clean = val.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const clean = val.replace(/[^0-9]/g, "");
     if (!clean) { setAt(i, ""); return; }
     if (clean.length === 1) {
       setAt(i, clean);
@@ -71,19 +71,18 @@ export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: strin
             <input
               ref={(el) => { refs.current[i] = el; }}
               className={`code-box ${d ? "filled" : ""}`}
-              type="text"
-              inputMode="text"
+              type="tel"
+              inputMode="numeric"
               enterKeyHint="next"
-              autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
-              autoComplete="off"
-              pattern="[A-Za-z0-9]*"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
               maxLength={1}
               value={d}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKey(i, e)}
-              aria-label={`Character ${i + 1} of 8`}
+              aria-label={`Digit ${i + 1} of 8`}
             />
             {i === 3 && <span className="code-sep">—</span>}
           </Fragment>
