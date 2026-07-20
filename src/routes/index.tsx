@@ -1497,14 +1497,12 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
           <Detail label="Account" value={maskEmail(a.email)} mono />
         </div>
 
-        <div className="mt-4 sm:mt-5 flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <a href={payload.redirectUrl} className="btn-red flex-1 text-center text-sm sm:text-base py-2.5 sm:py-3">
-            Open Netflix →
-          </a>
-          <button onClick={onClose} className="btn-ghost text-sm sm:text-base py-2.5 sm:py-3 sm:flex-1">
+        <div className="mt-4 sm:mt-5">
+          <button onClick={onClose} className="btn-red w-full text-sm sm:text-base py-2.5 sm:py-3">
             Activate another
           </button>
         </div>
+
       </div>
     </div>
   );
