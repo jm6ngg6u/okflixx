@@ -71,12 +71,19 @@ export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: strin
             <input
               ref={(el) => { refs.current[i] = el; }}
               className={`code-box ${d ? "filled" : ""}`}
+              type="text"
               inputMode="text"
+              enterKeyHint="next"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
+              pattern="[A-Za-z0-9]*"
               maxLength={1}
               value={d}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKey(i, e)}
-              aria-label={`Digit ${i + 1}`}
+              aria-label={`Character ${i + 1} of 8`}
             />
             {i === 3 && <span className="code-sep">—</span>}
           </Fragment>
