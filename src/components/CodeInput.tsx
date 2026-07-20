@@ -31,6 +31,11 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   const masked = maskedProp ?? internalMasked;
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   const shakeTimer = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   useImperativeHandle(ref, () => ({
     getCode: () => digits.join(""),
@@ -56,13 +61,14 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   useEffect(() => {
     const code = digits.join("");
     const filled = digits.filter(Boolean).length;
-    if (onChange) onChange(filled, code);
-    if (filled === LEN && onComplete) onComplete(code);
-  }, [digits, onComplete, onChange]);
+    onChangeRef.current?.(filled, code);
+    if (filled === LEN) onCompleteRef.current?.(code);
+  }, [digits]);
 
 
   const setAt = (i: number, v: string) => {
     setDigits((prev) => {
+      if (prev[i] === v) return prev;
       const next = [...prev];
       next[i] = v;
       return next;

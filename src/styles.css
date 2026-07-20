@@ -449,8 +449,8 @@ body:not([data-scroll-locked]) {
   animation: shine 3s linear infinite;
 }
 
-/* Reveal on scroll — short GPU transition so content appears instantly while scrolling. */
-.reveal { opacity: 0; transform: translate3d(0, 14px, 0); transition: opacity 0.38s ease, transform 0.38s ease; }
+/* Reveal on scroll — visible by default so hydration/slow devices never show blank content. */
+.reveal { opacity: 1; transform: translate3d(0, 0, 0); transition: opacity 0.24s ease, transform 0.24s ease; }
 .reveal.in { opacity: 1; transform: translate3d(0, 0, 0); }
 
 /* ==== GLASS + UI ==== */
