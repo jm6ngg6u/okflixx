@@ -138,17 +138,8 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   return (
     <div className="relative">
       <div className={frameClass} aria-invalid={!!error}>
-        {showMaskToggle && maskedProp === undefined && (
-          <button
-            type="button"
-            className="code-mask-toggle"
-            onClick={() => setInternalMasked((m) => !m)}
-            aria-pressed={masked}
-            aria-label={masked ? "Show code" : "Hide code"}
-          >
-            {masked ? "Show" : "Hide"}
-          </button>
-        )}
+
+
         <div className="code-boxes">
           {digits.map((d, i) => (
             <Fragment key={i}>
