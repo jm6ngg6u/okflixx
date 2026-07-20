@@ -376,6 +376,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand }: Pro
 
     return () => {
       cancelAnimationFrame(raf);
+      if (touchRaf) cancelAnimationFrame(touchRaf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseleave", onLeave);
@@ -420,7 +421,14 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand }: Pro
     window.addEventListener("resize", resize);
 
     let raf = 0;
+    let lastDraw = 0;
     const tick = () => {
+      const now = performance.now();
+      if (now - lastDraw < 33) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      lastDraw = now;
       ctx.clearRect(0, 0, w, h);
       for (const s of stars) {
         s.tw += 0.015;
