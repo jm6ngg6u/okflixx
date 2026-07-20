@@ -18,7 +18,15 @@ type Props = {
   beamsPerBand?: number;
 };
 
-export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand = 22 }: Props = {}) {
+export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand }: Props = {}) {
+  // Auto-scale beam density by viewport — mobile stays under ~24 beams total.
+  const defaultBeams =
+    typeof window !== "undefined"
+      ? window.innerWidth < 640 ? 10
+        : window.innerWidth < 1024 ? 16
+        : 22
+      : 22;
+  const beamCount = beamsPerBand ?? defaultBeams;
   const ribbonRef = useRef<HTMLCanvasElement>(null);
   const starRef = useRef<HTMLCanvasElement>(null);
 

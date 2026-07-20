@@ -31,10 +31,8 @@ export function ClickRipple() {
 
       const el = document.createElement("span");
       el.className = "click-ripple";
-      // Use transform for GPU-only paint, avoid triggering layout via left/top.
-      el.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) scale(0.3)`;
-      el.style.left = "0";
-      el.style.top = "0";
+      el.style.left = e.clientX + "px";
+      el.style.top = e.clientY + "px";
       document.body.appendChild(el);
       const kill = () => el.remove();
       el.addEventListener("animationend", kill, { once: true });

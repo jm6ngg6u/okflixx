@@ -691,7 +691,6 @@ button, a, [role="button"], input, textarea, select, label {
 /* ==== CLICK RIPPLE ==== */
 .click-ripple {
   position: fixed;
-  left: 0; top: 0;
   pointer-events: none;
   width: 12px; height: 12px;
   margin-left: -6px; margin-top: -6px;
@@ -704,8 +703,8 @@ button, a, [role="button"], input, textarea, select, label {
   contain: layout style paint;
 }
 @keyframes ripple {
-  0%   { opacity: 1; }
-  100% { opacity: 0; transform: translate3d(var(--x,0), var(--y,0), 0) scale(9); }
+  0%   { transform: scale(0.3); opacity: 1; }
+  100% { transform: scale(9);   opacity: 0; }
 }
 
 /* Ticker marquee */
