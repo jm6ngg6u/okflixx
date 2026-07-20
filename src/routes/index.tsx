@@ -414,7 +414,11 @@ function HomePage() {
         qc.invalidateQueries({ queryKey: ["success-activation-count"] });
 
       } else if (result.error === "invalid_code") {
+        setCodeError("That code doesn't match. Double-check the 8 characters on your TV.");
+        codeRef.current?.shake();
+        codeRef.current?.focusFirst();
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
+
       } else if (result.error === "maintenance") {
         toast.error("Service temporarily unavailable", { description: "Please try again in a moment." });
       } else if (result.error === "login_required") {
