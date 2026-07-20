@@ -669,6 +669,80 @@ button, a, [role="button"], input, textarea, select, label {
   user-select: none;
 }
 
+/* Error state — red ring, tinted boxes, and shake */
+.code-frame.is-error::before {
+  background: conic-gradient(from var(--ring-angle), #ff2a3a, rgba(255,42,58,0.35), #ff5a67, rgba(255,42,58,0.6), #ff2a3a);
+  animation-duration: 2.4s;
+}
+.code-frame.is-error .code-box {
+  border-color: rgba(255, 60, 76, 0.75);
+  background: rgba(255, 42, 58, 0.10);
+  box-shadow: 0 0 22px rgba(255, 42, 58, 0.28), inset 0 0 10px rgba(255, 42, 58, 0.15);
+  color: #ffd6da;
+  caret-color: #ff2a3a;
+}
+.code-frame.is-shake .code-boxes {
+  animation: code-shake 0.42s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes code-shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+  40%, 60% { transform: translate3d(6px, 0, 0); }
+}
+.code-error-msg {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #ff9aa3;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  animation: code-error-in 0.28s ease-out both;
+}
+.code-error-msg .dot {
+  width: 6px; height: 6px; border-radius: 999px;
+  background: #ff2a3a;
+  box-shadow: 0 0 10px #ff2a3a;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes code-error-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Mask toggle button */
+.code-mask-toggle {
+  position: absolute;
+  top: 10px; right: 12px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 2;
+}
+.code-mask-toggle:hover { color: #fff; background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+.code-mask-toggle:active { transform: scale(0.96); }
+
+/* PIN-mask uses text-security when supported */
+.code-box.is-masked {
+  -webkit-text-security: disc;
+  text-security: disc;
+  letter-spacing: 0.05em;
+}
+
 /* Animated glowing border ring around a card */
 .glow-ring-anim {
   position: relative;
