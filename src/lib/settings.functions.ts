@@ -421,9 +421,14 @@ export const getProxyModeStatus = createServerFn({ method: "GET" })
       supabase.rpc("has_role", { _user_id: userId, _role: "moderator" }),
     ]);
     if (!a && !m) throw new Error("Forbidden");
-    const { data: setting } = await supabase.from("app_settings").select("value").eq("key", "proxy_mode").maybeSingle();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: setting } = await supabaseAdmin.from("app_settings").select("value").eq("key", "proxy_mode").maybeSingle();
     const proxy_mode = setting?.value === "1";
-    const { data: stats } = await supabase.rpc("get_proxy_stats");
+    // `get_proxy_stats` is intentionally not executable by normal signed-in
+    // users after the security hardening pass. We already verified admin/mod
+    // above, so use the server-side admin client for the aggregate-only status.
+    const { data: stats, error } = await supabaseAdmin.rpc("get_proxy_stats");
+    if (error) throw error;
     const s: any = stats ?? {};
     return {
       proxy_mode,
