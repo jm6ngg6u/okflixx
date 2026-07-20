@@ -335,16 +335,17 @@ html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   /* Native smooth scroll on wheel/anchor jumps */
   scroll-behavior: smooth;
-  /* Kill iOS/Android 300ms tap delay + gray flash across the app */
+  /* Do not restrict page-level touch gestures; controls opt into fast taps below. */
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  /* Prevent rubber-band from bleeding into background canvas repaints */
-  overscroll-behavior-y: none;
+  touch-action: auto;
+  overscroll-behavior-y: auto;
 }
 html { scroll-padding-top: 72px; }
 @media (prefers-reduced-motion: reduce) {
@@ -356,6 +357,11 @@ html { scroll-padding-top: 72px; }
 button, a, [role="button"], input, textarea, select, label {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Guard against accidental app-wide scroll locks while keeping modal locks intact. */
+body:not([data-scroll-locked]) {
+  position: static !important;
 }
 
 /* Long content sections skip layout/paint when off-screen (huge scroll gain) */
@@ -443,9 +449,9 @@ button, a, [role="button"], input, textarea, select, label {
   animation: shine 3s linear infinite;
 }
 
-/* Reveal on scroll */
-.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.8s ease, transform 0.8s ease; }
-.reveal.in { opacity: 1; transform: translateY(0); }
+/* Reveal on scroll — visible by default so hydration/slow devices never show blank content. */
+.reveal { opacity: 1; transform: translate3d(0, 0, 0); transition: opacity 0.24s ease, transform 0.24s ease; }
+.reveal.in { opacity: 1; transform: translate3d(0, 0, 0); }
 
 /* ==== GLASS + UI ==== */
 .glass {
@@ -640,8 +646,7 @@ button, a, [role="button"], input, textarea, select, label {
   caret-color: #ff2a3a;
   padding: 0;
   /* Hardware-accelerated, no layout-triggering transitions */
-  transition: border-color 0.12s ease, background 0.12s ease, transform 0.08s ease, box-shadow 0.15s ease;
-  will-change: transform, box-shadow;
+  transition: border-color 0.08s ease, background 0.08s ease, transform 0.06s ease, box-shadow 0.1s ease;
   transform: translateZ(0);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -771,9 +776,8 @@ button, a, [role="button"], input, textarea, select, label {
   border-radius: 9999px;
   background: radial-gradient(circle, rgba(255,60,72,0.55), rgba(255,60,72,0) 70%);
   border: 1.5px solid rgba(255,60,72,0.85);
-  animation: ripple 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: ripple 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   z-index: 9999;
-  will-change: transform, opacity;
   contain: layout style paint;
 }
 @keyframes ripple {

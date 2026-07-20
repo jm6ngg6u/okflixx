@@ -31,6 +31,11 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   const masked = maskedProp ?? internalMasked;
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   const shakeTimer = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   useImperativeHandle(ref, () => ({
     getCode: () => digits.join(""),
@@ -56,13 +61,14 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   useEffect(() => {
     const code = digits.join("");
     const filled = digits.filter(Boolean).length;
-    if (onChange) onChange(filled, code);
-    if (filled === LEN && onComplete) onComplete(code);
-  }, [digits, onComplete, onChange]);
+    onChangeRef.current?.(filled, code);
+    if (filled === LEN) onCompleteRef.current?.(code);
+  }, [digits]);
 
 
   const setAt = (i: number, v: string) => {
     setDigits((prev) => {
+      if (prev[i] === v) return prev;
       const next = [...prev];
       next[i] = v;
       return next;
@@ -95,12 +101,25 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   };
 
   const handleKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      setAt(i, e.key);
+      if (i < LEN - 1) refs.current[i + 1]?.focus();
+      return;
+    }
     if (e.key === "Backspace" && !digits[i] && i > 0) {
       refs.current[i - 1]?.focus();
       setAt(i - 1, "");
     }
     if (e.key === "ArrowLeft" && i > 0) refs.current[i - 1]?.focus();
     if (e.key === "ArrowRight" && i < LEN - 1) refs.current[i + 1]?.focus();
+  };
+
+  const handleBeforeInput = (i: number, e: React.FormEvent<HTMLInputElement>) => {
+    const data = (e.nativeEvent as InputEvent).data ?? "";
+    if (!data) return;
+    e.preventDefault();
+    fillFrom(i, data);
   };
 
   const handlePaste = (i: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -143,8 +162,8 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
                 spellCheck={false}
                 autoComplete="one-time-code"
                 pattern="[0-9]*"
-                maxLength={1}
                 value={d}
+                onBeforeInput={(e) => handleBeforeInput(i, e)}
                 onChange={(e) => handleChange(i, e.target.value)}
                 onKeyDown={(e) => handleKey(i, e)}
                 onPaste={(e) => handlePaste(i, e)}

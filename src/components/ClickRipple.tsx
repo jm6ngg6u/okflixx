@@ -17,13 +17,13 @@ export function ClickRipple() {
     let scrollingUntil = 0;
 
     const onScroll = () => {
-      scrollingUntil = performance.now() + 120;
+      scrollingUntil = performance.now() + 45;
     };
 
     const onDown = (e: PointerEvent) => {
       const now = performance.now();
       if (now < scrollingUntil) return;
-      if (now - lastAt < 60) return;
+      if (now - lastAt < 45) return;
       lastAt = now;
 
       const target = e.target as HTMLElement | null;
@@ -36,7 +36,7 @@ export function ClickRipple() {
       document.body.appendChild(el);
       const kill = () => el.remove();
       el.addEventListener("animationend", kill, { once: true });
-      setTimeout(kill, 800);
+      setTimeout(kill, 420);
     };
 
     window.addEventListener("pointerdown", onDown, { passive: true });
