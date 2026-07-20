@@ -129,6 +129,35 @@ function HomePage() {
 
 
   const activate = useServerFn(submitActivation);
+
+  // Reliable in-page scroll handler for hash links (Activate/Features/FAQ/etc.).
+  // Native anchor jumps are inconsistent on mobile/TV due to sticky nav, smooth
+  // scroll quirks, and overlay layers — this bypasses all of that.
+  const scrollToId = useCallback((id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.pageYOffset - 12;
+    try {
+      window.scrollTo({ top: y, behavior: "smooth" });
+    } catch {
+      window.scrollTo(0, y);
+    }
+    if (id === "activate") {
+      window.setTimeout(() => {
+        const input = document.querySelector<HTMLInputElement>('#activate input[inputmode="numeric"], #activate input[type="tel"]');
+        input?.focus();
+      }, 450);
+    }
+  }, []);
+  const onHashClick = useCallback((id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    scrollToId(id);
+    if (typeof history !== "undefined") {
+      try { history.replaceState(null, "", `#${id}`); } catch {}
+    }
+  }, [scrollToId]);
+
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
   const fetchSuccessCount = useServerFn(getSuccessActivationCount);
