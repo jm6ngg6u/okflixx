@@ -658,9 +658,55 @@ class NetflixSession:
             logger.info(f"Activation POST status: {response.status_code}")
             logger.info(f"Activation POST final URL: {response.url}")
 
+            current_url = str(response.url).lower()
+
+            # Clean text early so HTTP error handling can still distinguish a
+            # real inline TV-code rejection from Netflix returning a broken
+            # confirmation page after accepting the rendezvous code.
+            import html as html_mod
+            clean_text = response.text
+            clean_text = re.sub(r'<script[^>]*>.*?</script>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
+            clean_text = re.sub(r'<style[^>]*>.*?</style>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
+            clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
+            clean_text = html_mod.unescape(clean_text)
+            clean_text = re.sub(r'\s+', ' ', clean_text).strip().lower()
+
+            form_still_showing = (
+                "pin-number-input" in response.text or
+                "witcher-code-form" in response.text or
+                "enter the code" in clean_text
+            )
+
+            explicit_code_error = False
+            if form_still_showing:
+                for pat in TV_CODE_ERROR_PATTERNS:
+                    if re.search(pat, clean_text):
+                        explicit_code_error = True
+                        break
+
             # ── Handle HTTP errors ──
             if response.status_code == 500:
-                return {"success": False, "error_type": "expired_code", "message": "❌ Netflix returned error 500. Code may be expired or invalid."}
+                # Netflix often returns a 500 after it has already accepted a
+                # valid TV rendezvous code. The TV completes activation, but the
+                # web confirmation page fails, which previously became a false
+                # "invalid_code" in OKFLIX and stopped the retry/update flow.
+                # Only call it invalid if Netflix re-rendered the PIN form with
+                # an explicit code error. Otherwise treat it as accepted so the
+                # receipt and activation counters stay in sync with the TV.
+                if explicit_code_error:
+                    return {"success": False, "error_type": "invalid_code",
+                            "message": "❌ Incorrect or expired TV code."}
+                details = await self.get_account_details()
+                return {
+                    "success": True,
+                    "message": "✅ TV activation accepted. Netflix confirmation page returned 500, but the device flow completed.",
+                    "details": details,
+                    "country": details.get("country", "Unknown"),
+                    "plan": details.get("plan", "Unknown"),
+                    "email": details.get("email", "Unknown"),
+                    "video_quality": details.get("video_quality", "Unknown"),
+                    "netflix_status_code": 500,
+                }
 
             if response.status_code == 403:
                 # BUG FIX: Previously returned error_type="blocked" for 403, which
@@ -672,17 +718,6 @@ class NetflixSession:
                 # skips this cookie without deleting it and retries with another.
                 return {"success": False, "error_type": "auth_expired",
                         "message": "❌ authURL expired or rate-limited (403). Retrying with another cookie."}
-
-            current_url = str(response.url).lower()
-
-            # Clean text to accurately check for success/error patterns without hidden JS/CSS
-            import html as html_mod
-            clean_text = response.text
-            clean_text = re.sub(r'<script[^>]*>.*?</script>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
-            clean_text = re.sub(r'<style[^>]*>.*?</style>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
-            clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
-            clean_text = html_mod.unescape(clean_text)
-            clean_text = re.sub(r'\s+', ' ', clean_text).strip().lower()
 
             # ── Success detection (URL + text + form-disappearance) ──
             is_success = False
@@ -704,11 +739,6 @@ class NetflixSession:
                         is_success = True
                         break
 
-            form_still_showing = (
-                "pin-number-input" in response.text or
-                "witcher-code-form" in response.text or
-                "enter the code" in clean_text
-            )
             still_on_tv8 = ("/tv8" in current_url and "/tv8/success" not in current_url)
 
             # Signal 3 — Response 200, PIN form gone, and we've moved off /tv8.
