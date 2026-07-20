@@ -1451,16 +1451,7 @@ function maskEmail(email: string | null): string {
 
 function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose: () => void }) {
   const b = useBrand();
-  const [count, setCount] = useState(6);
 
-  useEffect(() => {
-    if (count <= 0) {
-      window.location.href = payload.redirectUrl;
-      return;
-    }
-    const t = window.setTimeout(() => setCount((c) => c - 1), 1000);
-    return () => window.clearTimeout(t);
-  }, [count, payload.redirectUrl]);
 
   const a = payload.account;
   return (
