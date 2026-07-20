@@ -315,17 +315,28 @@
 
 /* Hide the Lovable badge on published deployments without affecting layout */
 #lovable-badge,
+#lovable-badge-root,
 a[href*="lovable.dev"][href*="badge"],
 a[href*="lovable.dev"][target="_blank"][class*="badge" i],
+a[href*="lovable.app"][target="_blank"][class*="badge" i],
+a[aria-label*="Lovable" i],
+a[title*="Made with Lovable" i],
 [data-lovable-badge],
+[data-testid*="lovable-badge" i],
+[id*="lovable-badge" i],
 [class*="lovable-badge" i],
-iframe[src*="lovable.dev"][src*="badge"] {
+[class*="LovableBadge" i],
+iframe[src*="lovable.dev"][src*="badge"],
+iframe[title*="Lovable" i] {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
   width: 0 !important;
   height: 0 !important;
+  position: absolute !important;
+  left: -99999px !important;
+  top: -99999px !important;
 }
 
 html, body {
