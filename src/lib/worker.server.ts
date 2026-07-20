@@ -92,7 +92,12 @@ export async function checkCookieViaWorker(args: {
       proxy: args.proxy ?? null,
     }, 45_000, args.signal);
   } catch (e: any) {
-    return { status: "invalid", is_valid: false, error: String(e?.message ?? e) };
+    return {
+      status: "unknown",
+      is_valid: true,
+      transient: true,
+      error: String(e?.message ?? e),
+    };
   }
 }
 
@@ -123,11 +128,12 @@ export async function checkProxyViaWorker(args: { proxy: ProxyPayload; signal?: 
   latency_ms?: number | null;
   country?: string | null;
   error?: string | null;
+  transient?: boolean;
 }> {
   try {
     return await callWorker("/check-proxy", { proxy: args.proxy }, 15_000, args.signal);
   } catch (e: any) {
-    return { ok: false, error: String(e?.message ?? e) };
+    return { ok: false, transient: true, error: String(e?.message ?? e) };
   }
 }
 

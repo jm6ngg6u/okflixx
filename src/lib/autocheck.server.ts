@@ -11,6 +11,7 @@ type CookieRunResult = {
   invalid?: number;
   on_hold?: number;
   free?: number;
+  transient?: number;
   deleted?: number;
   removed_invalid?: number;
   removed_free?: number;
@@ -141,7 +142,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       ? await query
       : await query.or(`last_checked_at.is.null,last_checked_at.lt.${cutoff}`);
 
-    let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, deleted = 0;
+    let checked = 0, active = 0, invalid = 0, on_hold = 0, free = 0, transient = 0, deleted = 0;
     const reasons: Record<string, number> = {};
     let control: "stop" | "cancel" | null = null;
     const snapshots: CookieSnapshot[] = [];
@@ -192,7 +193,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
           checked++;
           await recordJobProgress(jobId, {
             phase: "checking", total: rows?.length ?? 0,
-            checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
+            checked, active, invalid, on_hold, free, transient, proxy_mode: proxyMode, reasons,
           });
           control = await readJobControl(jobId);
           if (control) break;
@@ -213,34 +214,42 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       if (proxyId) {
         await supabaseAdmin.rpc("release_proxy", {
           _id: proxyId,
-          _success: !out.transient,
-          _err: out.transient ? out.error ?? "Proxy or Netflix check failed" : undefined,
+          _success: true,
+          _err: undefined,
         });
       }
-      await supabaseAdmin.from("cookie_pool").update({
-        status: out.status,
-        is_valid: out.is_valid,
-        email: out.email ?? null,
-        country: out.country ?? null,
-        plan_name: out.plan_name ?? null,
-        video_quality: out.video_quality ?? null,
-        name: out.name ?? null,
-        member_since: out.member_since ?? null,
-        max_streams: out.max_streams ?? null,
-        payment_method: out.payment_method ?? null,
-        last_checked_at: new Date().toISOString(),
-        last_checked_mode: proxyMode ? "proxy" : "direct",
-        last_error: out.error ?? null,
-      }).eq("id", r.id);
+      if (out.transient) {
+        await supabaseAdmin.from("cookie_pool").update({
+          last_checked_mode: proxyMode ? "proxy" : "direct",
+          last_error: out.error ?? "Transient cookie check failure",
+        }).eq("id", r.id);
+      } else {
+        await supabaseAdmin.from("cookie_pool").update({
+          status: out.status,
+          is_valid: out.is_valid,
+          email: out.email ?? null,
+          country: out.country ?? null,
+          plan_name: out.plan_name ?? null,
+          video_quality: out.video_quality ?? null,
+          name: out.name ?? null,
+          member_since: out.member_since ?? null,
+          max_streams: out.max_streams ?? null,
+          payment_method: out.payment_method ?? null,
+          last_checked_at: new Date().toISOString(),
+          last_checked_mode: proxyMode ? "proxy" : "direct",
+          last_error: out.error ?? null,
+        }).eq("id", r.id);
+      }
       checked++;
-      if (out.status === "active") active++;
+      if (out.transient) { transient++; const b = bucketReason(out.error); reasons[b] = (reasons[b] ?? 0) + 1; }
+      else if (out.status === "active") active++;
       else if (out.status === "invalid") { invalid++; const b = bucketReason(out.error); reasons[b] = (reasons[b] ?? 0) + 1; }
       else if (out.status === "on_hold") { on_hold++; const b = out.error ? bucketReason(out.error) : "on_hold"; reasons[b] = (reasons[b] ?? 0) + 1; }
       else if (out.status === "free") free++;
       if (checked % 5 === 0 || checked === (rows?.length ?? 0)) {
         await recordJobProgress(jobId, {
           phase: "checking", total: rows?.length ?? 0,
-          checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
+          checked, active, invalid, on_hold, free, transient, proxy_mode: proxyMode, reasons,
         });
       }
       // Cooperative stop/cancel: poll after every item so the admin control is immediate.
@@ -249,7 +258,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     }
     stopWatchingControl();
     if (control === "cancel") {
-      const summary = { checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons, cancelled: true };
+      const summary = { checked, active, invalid, on_hold, free, transient, proxy_mode: proxyMode, reasons, cancelled: true };
       await recordJobProgress(jobId, { ...summary, phase: "rolling_back", total: rows?.length ?? 0 });
       await restoreCookieSnapshots(supabaseAdmin, snapshots);
       await recordJobFinish(jobId, false, summary, "Cancelled by admin");
@@ -257,7 +266,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     }
     await recordJobProgress(jobId, {
       phase: "cleanup", total: rows?.length ?? 0,
-      checked, active, invalid, on_hold, free, proxy_mode: proxyMode, reasons,
+      checked, active, invalid, on_hold, free, transient, proxy_mode: proxyMode, reasons,
       stopped: control === "stop" || undefined,
     });
 
@@ -299,7 +308,7 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
     }
 
     const summary = {
-      checked, active, invalid, on_hold, free, deleted,
+      checked, active, invalid, on_hold, free, transient, deleted,
       removed_invalid, removed_free, removed_on_hold, removed_duplicates,
       proxy_mode: proxyMode, reasons,
       stopped: control === "stop" || undefined,
@@ -322,6 +331,7 @@ type ProxyRunResult = {
   checked?: number;
   ok_count?: number;
   dead?: number;
+  transient?: number;
   removed_invalid?: number;
   reasons?: Record<string, number>;
   error?: string;
@@ -362,7 +372,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .limit(500);
 
-    let ok = 0, dead = 0;
+    let ok = 0, dead = 0, transient = 0;
     const reasons: Record<string, number> = {};
     let control: "stop" | "cancel" | null = null;
     const snapshots: ProxySnapshot[] = [];
@@ -389,19 +399,28 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
         signal: abortCurrentCheck.signal,
       });
       if (control === "cancel") break;
-      await supabaseAdmin.from("proxy_pool").update({
-        is_valid: res.ok,
-        last_error: res.error ?? null,
-        last_latency_ms: res.latency_ms ?? null,
-        country: res.country ?? null,
-        last_checked_at: new Date().toISOString(),
-      }).eq("id", p.id);
-      if (res.ok) ok++;
-      else { dead++; const b = bucketReason(res.error); reasons[b] = (reasons[b] ?? 0) + 1; }
-      const done = ok + dead;
+      if (res.transient) {
+        await supabaseAdmin.from("proxy_pool").update({
+          last_error: res.error ?? "Transient proxy check failure",
+        }).eq("id", p.id);
+        transient++;
+        const b = bucketReason(res.error);
+        reasons[b] = (reasons[b] ?? 0) + 1;
+      } else {
+        await supabaseAdmin.from("proxy_pool").update({
+          is_valid: res.ok,
+          last_error: res.error ?? null,
+          last_latency_ms: res.latency_ms ?? null,
+          country: res.country ?? null,
+          last_checked_at: new Date().toISOString(),
+        }).eq("id", p.id);
+        if (res.ok) ok++;
+        else { dead++; const b = bucketReason(res.error); reasons[b] = (reasons[b] ?? 0) + 1; }
+      }
+      const done = ok + dead + transient;
       if (done % 5 === 0 || done === (rows?.length ?? 0)) {
         await recordJobProgress(jobId, {
-          phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, reasons,
+          phase: "checking", total: rows?.length ?? 0, checked: done, ok_count: ok, dead, transient, reasons,
         });
       }
       control = await readJobControl(jobId);
@@ -409,14 +428,14 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
     }
     stopWatchingControl();
     if (control === "cancel") {
-      const summary = { checked: ok + dead, ok_count: ok, dead, reasons, cancelled: true };
+      const summary = { checked: ok + dead + transient, ok_count: ok, dead, transient, reasons, cancelled: true };
       await recordJobProgress(jobId, { ...summary, phase: "rolling_back", total: rows?.length ?? 0 });
       await restoreProxySnapshots(supabaseAdmin, snapshots);
       await recordJobFinish(jobId, false, summary, "Cancelled by admin");
       return { ok: false, error: "cancelled", ...summary };
     }
     await recordJobProgress(jobId, {
-      phase: "cleanup", total: rows?.length ?? 0, checked: ok + dead, ok_count: ok, dead, reasons,
+      phase: "cleanup", total: rows?.length ?? 0, checked: ok + dead + transient, ok_count: ok, dead, transient, reasons,
       stopped: control === "stop" || undefined,
     });
 
@@ -428,7 +447,7 @@ export async function runProxiesAutocheck(force = false): Promise<ProxyRunResult
       removed_invalid = c ?? 0;
     }
     const summary = {
-      checked: ok + dead, ok_count: ok, dead, removed_invalid, reasons,
+      checked: ok + dead + transient, ok_count: ok, dead, transient, removed_invalid, reasons,
       stopped: control === "stop" || undefined,
     };
     await recordJobFinish(jobId, true, summary);

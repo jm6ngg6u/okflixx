@@ -76,7 +76,7 @@ function SettingsPage() {
       toast.success("Cookie check finished", {
         description: r?.skipped
           ? `Skipped (${r.skipped})`
-          : `${r.checked ?? 0} checked · ${r.active ?? 0} active · ${r.invalid ?? 0} invalid · ${r.on_hold ?? 0} on-hold · ${r.free ?? 0} free${reasonsDesc(r)}`,
+          : `${r.checked ?? 0} checked · ${r.active ?? 0} active · ${r.invalid ?? 0} invalid · ${r.on_hold ?? 0} on-hold · ${r.free ?? 0} free${r.transient ? ` · ${r.transient} transient` : ""}${reasonsDesc(r)}`,
       });
       qc.invalidateQueries({ queryKey: ["cookies"] });
       qc.invalidateQueries({ queryKey: ["cookie-countries"] });
@@ -90,7 +90,7 @@ function SettingsPage() {
       toast.success("Proxy check finished", {
         description: r?.skipped
           ? `Skipped (${r.skipped})`
-          : `${r.checked ?? 0} checked · ${r.ok_count ?? 0} valid · ${r.dead ?? 0} invalid${r.removed_invalid ? ` · ${r.removed_invalid} removed` : ""}${reasonsDesc(r)}`,
+          : `${r.checked ?? 0} checked · ${r.ok_count ?? 0} valid · ${r.dead ?? 0} invalid${r.transient ? ` · ${r.transient} transient` : ""}${r.removed_invalid ? ` · ${r.removed_invalid} removed` : ""}${reasonsDesc(r)}`,
       });
       qc.invalidateQueries({ queryKey: ["proxies"] });
       qc.invalidateQueries({ queryKey: ["job-runs"] });
@@ -102,7 +102,7 @@ function SettingsPage() {
     try {
       const res = await fetchRuns();
       const rows = res.rows ?? [];
-      const cols = ["job", "started_at", "finished_at", "ok", "duration_s", "checked", "active", "invalid", "on_hold", "free", "ok_count", "dead", "removed_invalid", "removed_free", "removed_on_hold", "removed_duplicates", "reasons", "error"];
+      const cols = ["job", "started_at", "finished_at", "ok", "duration_s", "checked", "active", "invalid", "on_hold", "free", "ok_count", "dead", "transient", "removed_invalid", "removed_free", "removed_on_hold", "removed_duplicates", "reasons", "error"];
       const esc = (v: any) => {
         const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -110,7 +110,7 @@ function SettingsPage() {
       const body = rows.map((r: any) => {
         const s = r.summary ?? {};
         const dur = r.finished_at ? Math.round((new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()) / 1000) : "";
-        return [r.job, r.started_at, r.finished_at ?? "", r.ok ?? "", dur, s.checked ?? "", s.active ?? "", s.invalid ?? "", s.on_hold ?? "", s.free ?? "", s.ok_count ?? "", s.dead ?? "", s.removed_invalid ?? "", s.removed_free ?? "", s.removed_on_hold ?? "", s.removed_duplicates ?? "", s.reasons ? JSON.stringify(s.reasons) : "", r.error ?? ""].map(esc).join(",");
+        return [r.job, r.started_at, r.finished_at ?? "", r.ok ?? "", dur, s.checked ?? "", s.active ?? "", s.invalid ?? "", s.on_hold ?? "", s.free ?? "", s.ok_count ?? "", s.dead ?? "", s.transient ?? "", s.removed_invalid ?? "", s.removed_free ?? "", s.removed_on_hold ?? "", s.removed_duplicates ?? "", s.reasons ? JSON.stringify(s.reasons) : "", r.error ?? ""].map(esc).join(",");
       });
       const csv = [cols.join(","), ...body].join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -140,12 +140,12 @@ function SettingsPage() {
         const parts: string[] = [];
         if (r.job === "cookies-autocheck") {
           if (s.skipped) parts.push(`Skipped: ${s.skipped}`);
-          else parts.push(`${s.checked ?? 0} checked, ${s.active ?? 0} active, ${s.invalid ?? 0} invalid, ${s.on_hold ?? 0} on-hold, ${s.free ?? 0} free`);
+          else parts.push(`${s.checked ?? 0} checked, ${s.active ?? 0} active, ${s.invalid ?? 0} invalid, ${s.on_hold ?? 0} on-hold, ${s.free ?? 0} free, ${s.transient ?? 0} transient`);
           if (s.removed_invalid || s.removed_free || s.removed_on_hold || s.removed_duplicates)
             parts.push(`Removed: ${s.removed_invalid ?? 0} invalid, ${s.removed_free ?? 0} free, ${s.removed_on_hold ?? 0} on-hold, ${s.removed_duplicates ?? 0} duplicates`);
         } else if (r.job === "proxies-autocheck") {
           if (s.skipped) parts.push(`Skipped: ${s.skipped}`);
-          else parts.push(`${s.checked ?? 0} checked, ${s.ok_count ?? 0} valid, ${s.dead ?? 0} invalid`);
+          else parts.push(`${s.checked ?? 0} checked, ${s.ok_count ?? 0} valid, ${s.dead ?? 0} invalid, ${s.transient ?? 0} transient`);
           if (s.removed_invalid) parts.push(`Removed: ${s.removed_invalid} invalid`);
         } else {
           parts.push(fmt(s));
