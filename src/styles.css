@@ -336,7 +336,30 @@ html, body {
   padding: 0;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Native smooth scroll on wheel/anchor jumps */
+  scroll-behavior: smooth;
+  /* Kill iOS/Android 300ms tap delay + gray flash across the app */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  /* Prevent rubber-band from bleeding into background canvas repaints */
+  overscroll-behavior-y: none;
 }
+html { scroll-padding-top: 72px; }
+@media (prefers-reduced-motion: reduce) {
+  html, body { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* Buttons/links/inputs — instant tap, no double-tap zoom */
+button, a, [role="button"], input, textarea, select, label {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Long content sections skip layout/paint when off-screen (huge scroll gain) */
+.cv-auto { content-visibility: auto; contain-intrinsic-size: 1px 800px; }
 
 .font-display { font-family: "Sora", sans-serif; letter-spacing: -0.025em; font-weight: 700; }
 .font-mono { font-family: "JetBrains Mono", monospace; }
@@ -616,8 +639,16 @@ html, body {
   outline: none;
   caret-color: #ff2a3a;
   padding: 0;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  /* Hardware-accelerated, no layout-triggering transitions */
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.08s ease, box-shadow 0.15s ease;
+  will-change: transform, box-shadow;
+  transform: translateZ(0);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: text;
+  user-select: text;
 }
+.code-box:active { transform: translateY(0) scale(0.97); }
 .code-box.filled {
   border-color: rgba(var(--brand-accent-rgb),0.7);
   background: rgba(var(--brand-accent-rgb),0.10);
@@ -627,7 +658,7 @@ html, body {
   border-color: var(--brand-accent);
   background: rgba(var(--brand-accent-rgb),0.14);
   box-shadow: 0 0 0 3px rgba(var(--brand-accent-rgb),0.22), 0 0 30px rgba(var(--brand-accent-rgb),0.28);
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
 }
 .code-sep {
   flex: 0 0 auto;
