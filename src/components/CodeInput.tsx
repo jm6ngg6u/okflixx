@@ -82,6 +82,7 @@ export const CodeInput = forwardRef<CodeInputHandle, { onComplete?: (code: strin
               value={d}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKey(i, e)}
+              onFocus={(e) => { try { e.currentTarget.select(); } catch {} }}
               aria-label={`Digit ${i + 1} of 8`}
             />
             {i === 3 && <span className="code-sep">—</span>}
