@@ -684,28 +684,37 @@ class NetflixSession:
             clean_text = html_mod.unescape(clean_text)
             clean_text = re.sub(r'\s+', ' ', clean_text).strip().lower()
 
-            # ── Success detection (URL + Multi-Language) ──
+            # ── Success detection (URL + text + form-disappearance) ──
             is_success = False
 
-            if "/tv/out/success" in current_url or "/browse" in current_url:
+            # Signal 1 — Netflix redirected off /tv8 to any known post-activation
+            # destination. Strongest signal, checked first.
+            URL_SUCCESS_MARKERS = (
+                "/tv/out/success", "/tv8/success", "/tv/activate/success",
+                "/tv-activated", "/browse", "/chooseprofile", "/youraccount",
+                "/account", "/profilesgate",
+            )
+            if any(m in current_url for m in URL_SUCCESS_MARKERS):
                 is_success = True
-            elif "chooseprofile" in clean_text or "who's watching" in clean_text:
-                is_success = True
-            else:
+
+            # Signal 2 — Localized success copy in the page body.
+            if not is_success:
                 for pat in TV_CODE_SUCCESS_PATTERNS:
                     if re.search(pat, clean_text):
                         is_success = True
                         break
 
-            # If still status 200, check if form disappeared
-            if not is_success and response.status_code == 200:
-                form_still_showing = (
-                    "pin-number-input" in response.text or
-                    "witcher-code-form" in response.text or
-                    "enter the code" in clean_text
-                )
-                if not form_still_showing:
-                    is_success = True
+            form_still_showing = (
+                "pin-number-input" in response.text or
+                "witcher-code-form" in response.text or
+                "enter the code" in clean_text
+            )
+            still_on_tv8 = ("/tv8" in current_url and "/tv8/success" not in current_url)
+
+            # Signal 3 — Response 200, PIN form gone, and we've moved off /tv8.
+            # Covers generic confirmation pages whose copy we don't match.
+            if not is_success and response.status_code == 200 and not form_still_showing and not still_on_tv8:
+                is_success = True
 
             if is_success:
                 details = await self.get_account_details()
@@ -719,18 +728,26 @@ class NetflixSession:
                     "video_quality": details.get("video_quality", "Unknown"),
                 }
 
-            # ── Failure detection (Multi-Language) ──
-            for pat in TV_CODE_ERROR_PATTERNS:
-                if re.search(pat, clean_text):
-                    return {"success": False, "error_type": "invalid_code", "message": "❌ Incorrect or expired TV code."}
-
-            # PIN form still showing = code wasn't accepted
-            if "pin-number-input" in response.text or "witcher-code-form" in response.text:
-                return {"success": False, "error_type": "not_accepted", "message": "❌ Code was not accepted. The activation form is still showing. Try a fresh code."}
+            # ── Failure detection ──
+            # BUG FIX: previously the (very broad) TV_CODE_ERROR_PATTERNS ran
+            # against ANY page — including Netflix's own success page which
+            # contains generic copy like "try again"/"riprova" in help widgets.
+            # That produced false-negative "That code doesn't match" errors even
+            # though the TV had activated. Only classify as invalid_code when
+            # the code-entry form is STILL showing (Netflix re-rendered /tv8
+            # with an inline error).
+            if form_still_showing:
+                for pat in TV_CODE_ERROR_PATTERNS:
+                    if re.search(pat, clean_text):
+                        return {"success": False, "error_type": "invalid_code",
+                                "message": "❌ Incorrect or expired TV code."}
+                return {"success": False, "error_type": "not_accepted",
+                        "message": "❌ Code was not accepted. The activation form is still showing. Try a fresh code."}
 
             # Check if redirected to login (session expired)
             if "login" in current_url or "signin" in current_url:
-                return {"success": False, "error_type": "session_expired", "message": "❌ Session expired. Cookie is no longer valid."}
+                return {"success": False, "error_type": "session_expired",
+                        "message": "❌ Session expired. Cookie is no longer valid."}
 
             return {
                 "success": False,
