@@ -1451,16 +1451,7 @@ function maskEmail(email: string | null): string {
 
 function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose: () => void }) {
   const b = useBrand();
-  const [count, setCount] = useState(6);
 
-  useEffect(() => {
-    if (count <= 0) {
-      window.location.href = payload.redirectUrl;
-      return;
-    }
-    const t = window.setTimeout(() => setCount((c) => c - 1), 1000);
-    return () => window.clearTimeout(t);
-  }, [count, payload.redirectUrl]);
 
   const a = payload.account;
   return (
@@ -1494,8 +1485,8 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
 
         <p className="mt-3 sm:mt-4 text-white/70 text-xs sm:text-sm leading-relaxed">
           TV connected with code <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded text-[11px] sm:text-xs">{payload.code}</span>.
-          Redirecting in <span className="text-[#ff2a3a] font-mono">{count}s</span>
         </p>
+
 
         <div className="mt-4 sm:mt-5 grid grid-cols-2 gap-2 sm:gap-2.5">
           <Detail label="Plan" value={a.plan_name ?? "Premium"} accent />
