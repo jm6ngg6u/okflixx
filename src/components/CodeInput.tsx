@@ -101,12 +101,25 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
   };
 
   const handleKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      setAt(i, e.key);
+      if (i < LEN - 1) refs.current[i + 1]?.focus();
+      return;
+    }
     if (e.key === "Backspace" && !digits[i] && i > 0) {
       refs.current[i - 1]?.focus();
       setAt(i - 1, "");
     }
     if (e.key === "ArrowLeft" && i > 0) refs.current[i - 1]?.focus();
     if (e.key === "ArrowRight" && i < LEN - 1) refs.current[i + 1]?.focus();
+  };
+
+  const handleBeforeInput = (i: number, e: React.FormEvent<HTMLInputElement>) => {
+    const data = (e.nativeEvent as InputEvent).data ?? "";
+    if (!data) return;
+    e.preventDefault();
+    fillFrom(i, data);
   };
 
   const handlePaste = (i: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -151,6 +164,7 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
                 pattern="[0-9]*"
                 maxLength={1}
                 value={d}
+                onBeforeInput={(e) => handleBeforeInput(i, e)}
                 onChange={(e) => handleChange(i, e.target.value)}
                 onKeyDown={(e) => handleKey(i, e)}
                 onPaste={(e) => handlePaste(i, e)}
