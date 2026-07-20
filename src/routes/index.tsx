@@ -648,7 +648,12 @@ function HomePage() {
                   </div>
                 </div>
 
-                <CodeInput ref={codeRef} onChange={(filled) => setCodeLen(filled)} />
+                <CodeInput
+                  ref={codeRef}
+                  error={codeError}
+                  onChange={(filled) => { setCodeLen(filled); if (codeError) setCodeError(null); }}
+                />
+
 
 
                 {/* Honeypot — hidden from humans, bots fill it and get rejected */}
