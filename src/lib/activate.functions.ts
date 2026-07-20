@@ -291,9 +291,12 @@ export const submitActivation = createServerFn({ method: "POST" })
 
     // 5. Config for the loop.
     const proxyMode = (await getSetting(supabaseAdmin, "proxy_mode", "0")) === "1";
+    // Silent internal rotation — the user never sees a per-attempt failure,
+    // so we can afford a generous cap. Bumped default 3 → 10 so a wave of
+    // free/on_hold/dead cookies doesn't exhaust the loop for the visitor.
     const maxAttempts = Math.max(
       1,
-      Math.min(10, parseInt(await getSetting(supabaseAdmin, "max_activation_attempts", "3"), 10)),
+      Math.min(25, parseInt(await getSetting(supabaseAdmin, "max_activation_attempts", "10"), 10)),
     );
     const rawPolicy = (await getSetting(supabaseAdmin, "cookie_rotation_policy", "round_robin")).toLowerCase();
     const policy: "round_robin" | "random" | "quality" =
@@ -335,7 +338,7 @@ export const submitActivation = createServerFn({ method: "POST" })
           ok: false,
           error: "no_cookie",
           attempts: attemptNumber,
-          message: "Cookie pool is empty — please try again shortly.",
+          message: "One moment — finishing up. Please try again in a few seconds.",
         };
       }
 
@@ -404,7 +407,7 @@ export const submitActivation = createServerFn({ method: "POST" })
             ok: false,
             error: "no_proxy",
             attempts: attemptNumber,
-            message: "Proxy mode is ON but no proxies are available. Please try again shortly.",
+            message: "One moment — finishing up. Please try again in a few seconds.",
           };
         }
       }
@@ -420,7 +423,59 @@ export const submitActivation = createServerFn({ method: "POST" })
         : null;
 
 
-      // 5c. Call the worker.
+      // 5c-pre. FAST PRE-CHECK — verify the cookie is actually usable before
+      // burning an activation call on it. If /check comes back with anything
+      // other than "active", the cookie is dead / invalid / free / on_hold
+      // (or the worker couldn't reach Netflix through this cookie). In all
+      // those cases we DELETE the cookie from the pool immediately and
+      // silently rotate to the next candidate — the user never sees a retry,
+      // an error, or any hint that this happened.
+      //
+      // "unknown" is treated as transient (network hiccup, bot page, etc.):
+      // we release the cookie without deleting and rotate, so a good cookie
+      // never gets nuked because of a single bad round-trip.
+      const preCheck = await checkCookieViaWorker({
+        cookies: cookie.cookies_json as { name: string; value: string; domain?: string }[],
+        proxy: proxyPayload,
+      });
+      if (preCheck.status !== "active") {
+        const transient = preCheck.status === "unknown" || preCheck.transient === true;
+        await supabaseAdmin.from("activation_attempts").insert({
+          code,
+          result: transient ? "worker_error" : preCheck.status,
+          ip_hash: ipHash,
+          user_agent: userAgent,
+          country,
+          cookie_id: cookie.id,
+          proxy_id: proxyRow?.id ?? null,
+          proxy_mode: proxyMode,
+          attempt_number: attemptNumber,
+          user_id: verifiedUserId,
+          error_message: preCheck.error ?? `pre_check:${preCheck.status}`,
+          selection_reason: { ...selectionReason, outcome: `pre_check_${preCheck.status}` },
+        });
+        if (transient) {
+          await supabaseAdmin.rpc("release_cookie", {
+            _id: cookie.id,
+            _success: false,
+            _outcome: "pre_check_unknown",
+          });
+        } else {
+          // dead / invalid / free / on_hold → gone from the pool immediately.
+          await supabaseAdmin.from("cookie_pool").delete().eq("id", cookie.id);
+        }
+        if (proxyRow) {
+          await supabaseAdmin.rpc("release_proxy", {
+            _id: proxyRow.id,
+            _success: true,
+          });
+        }
+        // Rotate silently — do not count this against the visible attempt cap
+        // aggressively; the loop's own `maxAttempts` still bounds us.
+        continue;
+      }
+
+      // 5c. Call the worker with a verified-active cookie.
       const outcome = await activateTVViaWorker({
         code,
         cookies: cookie.cookies_json as { name: string; value: string; domain?: string }[],
@@ -445,24 +500,18 @@ export const submitActivation = createServerFn({ method: "POST" })
       });
 
       // 5e. Update cookie / proxy state.
+      // Any cookie that comes back non-active (dead / invalid / free / on_hold)
+      // is unusable and must NEVER be picked again — delete it from the pool
+      // immediately so the next attempt in this same request, and every
+      // subsequent visitor, gets a fresh candidate. The 24h auto-check still
+      // handles residual cleanup, but we don't wait for it.
       const success = outcome.status === "success";
-      if (isCookieDead(outcome.status)) {
-        await supabaseAdmin.rpc("mark_cookie_invalid", {
-          _id: cookie.id,
-          _reason: ((outcome as any).error ?? outcome.status) as string,
-        });
-      } else if (outcome.status === "free" || outcome.status === "on_hold") {
-        await supabaseAdmin
-          .from("cookie_pool")
-          .update({
-            status: outcome.status,
-            is_valid: false,
-            is_locked: false,
-            locked_at: null,
-            last_used_at: new Date().toISOString(),
-            last_error: ((outcome as any).error ?? outcome.status) as string,
-          })
-          .eq("id", cookie.id);
+      const unusable =
+        isCookieDead(outcome.status) ||
+        outcome.status === "free" ||
+        outcome.status === "on_hold";
+      if (unusable) {
+        await supabaseAdmin.from("cookie_pool").delete().eq("id", cookie.id);
       } else {
         await supabaseAdmin.rpc("release_cookie", {
           _id: cookie.id,
@@ -540,7 +589,7 @@ export const submitActivation = createServerFn({ method: "POST" })
       ok: false,
       error: "exhausted",
       attempts: maxAttempts,
-      message: "We couldn't activate this code after several attempts — please try again shortly.",
+      message: "One moment — finishing up. Please try again in a few seconds.",
     };
   });
 
