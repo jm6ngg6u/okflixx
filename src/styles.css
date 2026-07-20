@@ -1233,6 +1233,11 @@ body:not([data-scroll-locked]) {
 
 /* Fluid, device-consistent section sizing (mobile → tablet → desktop → TV) */
 .section-pad-y { padding-top: clamp(3.5rem, 7vw, 8rem); padding-bottom: clamp(3.5rem, 7vw, 8rem); }
+
+/* Ensure hash-scroll targets aren't hidden under the floating nav on any device. */
+#activate, #features, #how-it-works, #faq, #live { scroll-margin-top: 84px; }
+@media (max-width: 640px) { #activate, #features, #how-it-works, #faq, #live { scroll-margin-top: 72px; } }
+
 .section-pad-x { padding-left: clamp(1rem, 3vw, 3rem); padding-right: clamp(1rem, 3vw, 3rem); }
 .section-title-fluid {
   font-size: clamp(2rem, 5.6vw, 4.75rem);
