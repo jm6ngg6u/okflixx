@@ -1429,8 +1429,6 @@ function maskEmail(email: string | null): string {
 function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose: () => void }) {
   const b = useBrand();
   const [count, setCount] = useState(6);
-  const [captured, setCaptured] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (count <= 0) {
@@ -1441,88 +1439,57 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
     return () => window.clearTimeout(t);
   }, [count, payload.redirectUrl]);
 
-  const capture = async () => {
-    try {
-      const a = payload.account;
-      const lines = [
-        `OKFLIX · Netflix TV Activation`,
-        `Code: ${payload.code}`,
-        `Time: ${new Date().toLocaleString()}`,
-        `Plan: ${a.plan_name ?? "Premium"} · ${a.video_quality ?? "UHD"}`,
-        `Country: ${a.country ?? "—"}`,
-        `Screens: ${a.max_streams ?? "—"}`,
-        `Member since: ${a.member_since ?? "—"}`,
-      ].join("\n");
-      await navigator.clipboard.writeText(lines);
-      setCaptured(true);
-      toast.success("Receipt copied");
-      window.setTimeout(() => setCaptured(false), 2000);
-    } catch {
-      toast.error("Clipboard unavailable");
-    }
-  };
-
-
   const a = payload.account;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
-      {/* Ember burst */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xl animate-in fade-in duration-300 overflow-y-auto">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(closest-side,rgba(255,42,58,0.35),transparent_70%)] animate-pulse" />
-        {Array.from({ length: 18 }).map((_, i) => (
-          <span
-            key={i}
-            className="absolute w-1 h-1 rounded-full bg-[#ff9a86]"
-            style={{
-              left: `${50 + Math.cos((i / 18) * Math.PI * 2) * 32}%`,
-              top: `${50 + Math.sin((i / 18) * Math.PI * 2) * 32}%`,
-              boxShadow: "0 0 12px #ff2a3a, 0 0 24px #ff2a3a",
-              animation: `ping 1.6s ${(i * 80) % 1200}ms cubic-bezier(0,0,0.2,1) infinite`,
-            }}
-          />
-        ))}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[radial-gradient(closest-side,rgba(255,42,58,0.25),transparent_70%)] animate-pulse" />
       </div>
 
-      <div
-        ref={cardRef}
-        className="relative w-full max-w-2xl glass p-8 md:p-10 border border-[#ff2a3a]/30 shadow-[0_0_0_1px_rgba(255,42,58,0.25),0_30px_120px_-20px_rgba(255,42,58,0.55)] animate-in zoom-in-95 duration-300"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-[#ff2a3a] to-[#b0060f] flex items-center justify-center shadow-[0_0_40px_rgba(255,42,58,0.6)]">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12l5 5L20 7" />
-              </svg>
-              <span className="absolute inset-0 rounded-full ring-2 ring-[#ff2a3a]/40 animate-ping" />
-            </div>
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-brand-accent">{b.success_kicker}</div>
-              <h3 className="font-display text-3xl md:text-4xl leading-none mt-1">{b.success_title}</h3>
-            </div>
+      <div className="relative w-full max-w-md sm:max-w-lg lg:max-w-xl glass p-5 sm:p-7 border border-[#ff2a3a]/30 shadow-[0_0_0_1px_rgba(255,42,58,0.25),0_20px_80px_-20px_rgba(255,42,58,0.45)] animate-in zoom-in-95 duration-300 my-auto">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="shrink-0 w-9 h-9 rounded-full border border-white/15 hover:border-white/40 hover:bg-white/5 text-white/70 hover:text-white flex items-center justify-center transition"
+            aria-label="Back"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <div className="relative w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#ff2a3a] to-[#b0060f] flex items-center justify-center shadow-[0_0_30px_rgba(255,42,58,0.55)]">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+            <span className="absolute inset-0 rounded-full ring-2 ring-[#ff2a3a]/40 animate-ping" />
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white text-xl leading-none" aria-label="Close">✕</button>
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-brand-accent truncate">{b.success_kicker}</div>
+            <h3 className="font-display text-xl sm:text-2xl lg:text-3xl leading-tight mt-0.5 truncate">{b.success_title}</h3>
+          </div>
         </div>
 
-        <p className="mt-4 text-white/70 text-sm md:text-base">
-          Your TV is now connected to Netflix using code <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded">{payload.code}</span>.
-          Redirecting in <span className="text-[#ff2a3a] font-mono">{count}s</span>…
+        <p className="mt-3 sm:mt-4 text-white/70 text-xs sm:text-sm leading-relaxed">
+          TV connected with code <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded text-[11px] sm:text-xs">{payload.code}</span>.
+          Redirecting in <span className="text-[#ff2a3a] font-mono">{count}s</span>
         </p>
 
-        <div className="mt-6 grid sm:grid-cols-2 gap-3">
+        <div className="mt-4 sm:mt-5 grid grid-cols-2 gap-2 sm:gap-2.5">
           <Detail label="Plan" value={a.plan_name ?? "Premium"} accent />
           <Detail label="Quality" value={a.video_quality ?? "UHD"} accent />
-          <Detail label="Country" value={`${flagEmoji(a.country)}  ${a.country ?? "Global"}`} />
-          <Detail label="Screens" value={a.max_streams != null ? String(a.max_streams) : "Unlimited"} />
-          <Detail label="Member since" value={a.member_since ?? "—"} />
+          <Detail label="Country" value={`${flagEmoji(a.country)} ${a.country ?? "—"}`} />
+          <Detail label="Screens" value={a.max_streams != null ? String(a.max_streams) : "—"} />
+          <Detail label="Member" value={a.member_since ?? "—"} />
           <Detail label="Account" value={maskEmail(a.email)} mono />
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          <a href={payload.redirectUrl} className="btn-red flex-1 text-center">Open Netflix now →</a>
-          <button onClick={capture} className="btn-ghost">
-            {captured ? "✓ Copied" : "Copy receipt"}
+        <div className="mt-4 sm:mt-5 flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <a href={payload.redirectUrl} className="btn-red flex-1 text-center text-sm sm:text-base py-2.5 sm:py-3">
+            Open Netflix →
+          </a>
+          <button onClick={onClose} className="btn-ghost text-sm sm:text-base py-2.5 sm:py-3 sm:flex-1">
+            Activate another
           </button>
-          <button onClick={onClose} className="btn-ghost">Activate another</button>
         </div>
       </div>
     </div>
@@ -1531,9 +1498,9 @@ function SuccessOverlay({ payload, onClose }: { payload: SuccessPayload; onClose
 
 function Detail({ label, value, accent, mono }: { label: string; value: string; accent?: boolean; mono?: boolean }) {
   return (
-    <div className={`rounded-lg border p-3 ${accent ? "border-[#ff2a3a]/30 bg-[#ff2a3a]/5" : "border-white/10 bg-white/[0.03]"}`}>
-      <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">{label}</div>
-      <div className={`mt-1 text-sm ${mono ? "font-mono" : ""} ${accent ? "text-white" : "text-white/85"}`}>{value}</div>
+    <div className={`rounded-lg border p-2 sm:p-2.5 min-w-0 ${accent ? "border-[#ff2a3a]/30 bg-[#ff2a3a]/5" : "border-white/10 bg-white/[0.03]"}`}>
+      <div className="font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.25em] text-white/40 truncate">{label}</div>
+      <div className={`mt-0.5 sm:mt-1 text-xs sm:text-sm truncate ${mono ? "font-mono" : ""} ${accent ? "text-white" : "text-white/85"}`}>{value}</div>
     </div>
   );
 }
