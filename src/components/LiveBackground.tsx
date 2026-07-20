@@ -111,7 +111,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand }: Pro
       // Start every beam inside the logo footprint, then fan outward with varied
       // endpoints/control points. This keeps the animation visually attached to
       // the logo without turning the whole scene into one hard point-source ray.
-      for (let i = 0; i < beamsPerBand * 2; i++) {
+      for (let i = 0; i < beamCount * 2; i++) {
         // Beams start from within the logo footprint, spread evenly (no tight center cluster)
         const logoRadius = w < 768 ? 18 : 22;
         const angle = Math.random() * Math.PI * 2;
@@ -378,7 +378,7 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand }: Pro
       document.removeEventListener("visibilitychange", onVis);
       clearTimeout(initialAnchor);
     };
-  }, [trail, intensity, beamsPerBand]);
+  }, [trail, intensity, beamCount]);
 
   useEffect(() => {
     const canvas = starRef.current;
