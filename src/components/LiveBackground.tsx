@@ -180,15 +180,22 @@ export function LiveBackground({ trail = 0, intensity = 0.9, beamsPerBand }: Pro
       pulse.x = e.clientX; pulse.y = e.clientY;
       mouse.tx = e.clientX; mouse.ty = e.clientY; mouse.active = true;
     };
+    let touchRaf = 0;
     const onTouchMove = (e: TouchEvent) => {
       const t = e.touches[0];
-      if (t) { mouse.tx = t.clientX; mouse.ty = t.clientY; mouse.active = true; }
+      if (!t || touchRaf) return;
+      const x = t.clientX;
+      const y = t.clientY;
+      touchRaf = window.requestAnimationFrame(() => {
+        mouse.tx = x; mouse.ty = y; mouse.active = true;
+        touchRaf = 0;
+      });
     };
     window.addEventListener("resize", resize);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseleave", onLeave);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("pointerdown", onTap);
+    window.addEventListener("pointerdown", onTap, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: true });
 
     const drawBeam = (b: Beam, tGlobal: number) => {
