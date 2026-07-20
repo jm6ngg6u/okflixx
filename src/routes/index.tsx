@@ -158,6 +158,50 @@ function HomePage() {
     }
   }, [scrollToId]);
 
+  // Global hash-scroll: makes every #activate / #features / #faq link work on
+  // any device (mobile / tablet / PC / TV), including footer <Link> hrefs,
+  // legal-page nav, direct URL entry, and back/forward navigation. Also
+  // delegates clicks on any <a href="#..."> or <a href="/#..."> so the same
+  // scroll+focus path fires even when TanStack Router keeps us on "/".
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const scrollFromHash = () => {
+      const id = window.location.hash.replace(/^#/, "");
+      if (id) scrollToId(id);
+    };
+    // Initial mount (covers /#activate direct loads and post-nav from /help).
+    const t = window.setTimeout(scrollFromHash, 60);
+    window.addEventListener("hashchange", scrollFromHash);
+
+    const onDocClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as HTMLElement | null)?.closest?.("a") as HTMLAnchorElement | null;
+      if (!a) return;
+      const raw = a.getAttribute("href") || "";
+      if (!raw) return;
+      let hash = "";
+      if (raw.startsWith("#")) hash = raw.slice(1);
+      else if (raw.startsWith("/#")) hash = raw.slice(2);
+      else {
+        try {
+          const u = new URL(a.href, window.location.href);
+          if (u.origin === window.location.origin && u.pathname === "/" && u.hash) hash = u.hash.slice(1);
+        } catch { /* ignore */ }
+      }
+      if (!hash) return;
+      if (!document.getElementById(hash)) return;
+      e.preventDefault();
+      scrollToId(hash);
+      try { history.replaceState(null, "", `#${hash}`); } catch { /* ignore */ }
+    };
+    document.addEventListener("click", onDocClick);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("hashchange", scrollFromHash);
+      document.removeEventListener("click", onDocClick);
+    };
+  }, [scrollToId]);
+
   const fetchGate = useServerFn(getGateConfig);
   const redeemFn = useServerFn(redeemAccessKey);
   const fetchSuccessCount = useServerFn(getSuccessActivationCount);
