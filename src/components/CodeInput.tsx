@@ -162,7 +162,6 @@ export const CodeInput = forwardRef<CodeInputHandle, CodeInputProps>(
                 spellCheck={false}
                 autoComplete="one-time-code"
                 pattern="[0-9]*"
-                maxLength={1}
                 value={d}
                 onBeforeInput={(e) => handleBeforeInput(i, e)}
                 onChange={(e) => handleChange(i, e.target.value)}
