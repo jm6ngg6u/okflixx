@@ -367,9 +367,14 @@ function HomePage() {
 
     const code = (codeRef.current?.getCode() ?? "").toUpperCase();
     if (!/^[A-Z0-9]{8}$/.test(code)) {
+      setCodeError("Enter the full 8-character code from your TV.");
+      codeRef.current?.shake();
+      codeRef.current?.focusFirst();
       toast.error("Invalid TV code", { description: "Enter the full 8-character code shown on your TV screen." });
       return;
     }
+    setCodeError(null);
+
 
     // Pre-flight gate checks — server is still source of truth, but naming
     // the blocking gate lets the user act immediately.
