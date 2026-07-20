@@ -391,15 +391,28 @@ function HomePage() {
   };
 
 
-  const handleActivate = async () => {
-    // Client throttle — 3s cooldown between submits.
+  // Silent internal retry when the backend can't line up a usable cookie/proxy
+  // (no_cookie / no_proxy / exhausted / server_error). The user only ever
+  // sees the loading state — never a "retry" banner, technical error, or
+  // toast about cookies. We spin up to MAX_SILENT_RETRIES times with a short
+  // gap; only if the whole run fails do we surface a single soft toast.
+  const MAX_SILENT_RETRIES = 6;
+  const silentRetryRef = useRef<number>(0);
+
+  const handleActivate = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    // Client throttle — 3s cooldown between USER submits. Internal silent
+    // retries bypass this so the loading spinner stays continuous.
     const now = Date.now();
-    if (submitting) return;
-    if (now - lastSubmitRef.current < 3000) {
-      toast.error("Slow down a moment.", { description: "Please wait a few seconds between activations." });
-      return;
+    if (submitting && !silent) return;
+    if (!silent) {
+      if (now - lastSubmitRef.current < 3000) {
+        toast.error("Slow down a moment.", { description: "Please wait a few seconds between activations." });
+        return;
+      }
+      lastSubmitRef.current = now;
+      silentRetryRef.current = 0;
     }
-    lastSubmitRef.current = now;
 
     const code = (codeRef.current?.getCode() ?? "").toUpperCase();
     if (!/^[A-Z0-9]{8}$/.test(code)) {
@@ -407,6 +420,8 @@ function HomePage() {
       codeRef.current?.shake();
       codeRef.current?.focusFirst();
       toast.error("Invalid TV code", { description: "Enter the full 8-character code shown on your TV screen." });
+      setSubmitting(false);
+      setStage("idle");
       return;
     }
     setCodeError(null);
@@ -425,7 +440,9 @@ function HomePage() {
       return;
     }
 
-    setLoginError(null); setKeyError(null); setServiceError(null); setRetryCountdown(0);
+    if (!silent) {
+      setLoginError(null); setKeyError(null); setServiceError(null); setRetryCountdown(0);
+    }
     setSubmitting(true);
     setStage("working");
 
@@ -442,6 +459,7 @@ function HomePage() {
         },
       });
       if (result.ok) {
+        silentRetryRef.current = 0;
         setSuccess({
           code,
           redirectUrl: result.redirectUrl,
@@ -450,45 +468,57 @@ function HomePage() {
         qc.invalidateQueries({ queryKey: ["success-activation-count"] });
 
       } else if (result.error === "invalid_code") {
+        silentRetryRef.current = 0;
         setCodeError("That code doesn't match. Double-check the 8 characters on your TV.");
         codeRef.current?.shake();
         codeRef.current?.focusFirst();
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
 
       } else if (result.error === "maintenance") {
+        silentRetryRef.current = 0;
         toast.error("Service temporarily unavailable", { description: "Please try again in a moment." });
       } else if (result.error === "login_required") {
+        silentRetryRef.current = 0;
         setLoginError("Please sign in to continue.");
         toast.error("Sign in required");
       } else if (result.error === "access_key_required" || result.error === "access_key_invalid") {
+        silentRetryRef.current = 0;
         if (result.error === "access_key_invalid" && sessionToken) {
           localStorage.removeItem(SESSION_KEY);
           setSessionToken(null);
         }
         setKeyError("Please enter a valid access key.");
         toast.error("Access key required");
-      } else if (result.error === "no_cookie" || result.error === "exhausted") {
-        setServiceError({
-          kind: result.error === "no_cookie" ? "no_cookie" : "exhausted",
-          message: "We couldn't activate your TV right now. Please try again in a moment.",
-          code: "",
-          at: Date.now(),
-        });
-        setRetryCountdown(20);
-        setAutoRetry(true);
-        toast.error("Activation failed", { description: "Please try again in a moment." });
       } else {
-        toast.error("Activation failed", { description: "Please try again in a moment." });
+        // Everything else (no_cookie / no_proxy / exhausted / server_error /
+        // unknown) is a transient pool issue. Retry silently — the user just
+        // keeps seeing the "Activating your TV…" spinner.
+        if (silentRetryRef.current < MAX_SILENT_RETRIES) {
+          silentRetryRef.current += 1;
+          window.setTimeout(() => { handleActivate({ silent: true }); }, 1500);
+          return; // keep submitting=true so the spinner stays up
+        }
+        silentRetryRef.current = 0;
+        toast("Please try again in a moment.", { description: "Working on it — give it another try." });
       }
     } catch (err) {
       console.error(err);
-      toast.error("Activation failed", { description: "Please check your connection and try again." });
+      // Network hiccup — one silent retry, otherwise soft toast.
+      if (silentRetryRef.current < MAX_SILENT_RETRIES) {
+        silentRetryRef.current += 1;
+        window.setTimeout(() => { handleActivate({ silent: true }); }, 2000);
+        return;
+      }
+      silentRetryRef.current = 0;
+      toast("Please try again in a moment.", { description: "Working on it — give it another try." });
     } finally {
+      // Only end the loading state when we're NOT scheduling another silent
+      // retry. Each early-return above skips this block.
       setStage("idle");
       setSubmitting(false);
     }
   };
-  handleActivateRef.current = handleActivate;
+  handleActivateRef.current = () => handleActivate();
 
 
 
@@ -841,49 +871,14 @@ function HomePage() {
                 </div>
               )}
 
-              {serviceError && !submitting && (
-                <div
-                  role="alert"
-                  aria-live="polite"
-                  className="mt-4 rounded-xl border border-[#ff2a3a]/40 bg-gradient-to-br from-[#ff2a3a]/10 via-black/40 to-black/20 p-4 animate-fade-in"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 w-9 h-9 rounded-full bg-[#ff2a3a]/15 border border-[#ff2a3a]/40 flex items-center justify-center">
-                      <AlertCircle className="w-4 h-4 text-[#ff8a90]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#ff8a90]">
-                        Activation didn't complete
-                      </div>
-                      <p className="mt-2 text-sm text-white/90 leading-relaxed">
-                        Something interrupted the link to your TV. Double-check the on-screen code, then try again — no charges, no lockouts.
-                      </p>
-                      <div className="mt-3 flex items-center gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(true); handleActivate(); }}
-                          disabled={retryCountdown > 0 && !autoRetry}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-[#ff2a3a]/50 bg-[#ff2a3a]/15 text-white hover:bg-[#ff2a3a]/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <RotateCcw className={`w-3 h-3 ${retryCountdown > 0 && autoRetry ? "animate-spin-slow" : ""}`} />
-                          {retryCountdown > 0 ? `Retry in ${retryCountdown}s` : "Retry activation"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setServiceError(null); setRetryCountdown(0); setAutoRetry(false); }}
-                          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-widest border border-white/10 bg-white/[0.04] text-white/50 hover:text-white/90 hover:border-white/20 transition"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Service-error banner intentionally removed — transient pool
+                  issues (no_cookie / no_proxy / exhausted / server_error)
+                  are retried silently in handleActivate() and never shown
+                  to the user. */}
 
 
               <button
-                onClick={handleActivate}
+                onClick={() => handleActivate()}
                 disabled={submitting || !!gate.data?.maintenance}
                 className="btn-red w-full mt-5 disabled:opacity-60 disabled:cursor-not-allowed group relative overflow-hidden"
               >
