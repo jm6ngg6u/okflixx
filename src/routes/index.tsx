@@ -118,6 +118,8 @@ function HomePage() {
   const [stage, setStage] = useState<"idle" | "working">("idle");
   // Live digit count from the CodeInput so Stage 01 (ENTER) fills instantly as user types.
   const [codeLen, setCodeLen] = useState(0);
+  const [codeError, setCodeError] = useState<string | null>(null);
+
 
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
