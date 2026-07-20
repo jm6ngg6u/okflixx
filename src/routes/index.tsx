@@ -532,11 +532,11 @@ function HomePage() {
 
           {/* Center pill */}
           <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-1.5 py-1.5 text-sm text-white/70">
-            <a href="#activate" onClick={onHashClick("activate")} className="px-4 py-1.5 rounded-full bg-white/10 text-white transition hover:bg-white/15"Activate</a>
-            <a href="#features" onClick={onHashClick("features")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5"Features</a>
-            <a href="#how-it-works" onClick={onHashClick("how-it-works")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5"Guide</a>
-            <a href="#faq" onClick={onHashClick("faq")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5"FAQ</a>
-            <a href="#live" onClick={onHashClick("live")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5 inline-flex items-center gap-1.5"
+            <a href="#activate" onClick={onHashClick("activate")} className="px-4 py-1.5 rounded-full bg-white/10 text-white transition hover:bg-white/15">Activate</a>
+            <a href="#features" onClick={onHashClick("features")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5">Features</a>
+            <a href="#how-it-works" onClick={onHashClick("how-it-works")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5">Guide</a>
+            <a href="#faq" onClick={onHashClick("faq")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5">FAQ</a>
+            <a href="#live" onClick={onHashClick("live")} className="px-4 py-1.5 rounded-full transition hover:text-white hover:bg-white/5 inline-flex items-center gap-1.5">
               <span className="kicker-dot-wrap">
                 <span className="kicker-dot-ping" />
                 <span className="kicker-dot" />
@@ -568,7 +568,7 @@ function HomePage() {
                 Sign in
               </Link>
             ) : null}
-            <a href="#activate" onClick={onHashClick("activate")} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black text-xs uppercase tracking-widest font-semibold hover:bg-white/90 transition shadow-[0_6px_20px_-6px_rgba(255,255,255,0.35)]"
+            <a href="#activate" onClick={onHashClick("activate")} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black text-xs uppercase tracking-widest font-semibold hover:bg-white/90 transition shadow-[0_6px_20px_-6px_rgba(255,255,255,0.35)]">
               Activate <span aria-hidden>↗</span>
             </a>
           </div>
@@ -1115,7 +1115,7 @@ function HomePage() {
 
 
           <div className="mt-10 sm:mt-12 text-center reveal">
-            <a href="#activate" onClick={onHashClick("activate")} className="btn-red inline-block"Enter your code</a>
+            <a href="#activate" onClick={onHashClick("activate")} className="btn-red inline-block">Enter your code</a>
           </div>
         </div>
       </section>
@@ -1309,8 +1309,8 @@ function HomePage() {
             Point your TV to <span className="text-white font-mono">netflix.com/tv8</span>, type the 8-character code on screen, and we'll pair a verified Premium session to your device in seconds — 4K where supported, zero setup, no card required.
           </p>
           <div className="mt-7 sm:mt-9 flex flex-wrap justify-center gap-3">
-            <a href="#activate" onClick={onHashClick("activate")} className="btn-red"Activate my TV →</a>
-            <a href="#how-it-works" onClick={onHashClick("how-it-works")} className="btn-ghost"How it works</a>
+            <a href="#activate" onClick={onHashClick("activate")} className="btn-red">Activate my TV →</a>
+            <a href="#how-it-works" onClick={onHashClick("how-it-works")} className="btn-ghost">How it works</a>
           </div>
           <p className="mt-5 sm:mt-6 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.28em] text-white/40">
             Instant pairing · Premium tier · No sign-up card
