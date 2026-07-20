@@ -118,6 +118,8 @@ function HomePage() {
   const [stage, setStage] = useState<"idle" | "working">("idle");
   // Live digit count from the CodeInput so Stage 01 (ENTER) fills instantly as user types.
   const [codeLen, setCodeLen] = useState(0);
+  const [codeError, setCodeError] = useState<string | null>(null);
+
 
   const activate = useServerFn(submitActivation);
   const fetchGate = useServerFn(getGateConfig);
@@ -365,9 +367,14 @@ function HomePage() {
 
     const code = (codeRef.current?.getCode() ?? "").toUpperCase();
     if (!/^[A-Z0-9]{8}$/.test(code)) {
+      setCodeError("Enter the full 8-character code from your TV.");
+      codeRef.current?.shake();
+      codeRef.current?.focusFirst();
       toast.error("Invalid TV code", { description: "Enter the full 8-character code shown on your TV screen." });
       return;
     }
+    setCodeError(null);
+
 
     // Pre-flight gate checks — server is still source of truth, but naming
     // the blocking gate lets the user act immediately.
@@ -407,7 +414,11 @@ function HomePage() {
         qc.invalidateQueries({ queryKey: ["success-activation-count"] });
 
       } else if (result.error === "invalid_code") {
+        setCodeError("That code doesn't match. Double-check the 8 characters on your TV.");
+        codeRef.current?.shake();
+        codeRef.current?.focusFirst();
         toast.error("Invalid TV code", { description: "Please check the code shown on your TV and try again." });
+
       } else if (result.error === "maintenance") {
         toast.error("Service temporarily unavailable", { description: "Please try again in a moment." });
       } else if (result.error === "login_required") {
@@ -637,7 +648,12 @@ function HomePage() {
                   </div>
                 </div>
 
-                <CodeInput ref={codeRef} onChange={(filled) => setCodeLen(filled)} />
+                <CodeInput
+                  ref={codeRef}
+                  error={codeError}
+                  onChange={(filled) => { setCodeLen(filled); if (codeError) setCodeError(null); }}
+                />
+
 
 
                 {/* Honeypot — hidden from humans, bots fill it and get rejected */}
