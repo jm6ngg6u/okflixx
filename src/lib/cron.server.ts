@@ -7,9 +7,7 @@
 
 let cachedSecret: { value: string; expires: number } | null = null;
 
-async function loadCronSecret(): Promise<string> {
-  const envSecret = process.env.CRON_SECRET;
-  if (envSecret) return envSecret;
+async function loadStoredCronSecret(): Promise<string> {
   if (cachedSecret && cachedSecret.expires > Date.now()) return cachedSecret.value;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -26,21 +24,27 @@ async function loadCronSecret(): Promise<string> {
   }
 }
 
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export async function verifyCronRequest(request: Request): Promise<boolean> {
-  const expected = await loadCronSecret();
-  if (!expected) {
+  const envSecret = process.env.CRON_SECRET ?? "";
+  const storedSecret = await loadStoredCronSecret();
+  if (!envSecret && !storedSecret) {
     return process.env.NODE_ENV !== "production";
   }
   const provided =
     request.headers.get("x-cron-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
     "";
-  if (!provided || provided.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
-  }
-  return diff === 0;
+  if (!provided) return false;
+  // Accept either the env secret OR the admin-managed app_settings secret so
+  // pg_cron can call in even when the two rotate out of sync.
+  return timingSafeEqualStr(provided, envSecret) || timingSafeEqualStr(provided, storedSecret);
 }
 
 
