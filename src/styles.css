@@ -117,12 +117,12 @@
 [data-radix-popper-content-wrapper] [role="menuitem"][data-highlighted],
 [data-radix-popper-content-wrapper] [role="option"]:hover,
 [data-radix-popper-content-wrapper] [role="menuitem"]:hover {
-  background: linear-gradient(90deg, rgba(229,9,20,0.18), rgba(229,9,20,0.06)) !important;
+  background: linear-gradient(90deg, rgba(255,42,58,0.18), rgba(255,42,58,0.06)) !important;
   color: #fff !important;
   outline: none;
 }
 [data-radix-popper-content-wrapper] [role="option"][data-state="checked"] {
-  background: rgba(229,9,20,0.14) !important;
+  background: rgba(255,42,58,0.14) !important;
   color: #fff !important;
 }
 [data-radix-popper-content-wrapper] [role="separator"] {
