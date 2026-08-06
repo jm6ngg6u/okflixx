@@ -71,18 +71,30 @@ const RESULTS = [
   { key: "no_cookie",     label: "No cookie",     tone: "red"     },
   { key: "exhausted",     label: "Exhausted",     tone: "red"     },
   { key: "server_error",  label: "Server error",  tone: "red"     },
+  { key: "worker_error",  label: "Worker error",  tone: "red"     },
+  { key: "auth_expired",  label: "Auth expired",  tone: "amber"   },
+  { key: "tv8_unavailable", label: "TV8 unavail", tone: "amber"   },
+  { key: "cookie_dead",   label: "Cookie dead",   tone: "red"     },
+  { key: "free",          label: "Free account",  tone: "amber"   },
+  { key: "on_hold",       label: "Account hold",  tone: "amber"   },
 ];
 
 const RESULT_STYLE: Record<string, string> = {
-  success:      "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  rate_limited: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  bot_detected: "bg-red-500/15 text-red-300 border-red-500/30",
-  invalid_code: "bg-white/10 text-white/60 border-white/15",
-  expired_code: "bg-white/10 text-white/60 border-white/15",
-  maintenance:  "bg-sky-500/15 text-sky-300 border-sky-500/30",
-  no_cookie:    "bg-red-500/15 text-red-300 border-red-500/30",
-  exhausted:    "bg-red-500/15 text-red-300 border-red-500/30",
-  server_error: "bg-red-500/15 text-red-300 border-red-500/30",
+  success:        "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  rate_limited:   "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  bot_detected:   "bg-red-500/15 text-red-300 border-red-500/30",
+  invalid_code:   "bg-white/10 text-white/60 border-white/15",
+  expired_code:   "bg-white/10 text-white/60 border-white/15",
+  maintenance:    "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  no_cookie:      "bg-red-500/15 text-red-300 border-red-500/30",
+  exhausted:      "bg-red-500/15 text-red-300 border-red-500/30",
+  server_error:   "bg-red-500/15 text-red-300 border-red-500/30",
+  worker_error:   "bg-red-500/15 text-red-300 border-red-500/30",
+  auth_expired:   "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  tv8_unavailable: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  cookie_dead:    "bg-red-500/15 text-red-300 border-red-500/30",
+  free:           "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  on_hold:        "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
 
 const TIME_PRESETS: { label: string; minutes: number | null }[] = [
@@ -457,17 +469,17 @@ function AttemptsPage() {
       <div className="glass overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/5 bg-white/[0.02] sticky top-0 backdrop-blur">
+            <thead className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/5 bg-[#0a0a0a]/80 sticky top-0 backdrop-blur-md z-10 shadow-sm">
               <tr>
-                <th className="text-left px-3 py-2.5 w-[150px]">Time</th>
-                <th className="text-left px-3 py-2.5 w-[40px]">#</th>
-                <th className="text-left px-3 py-2.5 w-[110px]">Code</th>
-                <th className="text-left px-3 py-2.5 w-[130px]">Result</th>
-                <th className="text-left px-3 py-2.5 w-[70px]">Latency</th>
-                <th className="text-left px-3 py-2.5 w-[50px]">GEO</th>
-                <th className="text-left px-3 py-2.5 w-[60px]">Route</th>
-                <th className="text-left px-3 py-2.5">Trace</th>
-                <th className="text-left px-3 py-2.5 w-[110px]">IP hash</th>
+                <th className="text-left px-3 py-3 w-[150px]">Time</th>
+                <th className="text-left px-3 py-3 w-[40px]">#</th>
+                <th className="text-left px-3 py-3 w-[110px]">Code</th>
+                <th className="text-left px-3 py-3 w-[130px]">Result</th>
+                <th className="text-left px-3 py-3 w-[70px]">Latency</th>
+                <th className="text-left px-3 py-3 w-[50px]">GEO</th>
+                <th className="text-left px-3 py-3 w-[60px]">Route</th>
+                <th className="text-left px-3 py-3">Trace</th>
+                <th className="text-left px-3 py-3 w-[110px]">IP hash</th>
               </tr>
             </thead>
             <tbody className="font-mono">
@@ -491,7 +503,7 @@ function AttemptsPage() {
                 if (item.kind === "header") {
                   return (
                     <tr key={`h-${item.label}`}>
-                      <td colSpan={9} className="px-3 pt-4 pb-1 text-[9px] uppercase tracking-widest text-white/30 font-mono">
+                      <td colSpan={9} className="px-3 pt-6 pb-1.5 text-[10px] uppercase tracking-widest text-[#ff2a3a]/80 font-mono bg-[#0c0c0c]/40 border-l-2 border-[#ff2a3a]">
                         — {item.label}
                       </td>
                     </tr>
@@ -500,66 +512,70 @@ function AttemptsPage() {
                 const r = item.row;
                 const isNew = newRowIds.has(r.id);
                 const isSuccess = r.result === "success";
+                const rowStyle = RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/50 border-white/10";
                 return (
                   <tr
                     key={r.id}
                     onClick={() => setModalAttempt(r)}
-                    className={`border-b border-white/5 hover:bg-white/[0.04] transition cursor-pointer ${isNew ? "row-slide-in bg-[#ff2a3a]/[0.05]" : ""}`}
+                    className={`border-b border-white/[0.03] hover:bg-white/[0.04] transition-all cursor-pointer group ${isNew ? "row-slide-in bg-[#ff2a3a]/[0.08]" : ""}`}
                   >
-                    <td className={`px-3 ${rowPad} whitespace-nowrap ${rowText} text-white/60 tabular-nums`}>
-                      {new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                      <div className="text-[9px] text-white/30">{new Date(r.created_at).toLocaleDateString()}</div>
+                    <td className={`px-3 ${rowPad} whitespace-nowrap ${rowText} text-white/50 tabular-nums`}>
+                      <div className="flex flex-col">
+                        <span className="text-white/80 group-hover:text-white transition-colors">{new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                        <span className="text-[9px] text-white/30 uppercase tracking-tighter">{new Date(r.created_at).toLocaleDateString()}</span>
+                      </div>
                     </td>
-                    <td className={`px-3 ${rowPad} ${rowText} text-white/40 tabular-nums`}>
+                    <td className={`px-3 ${rowPad} ${rowText} text-white/40 tabular-nums font-mono`}>
                       {r.attempt_number ?? "—"}
                     </td>
-                    <td className={`px-3 ${rowPad} ${rowText} text-[#ff8a90] tabular-nums`}>{r.code ?? "—"}</td>
+                    <td className={`px-3 ${rowPad} ${rowText}`}>
+                      <code className="text-[#ff2a3a] font-bold tracking-wider bg-[#ff2a3a]/5 px-1.5 py-0.5 rounded border border-[#ff2a3a]/10 group-hover:bg-[#ff2a3a]/10 group-hover:border-[#ff2a3a]/20 transition-all">{r.code ?? "—"}</code>
+                    </td>
                     <td className={`px-3 ${rowPad}`}>
-                      <Badge variant="outline" className={`${RESULT_STYLE[r.result ?? ""] ?? "bg-white/5 text-white/50 border-white/10"} text-[10px] font-mono`}>
+                      <Badge variant="outline" className={`${rowStyle} text-[10px] font-bold uppercase tracking-wider py-0.5 px-2`}>
                         {(r.result ?? "unknown").replace(/_/g, " ")}
                       </Badge>
                     </td>
                     <td className={`px-3 ${rowPad} ${rowText} tabular-nums ${
                       r.duration_ms == null ? "text-white/30"
-                      : r.duration_ms < 1500 ? "text-emerald-400"
+                      : r.duration_ms < 1500 ? "text-emerald-400 font-bold"
                       : r.duration_ms < 4000 ? "text-amber-400"
-                      : "text-[#ff8a90]"
+                      : "text-[#ff2a3a]"
                     }`}>
                       {r.duration_ms == null ? "—" : fmtMs(r.duration_ms)}
                     </td>
-                    <td className={`px-3 ${rowPad} ${rowText} text-white/70`}>{r.country ?? "—"}</td>
                     <td className={`px-3 ${rowPad} ${rowText}`}>
-                      {r.proxy_mode
-                        ? <span className="inline-flex items-center gap-1 text-sky-300"><Globe2 className="w-3 h-3" /> prx</span>
-                        : <span className="inline-flex items-center gap-1 text-white/40"><Zap className="w-3 h-3" /> dir</span>}
+                      {r.country ? (
+                        <div className="flex items-center gap-1.5" title={r.country}>
+                          <span className="text-sm">{countryFlag(r.country)}</span>
+                          <span className="text-[10px] text-white/60 font-mono">{r.country}</span>
+                        </div>
+                      ) : (
+                        <span className="text-white/20">—</span>
+                      )}
                     </td>
-                    <td className={`px-3 ${rowPad} ${rowText} text-white/50`}>
+                    <td className={`px-3 ${rowPad} ${rowText}`}>
+                      <Badge variant="outline" className={`text-[9px] uppercase tracking-tighter font-bold ${r.proxy_mode ? "bg-amber-500/10 text-amber-300/80 border-amber-500/20" : "bg-sky-500/10 text-sky-300/80 border-sky-500/20"}`}>
+                        {r.proxy_mode ? "PRX" : "DIR"}
+                      </Badge>
+                    </td>
+                    <td className={`px-3 ${rowPad} ${rowText}`}>
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
                         {r.selection_reason?.policy && (
                           <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest bg-[#ff2a3a]/10 border border-[#ff2a3a]/30 text-[#ff8a90]"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-white/5 border border-white/10 text-white/60 group-hover:text-white/90 group-hover:border-white/20 transition-all"
                             title={r.selection_reason?.why ?? ""}
                           >
                             {r.selection_reason.policy.replace("_", " ")}
                           </span>
                         )}
                         {r.cookie_id && (
-                          <span className="inline-flex items-center gap-1 text-white/40" title={`Cookie ${r.cookie_id}${r.selection_reason?.cookie?.total_uses != null ? ` · ${r.selection_reason.cookie.total_uses} uses` : ""}`}>
+                          <span className="inline-flex items-center gap-1 text-white/40 group-hover:text-white/60 transition-colors" title={`Cookie ${r.cookie_id}${r.selection_reason?.cookie?.total_uses != null ? ` · ${r.selection_reason.cookie.total_uses} uses` : ""}`}>
                             <Cookie className="w-3 h-3" /> {r.cookie_id.slice(0, 6)}
                           </span>
                         )}
-                        {r.selection_reason?.eligible_at_pick != null && (
-                          <span className="text-white/35 tabular-nums" title="Eligible cookies at pick time">
-                            elig {r.selection_reason.eligible_at_pick}
-                          </span>
-                        )}
-                        {r.proxy_id && (
-                          <span className="inline-flex items-center gap-1 text-white/40" title={`Proxy ${r.proxy_id}`}>
-                            <Globe2 className="w-3 h-3" /> {r.proxy_id.slice(0, 6)}
-                          </span>
-                        )}
                         {r.error_message && (
-                          <span className="text-[#ff8a90]/80 truncate max-w-[220px]" title={r.error_message}>
+                          <span className="text-[#ff2a3a] truncate max-w-[220px] font-medium" title={r.error_message}>
                             · {r.error_message}
                           </span>
                         )}
@@ -568,7 +584,7 @@ function AttemptsPage() {
                         )}
                       </div>
                     </td>
-                    <td className={`px-3 ${rowPad} ${rowText} text-white/40`}>
+                    <td className={`px-3 ${rowPad} ${rowText} text-white/40 tabular-nums font-mono group-hover:text-white/60 transition-colors`}>
                       {(r.ip_hash ?? "").slice(0, 10) || "—"}{r.ip_hash ? "…" : ""}
                     </td>
                   </tr>
@@ -789,4 +805,14 @@ function downloadFile(name: string, content: string, mime: string) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function countryFlag(code: string): string {
+  if (!code || code.length !== 2) return code || "—";
+  try {
+    const OFFSET = 127397;
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c => c.charCodeAt(0) + OFFSET));
+  } catch {
+    return code;
+  }
 }
