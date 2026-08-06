@@ -412,14 +412,16 @@ function AttemptsPage() {
                 </button>
               );
             })}
-            {selectedResults.length > 0 && (
-              <button
-                onClick={() => { setSelectedResults([]); setPage(0); }}
-                className="h-7 px-2 rounded-md text-[10px] font-mono text-white/40 hover:text-white/80 inline-flex items-center gap-1"
-              >
-                <X className="w-3 h-3" /> Clear
-              </button>
-            )}
+            <button
+              onClick={() => { setSelectedResults([]); setPage(0); }}
+              className={`h-7 px-2.5 rounded-md border text-[11px] font-mono transition ${
+                selectedResults.length === 0
+                  ? "bg-white/10 text-white border-white/20"
+                  : "border-white/10 bg-white/[0.02] text-white/40 hover:text-white/80 hover:bg-white/[0.06]"
+              }`}
+            >
+              All results
+            </button>
           </div>
         </div>
 
