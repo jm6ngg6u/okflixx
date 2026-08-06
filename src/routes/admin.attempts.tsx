@@ -290,19 +290,20 @@ function AttemptsPage() {
   const successRate = summary.total ? Math.round((summary.success / summary.total) * 1000) / 10 : 0;
 
   return (
-    <div className="space-y-6 font-ops">
+    <div className="space-y-6 font-ops animate-in fade-in duration-700">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-[#ff2a3a]/20 to-[#b0060f]/10 border border-[#ff2a3a]/20 flex items-center justify-center">
-            <ScrollText className="w-5 h-5 text-[#ff2a3a]" />
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#ff2a3a]/10 border border-[#ff2a3a]/20 flex items-center justify-center relative overflow-hidden group shadow-[0_0_30px_rgba(229,9,20,0.15)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#ff2a3a]/20 via-transparent to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+            <ScrollText className="w-6 h-6 text-[#ff2a3a] relative z-10" />
           </div>
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#ff2a3a] mb-1 flex items-center gap-2">
+            <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-[#ff2a3a] mb-1 flex items-center gap-2 font-bold">
               <Radio className={`w-3 h-3 ${rtStatus === "live" ? "text-[#ff2a3a] animate-pulse" : "text-white/30"}`} />
-              // Attempts log · live stream
+              // ACTIVATION ENGINE LOG · REALTIME
             </div>
-            <h1 className="font-display text-3xl md:text-4xl leading-none">Activation attempts</h1>
+            <h1 className="font-display text-4xl md:text-5xl leading-none tracking-tighter text-shine">Activation attempts</h1>
             <p className="text-sm text-white/50 mt-2 flex items-center gap-2 flex-wrap font-mono">
               <span className={`w-1.5 h-1.5 rounded-full ${
                 rtStatus === "live" ? "bg-emerald-400 animate-pulse"
