@@ -397,11 +397,55 @@ function SettingsPage() {
   );
 }
 
+function GithubSection() {
+  const fetchGithub = useServerFn(getGithubInfo);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-github-info"],
+    queryFn: () => fetchGithub(),
+    refetchInterval: 60000,
+  });
 
+  return (
+    <Section
+      icon={Github}
+      title="GitHub connection"
+      subtitle="The source repository and deployment connection for this OKFLIX project."
+    >
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex-1 flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+          <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06]">
+            <GitBranch className="w-5 h-5 text-white/70" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-0.5">Connected Repository</div>
+            <div className="text-sm font-medium text-white truncate">
+              {isLoading ? "..." : data?.repoName ?? "Unknown Repository"}
+            </div>
+          </div>
+        </div>
 
+        <div className="flex-1 flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+          <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06]">
+            <Github className="w-5 h-5 text-white/70" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-0.5">Connected Account</div>
+            <div className="text-sm font-medium text-white truncate">
+              {isLoading ? "..." : data?.githubAccount ?? "Unknown Account"}
+            </div>
+          </div>
+        </div>
 
-
-
+        <Button variant="outline" size="sm" asChild className="shrink-0 border-white/10 hover:border-[#ff2a3a]/50 hover:bg-[#ff2a3a]/5 transition-all">
+          <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+            <ExternalLink className="w-3.5 h-3.5 mr-2" />
+            GitHub Dashboard
+          </a>
+        </Button>
+      </div>
+    </Section>
+  );
+}
 
 function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   icon: any; title: string; subtitle?: string; pill?: React.ReactNode; children: React.ReactNode; highlight?: string;
