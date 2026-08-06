@@ -304,13 +304,14 @@ function SettingsPage() {
 
 
 
-      {/* Activation flow */}
+      {/* GitHub Connection */}
+      <GithubSection />
 
+      {/* Activation flow */}
       <ActivationFlowSection local={local} set={set} save={save} busy={busy} />
 
-
-
       <LiveJobsPanel />
+
 
       {/* Auto jobs */}
 
