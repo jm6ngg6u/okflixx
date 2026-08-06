@@ -161,12 +161,12 @@
 }
 .admin-shell button[role="combobox"]:hover,
 .admin-shell [data-slot="select-trigger"]:hover {
-  border-color: rgba(229,9,20,0.5) !important;
+  border-color: rgba(255,42,58,0.5) !important;
 }
 .admin-shell button[role="combobox"][data-state="open"],
 .admin-shell [data-slot="select-trigger"][data-state="open"] {
-  border-color: rgba(229,9,20,0.7) !important;
-  box-shadow: 0 0 0 3px rgba(229,9,20,0.15);
+  border-color: rgba(255,42,58,0.7) !important;
+  box-shadow: 0 0 0 3px rgba(255,42,58,0.15);
 }
 
 /* ==== Admin tables — unified UX (hover, zebra, states) ==== */
