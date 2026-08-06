@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
   runCookiesAutocheckNow, runProxiesAutocheckNow, getProxyModeStatus,
+  getGithubInfo,
 } from "@/lib/settings.functions";
+import { Github, ExternalLink, GitBranch } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
