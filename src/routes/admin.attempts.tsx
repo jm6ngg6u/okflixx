@@ -420,7 +420,7 @@ function AttemptsPage() {
                   : "border-white/10 bg-white/[0.02] text-white/40 hover:text-white/80 hover:bg-white/[0.06]"
               }`}
             >
-              Implement end-to-end activation tests for proxy on and proxy off to verify cookie check and TV activation success in the website flow.
+              continue the work
             </button>
           </div>
         </div>
