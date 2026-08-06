@@ -304,19 +304,19 @@ function AttemptsPage() {
               // ACTIVATION ENGINE LOG · REALTIME
             </div>
             <h1 className="font-display text-4xl md:text-5xl leading-none tracking-tighter text-shine">Activation attempts</h1>
-            <p className="text-sm text-white/50 mt-2 flex items-center gap-2 flex-wrap font-mono">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                rtStatus === "live" ? "bg-emerald-400 animate-pulse"
-                : rtStatus === "connecting" ? "bg-amber-400 animate-pulse"
-                : "bg-[#ff2a3a]"
+            <p className="text-sm text-white/50 mt-2 flex items-center gap-2 flex-wrap font-mono font-medium">
+              <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${
+                rtStatus === "live" ? "text-emerald-400 bg-current animate-pulse"
+                : rtStatus === "connecting" ? "text-amber-400 bg-current animate-pulse"
+                : "text-[#ff2a3a] bg-current"
               }`} />
-              <span className="text-white/70">
-                {rtStatus === "live" ? "realtime + " : ""}poll every {LIVE_POLL_MS / 1000}s
-                {!shouldPoll && <span className="text-amber-400"> · paused</span>}
+              <span className="text-white/80 uppercase tracking-tight">
+                {rtStatus === "live" ? "REALTIME SYNC + " : ""}POLL EVERY {LIVE_POLL_MS / 1000}s
+                {!shouldPoll && <span className="text-[#ff2a3a] animate-pulse"> · [PAUSED]</span>}
               </span>
-              <span className="text-white/30">·</span>
-              <span className="tabular-nums text-white/70">{total.toLocaleString()} total match</span>
-              {query.isFetching && <span className="text-emerald-400 tabular-nums">· syncing…</span>}
+              <span className="text-white/20">|</span>
+              <span className="tabular-nums text-white/90">{total.toLocaleString()} MATCHED RECORDS</span>
+              {query.isFetching && <span className="text-[#ff2a3a] animate-pulse font-bold tracking-widest"> [SYNCING...]</span>}
             </p>
           </div>
         </div>
