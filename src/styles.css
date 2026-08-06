@@ -564,7 +564,7 @@ body:not([data-scroll-locked]) {
     from var(--live-border-angle, 0deg),
     #ff2a3a 0%,
     transparent 25%,
-    #e50914 50%,
+    #ff2a3a 50%,
     transparent 75%,
     #ff2a3a 100%
   );
