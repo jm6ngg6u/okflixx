@@ -395,14 +395,31 @@ body:not([data-scroll-locked]) {
 }
 
 /* ==== TEXT ANIMATIONS ==== */
+/* Unified text shine — red base with a moving white highlight to keep it "moderated" as requested. */
 .text-shine {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.85) 0%,
+    #ff2a3a 0%,
+    #ff8a90 20%,
+    #ffffff 40%,
+    #ff8a90 60%,
+    #d42230 80%,
+    #ff2a3a 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine var(--brand-shine-duration, 4s) linear infinite;
+}
+.text-shine-white {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.8) 0%,
     rgba(255, 255, 255, 1) 25%,
-    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0.8) 50%,
     rgba(255, 255, 255, 1) 75%,
-    rgba(255, 255, 255, 0.85) 100%
+    rgba(255, 255, 255, 0.8) 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
