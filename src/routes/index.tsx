@@ -1019,8 +1019,8 @@ function HomePage() {
                     <div className="font-mono text-[10px] sm:text-xs text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
                     <div className="leading-none" style={{ fontSize: "clamp(1.5rem, 3.2vw, 2rem)" }} aria-hidden>{f.ic}</div>
                   </div>
-                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3 text-shine-white" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
-                    {f.t}
+                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
+                    {f.t.split(' ').slice(0, -1).join(' ')} <span className="text-shine-white">{f.t.split(' ').slice(-1)}</span>
                   </h3>
                   <p className="text-white/70 text-[13px] sm:text-sm leading-relaxed flex-1">
                     {f.d}
@@ -1113,7 +1113,9 @@ function HomePage() {
                         </span>
                         <span aria-hidden className="leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 1.9rem)" }}>{icon}</span>
                       </div>
-                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-shine-white" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
+                      <div className="font-display font-semibold mb-1.5 sm:mb-2" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>
+                        {title.split(' ').slice(0, -1).join(' ')} <span className="text-shine-white">{title.split(' ').slice(-1)}</span>
+                      </div>
                       <p className="text-[13px] sm:text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
@@ -1199,8 +1201,8 @@ function HomePage() {
                         <span className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
                           {String(n).padStart(2, "0")}
                         </span>
-                        <span className="font-display leading-snug text-shine-white" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
-                          {q}
+                        <span className="font-display leading-snug" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
+                          {q.split(' ').slice(0, -1).join(' ')} <span className="text-shine-white">{q.split(' ').slice(-1)}</span>
                         </span>
                       </div>
                     </AccordionTrigger>
