@@ -366,6 +366,41 @@ function SettingsPage() {
         title="Admin notifications"
         subtitle="Toast notifications when scheduled or manual jobs finish. Quiet hours mute toasts within a time window (24h HH:MM, local time)."
       >
+        <div className="grid sm:grid-cols-2 gap-4">
+          <ToggleField k="admin_toasts_enabled" label="Enable job toasts" hint="Show notifications on job completion" local={local} set={set} onSave={save} busy={busy} />
+          <div className="space-y-4">
+            <ToggleField k="quiet_hours_enabled" label="Quiet hours" hint="Mute notifications during specific times" local={local} set={set} onSave={save} busy={busy} />
+            {local.quiet_hours_enabled === "1" && (
+              <div className="grid grid-cols-2 gap-3 pl-12">
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-white/40">Start (HH:MM)</div>
+                  <Input
+                    value={local.quiet_hours_start ?? "22:00"}
+                    onChange={(e) => set("quiet_hours_start", e.target.value)}
+                    onBlur={() => save("quiet_hours_start")}
+                    placeholder="22:00"
+                    className="h-8 bg-black/20 border-white/10 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-white/40">End (HH:MM)</div>
+                  <Input
+                    value={local.quiet_hours_end ?? "08:00"}
+                    onChange={(e) => set("quiet_hours_end", e.target.value)}
+                    onBlur={() => save("quiet_hours_end")}
+                    placeholder="08:00"
+                    className="h-8 bg-black/20 border-white/10 font-mono text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </Section>
+
+      {/* GitHub Connection */}
+      <GithubSection />
+      >
         <div className="grid sm:grid-cols-2 gap-3">
           <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
           <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
