@@ -415,17 +415,17 @@ body:not([data-scroll-locked]) {
 .text-shine-white {
   background: linear-gradient(
     90deg,
-    rgba(255, 42, 58, 0.12) 0%,
-    rgba(255, 255, 255, 0.9) 25%,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 1) 25%,
     #ffffff 50%,
-    rgba(255, 255, 255, 0.9) 75%,
-    rgba(255, 42, 58, 0.12) 100%
+    rgba(255, 255, 255, 1) 75%,
+    rgba(255, 255, 255, 0.7) 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shine var(--brand-shine-duration, 4s) linear infinite;
+  animation: none;
 }
 @keyframes shine {
   to { background-position: 200% center; }
