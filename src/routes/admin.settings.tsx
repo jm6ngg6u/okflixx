@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listSettings, setSetting, toggleProxyMode, setMaintenance,
   runCookiesAutocheckNow, runProxiesAutocheckNow, getProxyModeStatus,
+  getGithubInfo,
 } from "@/lib/settings.functions";
+import { Github, ExternalLink, GitBranch } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -302,13 +304,14 @@ function SettingsPage() {
 
 
 
-      {/* Activation flow */}
+      {/* GitHub Connection */}
+      <GithubSection />
 
+      {/* Activation flow */}
       <ActivationFlowSection local={local} set={set} save={save} busy={busy} />
 
-
-
       <LiveJobsPanel />
+
 
       {/* Auto jobs */}
 
@@ -364,42 +367,92 @@ function SettingsPage() {
         title="Admin notifications"
         subtitle="Toast notifications when scheduled or manual jobs finish. Quiet hours mute toasts within a time window (24h HH:MM, local time)."
       >
-        <div className="grid sm:grid-cols-2 gap-3">
-          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
-          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
-          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-            <div className="text-sm font-medium mb-2">Quiet hours</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Start</label>
-                <div className="flex gap-2 mt-1">
-                  <Input type="time" value={local.notify_quiet_start ?? ""} onChange={(e) => set("notify_quiet_start", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-                  <Button size="sm" onClick={() => save("notify_quiet_start")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <ToggleField k="admin_toasts_enabled" label="Enable job toasts" hint="Show notifications on job completion" local={local} set={set} onSave={save} busy={busy} />
+          <div className="space-y-4">
+            <ToggleField k="quiet_hours_enabled" label="Quiet hours" hint="Mute notifications during specific times" local={local} set={set} onSave={save} busy={busy} />
+            {local.quiet_hours_enabled === "1" && (
+              <div className="grid grid-cols-2 gap-3 pl-12">
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-white/40">Start (HH:MM)</div>
+                  <Input
+                    value={local.quiet_hours_start ?? "22:00"}
+                    onChange={(e) => set("quiet_hours_start", e.target.value)}
+                    onBlur={() => save("quiet_hours_start")}
+                    placeholder="22:00"
+                    className="h-8 bg-black/20 border-white/10 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-white/40">End (HH:MM)</div>
+                  <Input
+                    value={local.quiet_hours_end ?? "08:00"}
+                    onChange={(e) => set("quiet_hours_end", e.target.value)}
+                    onBlur={() => save("quiet_hours_end")}
+                    placeholder="08:00"
+                    className="h-8 bg-black/20 border-white/10 font-mono text-xs"
+                  />
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">End</label>
-                <div className="flex gap-2 mt-1">
-                  <Input type="time" value={local.notify_quiet_end ?? ""} onChange={(e) => set("notify_quiet_end", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-                  <Button size="sm" onClick={() => save("notify_quiet_end")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
-                </div>
-              </div>
-            </div>
-            <div className="text-[11px] text-white/40 mt-2">Leave blank to always notify. Window may wrap midnight.</div>
+            )}
           </div>
         </div>
       </Section>
+
 
     </div>
   );
 }
 
+function GithubSection() {
+  const fetchGithub = useServerFn(getGithubInfo);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-github-info"],
+    queryFn: () => fetchGithub(),
+    refetchInterval: 60000,
+  });
 
+  return (
+    <Section
+      icon={Github}
+      title="GitHub connection"
+      subtitle="The source repository and deployment connection for this OKFLIX project."
+    >
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex-1 flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+          <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06]">
+            <GitBranch className="w-5 h-5 text-white/70" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-0.5">Connected Repository</div>
+            <div className="text-sm font-medium text-white truncate">
+              {isLoading ? "..." : data?.repoName ?? "Unknown Repository"}
+            </div>
+          </div>
+        </div>
 
+        <div className="flex-1 flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+          <div className="p-2 rounded-lg bg-black/40 border border-white/[0.06]">
+            <Github className="w-5 h-5 text-white/70" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-0.5">Connected Account</div>
+            <div className="text-sm font-medium text-white truncate">
+              {isLoading ? "..." : data?.githubAccount ?? "Unknown Account"}
+            </div>
+          </div>
+        </div>
 
-
-
+        <Button variant="outline" size="sm" asChild className="shrink-0 border-white/10 hover:border-[#ff2a3a]/50 hover:bg-[#ff2a3a]/5 transition-all">
+          <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+            <ExternalLink className="w-3.5 h-3.5 mr-2" />
+            GitHub Dashboard
+          </a>
+        </Button>
+      </div>
+    </Section>
+  );
+}
 
 function Section({ icon: Icon, title, subtitle, pill, children, highlight }: {
   icon: any; title: string; subtitle?: string; pill?: React.ReactNode; children: React.ReactNode; highlight?: string;
