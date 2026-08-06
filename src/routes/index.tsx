@@ -1019,7 +1019,7 @@ function HomePage() {
                     <div className="font-mono text-[10px] sm:text-xs text-[#ff2a3a] tracking-[0.32em]">{f.i}</div>
                     <div className="leading-none" style={{ fontSize: "clamp(1.5rem, 3.2vw, 2rem)" }} aria-hidden>{f.ic}</div>
                   </div>
-                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3 text-shine" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
+                  <h3 className="font-display leading-[1.15] tracking-tight mb-2 sm:mb-3 text-shine-white" style={{ fontSize: "clamp(1.15rem, 2.2vw, 1.6rem)" }}>
                     {f.t}
                   </h3>
                   <p className="text-white/70 text-[13px] sm:text-sm leading-relaxed flex-1">
