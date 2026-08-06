@@ -12,7 +12,7 @@
   --color-border: rgba(255,255,255,0.10);
   --color-input: rgba(255,255,255,0.08);
   --color-ring: #ff2a3a;
-  --color-primary: #e50914;
+  --color-primary: #ff2a3a;
   --color-primary-foreground: #ffffff;
   --color-secondary: #17171a;
   --color-secondary-foreground: #f5f5f5;
@@ -21,8 +21,8 @@
   --color-destructive: #ff2a3a;
   --color-destructive-foreground: #ffffff;
   --color-red-500: #ff2a3a;
-  --color-red-600: #e50914;
-  --color-red-700: #b0060f;
+  --color-red-600: #ff2a3a;
+  --color-red-700: #d42230;
   --font-display: var(--brand-font-display, "Sora"), sans-serif;
   --font-body: var(--brand-font-body, "Inter"), sans-serif;
   --font-ops: "Work Sans", "Inter", sans-serif;
@@ -117,12 +117,12 @@
 [data-radix-popper-content-wrapper] [role="menuitem"][data-highlighted],
 [data-radix-popper-content-wrapper] [role="option"]:hover,
 [data-radix-popper-content-wrapper] [role="menuitem"]:hover {
-  background: linear-gradient(90deg, rgba(229,9,20,0.18), rgba(229,9,20,0.06)) !important;
+  background: linear-gradient(90deg, rgba(255,42,58,0.18), rgba(255,42,58,0.06)) !important;
   color: #fff !important;
   outline: none;
 }
 [data-radix-popper-content-wrapper] [role="option"][data-state="checked"] {
-  background: rgba(229,9,20,0.14) !important;
+  background: rgba(255,42,58,0.14) !important;
   color: #fff !important;
 }
 [data-radix-popper-content-wrapper] [role="separator"] {
@@ -161,12 +161,12 @@
 }
 .admin-shell button[role="combobox"]:hover,
 .admin-shell [data-slot="select-trigger"]:hover {
-  border-color: rgba(229,9,20,0.5) !important;
+  border-color: rgba(255,42,58,0.5) !important;
 }
 .admin-shell button[role="combobox"][data-state="open"],
 .admin-shell [data-slot="select-trigger"][data-state="open"] {
-  border-color: rgba(229,9,20,0.7) !important;
-  box-shadow: 0 0 0 3px rgba(229,9,20,0.15);
+  border-color: rgba(255,42,58,0.7) !important;
+  box-shadow: 0 0 0 3px rgba(255,42,58,0.15);
 }
 
 /* ==== Admin tables — unified UX (hover, zebra, states) ==== */
@@ -408,7 +408,7 @@ body:not([data-scroll-locked]) {
   100% { background-position: 200% 50%; }
 }
 .text-live {
-  background: linear-gradient(90deg, #ff2a3a, #ff8a90, #e50914, #ff2a3a);
+  background: linear-gradient(90deg, #ff2a3a, #ff8a90, #d42230, #ff2a3a);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -564,7 +564,7 @@ body:not([data-scroll-locked]) {
     from var(--live-border-angle, 0deg),
     #ff2a3a 0%,
     transparent 25%,
-    #e50914 50%,
+    #ff2a3a 50%,
     transparent 75%,
     #ff2a3a 100%
   );
@@ -769,7 +769,7 @@ body:not([data-scroll-locked]) {
   position: absolute; inset: 0;
   border-radius: inherit;
   padding: 1.5px;
-  background: conic-gradient(from var(--ring-angle, 0deg), #ff2a3a 0%, transparent 25%, #e50914 50%, transparent 75%, #ff2a3a 100%);
+  background: conic-gradient(from var(--ring-angle, 0deg), #ff2a3a 0%, transparent 25%, #d42230 50%, transparent 75%, #ff2a3a 100%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
