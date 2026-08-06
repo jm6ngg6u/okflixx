@@ -769,7 +769,7 @@ body:not([data-scroll-locked]) {
   position: absolute; inset: 0;
   border-radius: inherit;
   padding: 1.5px;
-  background: conic-gradient(from var(--ring-angle, 0deg), #ff2a3a 0%, transparent 25%, #e50914 50%, transparent 75%, #ff2a3a 100%);
+  background: conic-gradient(from var(--ring-angle, 0deg), #ff2a3a 0%, transparent 25%, #d42230 50%, transparent 75%, #ff2a3a 100%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
