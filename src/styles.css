@@ -21,8 +21,8 @@
   --color-destructive: #ff2a3a;
   --color-destructive-foreground: #ffffff;
   --color-red-500: #ff2a3a;
-  --color-red-600: #e50914;
-  --color-red-700: #b0060f;
+  --color-red-600: #ff2a3a;
+  --color-red-700: #d42230;
   --font-display: var(--brand-font-display, "Sora"), sans-serif;
   --font-body: var(--brand-font-body, "Inter"), sans-serif;
   --font-ops: "Work Sans", "Inter", sans-serif;
