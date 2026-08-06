@@ -425,7 +425,7 @@ body:not([data-scroll-locked]) {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: none;
+  animation: shine var(--brand-shine-duration, 4s) linear infinite;
 }
 @keyframes shine {
   to { background-position: 200% center; }
