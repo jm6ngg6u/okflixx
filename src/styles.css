@@ -408,7 +408,7 @@ body:not([data-scroll-locked]) {
   100% { background-position: 200% 50%; }
 }
 .text-live {
-  background: linear-gradient(90deg, #ff2a3a, #ff8a90, #e50914, #ff2a3a);
+  background: linear-gradient(90deg, #ff2a3a, #ff8a90, #d42230, #ff2a3a);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   background-clip: text;
