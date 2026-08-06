@@ -13,7 +13,6 @@ import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
-import overrideCss from "../styles-override.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import "../lib/toast-format";
 import { BrandingProvider } from "../lib/branding-context";
