@@ -398,8 +398,6 @@ function SettingsPage() {
           </div>
         </div>
       </Section>
-      {/* GitHub Connection */}
-      <GithubSection />
 
 
     </div>
