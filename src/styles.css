@@ -415,11 +415,11 @@ body:not([data-scroll-locked]) {
 .text-shine-white {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(255, 255, 255, 1) 25%,
-    rgba(255, 255, 255, 0.8) 50%,
-    rgba(255, 255, 255, 1) 75%,
-    rgba(255, 255, 255, 0.8) 100%
+    rgba(255, 42, 58, 0.12) 0%,
+    rgba(255, 255, 255, 0.9) 25%,
+    #ffffff 50%,
+    rgba(255, 255, 255, 0.9) 75%,
+    rgba(255, 42, 58, 0.12) 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;

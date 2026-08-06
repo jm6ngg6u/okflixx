@@ -1113,7 +1113,7 @@ function HomePage() {
                         </span>
                         <span aria-hidden className="leading-none" style={{ fontSize: "clamp(1.5rem, 3vw, 1.9rem)" }}>{icon}</span>
                       </div>
-                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-shine" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
+                      <div className="font-display font-semibold mb-1.5 sm:mb-2 text-shine-white" style={{ fontSize: "clamp(1rem, 1.6vw, 1.15rem)" }}>{title}</div>
                       <p className="text-[13px] sm:text-sm text-white/65 leading-relaxed flex-1">{desc}</p>
                     </div>
                   </button>
@@ -1199,7 +1199,7 @@ function HomePage() {
                         <span className="font-mono text-[10px] sm:text-xs tracking-[0.28em] text-[#ff2a3a] shrink-0">
                           {String(n).padStart(2, "0")}
                         </span>
-                        <span className="font-display leading-snug text-shine" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
+                        <span className="font-display leading-snug text-shine-white" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
                           {q}
                         </span>
                       </div>
