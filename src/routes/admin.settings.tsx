@@ -397,36 +397,9 @@ function SettingsPage() {
           </div>
         </div>
       </Section>
-
       {/* GitHub Connection */}
       <GithubSection />
-      >
-        <div className="grid sm:grid-cols-2 gap-3">
-          <ToggleField k="notify_cookies" label="Cookie check completion" hint="Toast when cookie auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
-          <ToggleField k="notify_proxies" label="Proxy check completion" hint="Toast when proxy auto-check finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
-          <ToggleField k="notify_cleanup" label="Nightly cleanup" hint="Toast when nightly cleanup finishes" local={local} set={set} onSave={save} busy={busy} defaultOn />
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-            <div className="text-sm font-medium mb-2">Quiet hours</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">Start</label>
-                <div className="flex gap-2 mt-1">
-                  <Input type="time" value={local.notify_quiet_start ?? ""} onChange={(e) => set("notify_quiet_start", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-                  <Button size="sm" onClick={() => save("notify_quiet_start")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 font-mono">End</label>
-                <div className="flex gap-2 mt-1">
-                  <Input type="time" value={local.notify_quiet_end ?? ""} onChange={(e) => set("notify_quiet_end", e.target.value)} className="bg-white/5 border-white/10 font-mono text-xs" />
-                  <Button size="sm" onClick={() => save("notify_quiet_end")} className="btn-red shrink-0"><Save className="w-3.5 h-3.5" /></Button>
-                </div>
-              </div>
-            </div>
-            <div className="text-[11px] text-white/40 mt-2">Leave blank to always notify. Window may wrap midnight.</div>
-          </div>
-        </div>
-      </Section>
+
 
     </div>
   );
