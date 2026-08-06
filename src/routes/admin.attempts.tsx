@@ -420,7 +420,7 @@ function AttemptsPage() {
                   : "border-white/10 bg-white/[0.02] text-white/40 hover:text-white/80 hover:bg-white/[0.06]"
               }`}
             >
-              All results
+              Load the security issues from the scan results and fix the selected issues.
             </button>
           </div>
         </div>
