@@ -128,7 +128,7 @@ def _make_request(cookies, proxy_url=None, retry_count=0):
     _manage_rate_limit()
 
     if retry_count == 0:
-        time.sleep(random.uniform(0.02, 0.2))
+        time.sleep(random.uniform(0.01, 0.05))
 
     if retry_count > 0:
         _close_session()
@@ -141,7 +141,7 @@ def _make_request(cookies, proxy_url=None, retry_count=0):
 
     kwargs = {
         "headers": headers,
-        "timeout": 15 + (retry_count * 5),
+        "timeout": 10 + (retry_count * 3),
         "allow_redirects": True,
     }
     if proxy_url:
@@ -229,9 +229,37 @@ def check_cookie_sync(cookie_dict, proxy_url=None):
         return result
 
     if not response_text:
-        # Fallback: if proxy failed, try direct
+        # Fallback: if proxy failed, try another proxy from pool before going direct
+        # Direct connections from Railway are often blocked, so prioritize proxies
         if proxy_url:
-            response_text, status_code = _make_request(cookie_dict, proxy_url=None)
+            try:
+                import database as db
+                from proxy import _format_proxy_url
+                
+                fallback_success = False
+                if db.is_proxy_mode():
+                    for _ in range(2):
+                        p = db.get_random_valid_proxy()
+                        if not p:
+                            break
+                            
+                        new_proxy_url = _format_proxy_url(p)
+                        if new_proxy_url and new_proxy_url != proxy_url:
+                            response_text, status_code = _make_request(cookie_dict, proxy_url=new_proxy_url)
+                            if response_text:
+                                fallback_success = True
+                                break
+                            # Mark this fallback proxy as invalid since it failed the request
+                            db.mark_proxy_invalid(p['id'])
+            except ImportError:
+                # Running in website worker environment (no database.py / SQLite).
+                # Skip fallback; the website TS logic handles proxy rotation.
+                fallback_success = False
+            
+            # Last resort: direct connection
+            if not fallback_success:
+                response_text, status_code = _make_request(cookie_dict, proxy_url=None)
+                
             if not response_text:
                 # BUG FIX: same issue — no response from Netflix (network/proxy
                 # failure) is not a confirmed-invalid verdict. Mark transient so
