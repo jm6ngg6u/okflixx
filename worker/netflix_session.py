@@ -166,6 +166,9 @@ TV_CODE_ERROR_PATTERNS = [
     r"m[ãa] (đó|không đúng|không ch[íi]nh x[áa]c|sai)", r"thử lại",
     r"kod (jest |nieprawidłowy|błędny)", r"spr[óo]buj ponownie",
     r"код (неверный|неправильный|ошибочный)", r"попробуйте",
+    r"something went wrong", r"algo sali[oó] mal", r"quelque chose s'est mal pass[ée]", r"etwas ist schiefgelaufen",
+    r"qualcosa [eè] andato storto", r"bir [sş]eyler ters gitti", r"משהו השתבש", r"حدث خطأ ما",
+    r"household", r"hogar", r"foyer", r"haushalt", r"nucleo domestico", r"hane", r"בית", r"عائلة",
     r"代码(有误|错误|无效|不正确)", r"请重试", r"再试一[次遍]",
     r"代碼(有誤|錯誤|無效|不正確)", r"請重試", r"再試一[次遍]",
     r"kode (salah|tidak valid|tidak tepat)", r"coba lagi",
@@ -209,10 +212,11 @@ class NetflixSession:
         # Initialize AsyncClient with optional proxy
         client_kwargs = dict(
             headers=self.headers,
-            timeout=15.0,
+            timeout=10.0,
             follow_redirects=True,
             verify=True
         )
+        self._proxy_url = None
         if proxy_dict:
             # BUG FIX: httpx 0.27 removed the `proxies=` dict kwarg entirely.
             # Passing a dict raises TypeError at construction time, breaking TV
@@ -226,6 +230,7 @@ class NetflixSession:
                           or next(iter(proxy_dict.values()), None))
             if _proxy_url:
                 client_kwargs['proxy'] = _proxy_url
+                self._proxy_url = _proxy_url
         self.client = httpx.AsyncClient(**client_kwargs)
         self.cookies_raw = {}  # Store raw {name: value} for DB persistence
 
@@ -450,107 +455,48 @@ class NetflixSession:
 
         return details
 
-    async def _get_tv8_params(self):
+    @staticmethod
+    def _extract_auth_url_regex(html):
         """
-        Fetch ALL required parameters from the TV8 React page.
-        
-        Netflix redesigned /tv8 in mid-2026: removed the HTML <form> and
-        hidden <input name="authURL">, replaced with a React app that renders
-        8 individual PIN input boxes. All parameters now live inside the
-        netflix.reactContext JSON blob in a <script> tag.
+        Extract authURL from Netflix /tv8 page using proven regex patterns.
+        Ported from FreeTV.py's extract_auth_url() — simple, reliable, works
+        with both the old HTML form and the new React-based /tv8 page.
         """
-        try:
-            response = await self.client.get("https://www.netflix.com/tv8")
-            if response.status_code != 200:
-                logger.error(f"Failed to load /tv8: status {response.status_code}")
-                return None
+        import urllib.parse as _up
+        patterns = [
+            r'name="authURL"\s+value="([^"]+)"',
+            r'authURL["\']?\s*[:=]\s*["\']([^"]+)["\']',
+            r'authURL=([^&\s"\']+)',
+            r'["\']authURL["\']\s*:\s*["\']([^"\']+)["\']',
+            r'value="(c1\.[^"]+)"',
+        ]
+        for pat in patterns:
+            m = re.search(pat, html)
+            if m:
+                return _up.unquote(m.group(1))
+        return None
 
-            html = response.text
+    @staticmethod
+    def _is_tv_code_error(cleaned_text):
+        """Check if cleaned page text contains TV code error patterns.
+        Ported from FreeTV.py — covers 30+ languages."""
+        text_lower = cleaned_text.lower()
+        for pattern in TV_CODE_ERROR_PATTERNS:
+            if re.search(pattern, text_lower):
+                return True
+        return False
 
-            # ── Extract netflix.reactContext JSON ──
-            ctx = None
-            ctx_match = re.search(r'netflix\.reactContext\s*=\s*(\{.+?\});', html, re.DOTALL)
-            if ctx_match:
-                try:
-                    ctx = json.loads(ctx_match.group(1))
-                except json.JSONDecodeError:
-                    try:
-                        raw = _decode_hex_escapes(ctx_match.group(1))
-                        ctx = json.loads(raw)
-                    except Exception:
-                        pass
-
-            if not ctx:
-                logger.error("Could not parse netflix.reactContext from /tv8")
-                return None
-
-            models = ctx.get('models', {})
-
-            # ── Extract authURL ──
-            auth_url = None
-
-            # Priority 1: from flow.data.fields or flow.data
-            flow_data = models.get('flow', {}).get('data', {})
-            auth_url = flow_data.get('authURL')
-
-            # Priority 2: from signupContext or userInfo
-            if not auth_url:
-                for key in ['signupContext', 'userInfo', 'loginContext']:
-                    if key in models:
-                        data = models[key].get('data', models[key])
-                        auth_url = data.get('authURL')
-                        if auth_url:
-                            break
-
-            # Priority 3: regex fallback from full HTML
-            if not auth_url:
-                m = re.search(r'"authURL"\s*:\s*"([^"]+)"', html)
-                if m:
-                    auth_url = m.group(1)
-                    try:
-                        auth_url = auth_url.encode().decode('unicode_escape')
-                    except Exception:
-                        pass
-
-            if not auth_url:
-                logger.error("Could not find authURL in reactContext or HTML")
-                return None
-
-            logger.info(f"Got authURL: {auth_url[:40]}...")
-
-            # ── Extract flow parameters ──
-            fields = flow_data.get('fields', {})
-
-            params = {
-                'authURL': auth_url,
-                'flow': flow_data.get('flow', 'websiteSignUp'),
-                'mode': flow_data.get('mode', 'enterTvLoginRendezvousCode'),
-                'action': flow_data.get('action', 'nextAction'),
-            }
-
-            # Extract moneyballSessionUuid if present
-            mbs = fields.get('moneyballSessionUuid')
-            if isinstance(mbs, dict):
-                params['moneyballSessionUuid'] = mbs.get('value', '')
-            elif isinstance(mbs, str):
-                params['moneyballSessionUuid'] = mbs
-
-            # Extract esn if present
-            esn = fields.get('esn')
-            if isinstance(esn, dict):
-                params['esn'] = esn.get('value', '')
-
-            logger.info(f"TV8 params: flow={params['flow']}, mode={params['mode']}, action={params['action']}")
-            return params
-
-        except Exception as e:
-            logger.error(f"Error fetching TV8 params: {e}")
-            return None
-
-    async def _get_auth_url(self):
-        """Legacy wrapper — extracts just authURL for backward compatibility."""
-        params = await self._get_tv8_params()
-        return params['authURL'] if params else None
+    @staticmethod
+    def _is_tv_code_success(final_url, cleaned_text):
+        """Check if final URL or cleaned text indicates TV activation success.
+        Ported from FreeTV.py — uses explicit success indicators only."""
+        if "/tv/out/success" in final_url.lower():
+            return True
+        text_lower = cleaned_text.lower()
+        for pat in TV_CODE_SUCCESS_PATTERNS:
+            if re.search(pat, text_lower):
+                return True
+        return False
 
     async def get_account_details(self):
         """
@@ -602,151 +548,144 @@ class NetflixSession:
     async def activate_tv(self, code):
         """
         Activates a TV device using the 8-digit code.
-        
-        Updated July 2026: Netflix redesigned /tv8 from HTML form to React PIN input.
-        Parameters now come from netflix.reactContext JSON instead of hidden inputs.
-        """
-        # Step 1: Get all parameters from the React page
-        params = await self._get_tv8_params()
-        if not params:
-            # BUG FIX: Previously returned error_type="auth" here, which netflix_adapter.py
-            # mapped to cookie_dead=True — permanently deleting a healthy cookie from the pool
-            # whenever /tv8 failed to load for any reason (network blip, Netflix rate-limit,
-            # temporary 5xx, slow Railway cold-start, React-context parse error).
-            # A /tv8 page load failure says nothing about the cookie's validity — the
-            # account may be perfectly active. Changed to "tv8_unavailable" which
-            # netflix_adapter.py now treats as a transient error: skip this cookie and
-            # try another, but leave it in the pool for future activations.
-            return {"success": False, "error_type": "tv8_unavailable",
-                    "message": "❌ Could not load activation page. This may be a temporary Netflix issue — retrying with another cookie."}
 
-        # Step 2: Submit the TV code
+        Ported from FreeTV.py's proven submit_tv_code() approach, using
+        curl_cffi with Chrome120 TLS impersonation instead of httpx.
+
+        Why this works when the old httpx version didn't:
+        1. curl_cffi impersonates real Chrome TLS fingerprint → bypasses anti-bot
+        2. Simple regex authURL extraction → works with any /tv8 page variant
+        3. Strict URL-based success detection → no false positives
+        4. Post-activation verification → catches edge cases where POST
+           "succeeds" but TV never actually activates (proxy/CDN issue)
+        """
+        from curl_cffi import requests as curl_requests
+        import html as html_mod
+
+        # Create a fresh curl_cffi session with Chrome TLS impersonation
+        curl_session = curl_requests.Session(impersonate="chrome120")
+
+        # Set cookies from our raw cookie dict
+        for name, value in self.cookies_raw.items():
+            curl_session.cookies.set(name, value, domain=".netflix.com")
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Connection': 'keep-alive',
+        }
+
+        # Build common kwargs for curl_cffi requests
+        base_kwargs = {"headers": headers, "timeout": 15, "allow_redirects": True}
+        if self._proxy_url:
+            base_kwargs["proxy"] = self._proxy_url
+
         try:
-            # Revert payload to match the proven legacy API format that Netflix still expects
-            # even though their frontend React UI uses different field names internally.
-            payload = {
+            # ══════════════════════════════════════════════
+            #  Step 1: GET /tv8 → extract authURL (FreeTV.py regex approach)
+            # ══════════════════════════════════════════════
+            try:
+                r = curl_session.get("https://www.netflix.com/tv8", **base_kwargs)
+            except Exception as e:
+                logger.error(f"Failed to fetch /tv8: {e}")
+                return {"success": False, "error_type": "tv8_unavailable",
+                        "message": "❌ Could not load activation page. Retrying with another cookie."}
+
+            if r.status_code != 200:
+                logger.error(f"Failed to load /tv8: status {r.status_code}")
+                return {"success": False, "error_type": "tv8_unavailable",
+                        "message": "❌ Could not load activation page. Retrying with another cookie."}
+
+            auth_url = self._extract_auth_url_regex(r.text)
+            if not auth_url:
+                # Fallback: try to find any c1.xxx token in the page
+                fallback = re.search(r'c1\.[a-zA-Z0-9%+=/]+', r.text)
+                if fallback:
+                    auth_url = fallback.group(0)
+                else:
+                    logger.error("Could not extract authURL from /tv8")
+                    return {"success": False, "error_type": "tv8_unavailable",
+                            "message": "❌ Could not extract authURL from activation page."}
+
+            logger.info(f"Got authURL: {auth_url[:40]}...")
+
+            # ══════════════════════════════════════════════
+            #  Step 2: POST the TV code
+            #  Uses Netflix's actual form fields from reactContext:
+            #  - flow: "websiteSignUp" (the signup/login flow identifier)
+            #  - authURL: CSRF token extracted from GET /tv8
+            #  - mode: "enterTvLoginRendezvousCode" (current flow step)
+            #  - action: "nextAction" (triggers field submission)
+            #  - withFields lists: tvLoginRendezvousCode + isTvUrl2
+            #  - isTvUrl2: "true" — required hidden field, tells Netflix
+            #    this is the /tv8 (URL v2) flow, not the legacy /activate
+            # ══════════════════════════════════════════════
+            form_data = {
                 "flow": "websiteSignUp",
-                "authURL": params['authURL'],
-                "flowMode": "enterTvLoginRendezvousCode",
+                "mode": "enterTvLoginRendezvousCode",
+                "authURL": auth_url,
                 "withFields": "tvLoginRendezvousCode,isTvUrl2",
-                "code": code,
                 "tvLoginRendezvousCode": code,
+                "isTvUrl2": "true",
                 "action": "nextAction",
             }
 
-            # Still include moneyballSessionUuid if available just in case
-            if params.get('moneyballSessionUuid'):
-                payload["moneyballSessionUuid"] = params['moneyballSessionUuid']
+            post_headers = {
+                **headers,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": "https://www.netflix.com/tv8",
+                "Origin": "https://www.netflix.com",
+            }
 
-            # Include esn if available
-            if params.get('esn'):
-                payload["esn"] = params['esn']
+            post_kwargs = {"data": form_data, "headers": post_headers,
+                           "timeout": 15, "allow_redirects": True}
+            if self._proxy_url:
+                post_kwargs["proxy"] = self._proxy_url
 
-            logger.info(f"Submitting code {code} with authURL {params['authURL'][:30]}...")
-            logger.info(f"Payload fields: {list(payload.keys())}")
+            try:
+                r = curl_session.post("https://www.netflix.com/tv8", **post_kwargs)
+            except Exception as e:
+                logger.error(f"Activation POST failed: {e}")
+                return {"success": False, "error_type": "error",
+                        "message": "❌ Activation request failed."}
 
-            response = await self.client.post(
-                "https://www.netflix.com/tv8",
-                data=payload,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Origin": "https://www.netflix.com",
-                    "Referer": "https://www.netflix.com/tv8",
-                }
-            )
+            final_url = str(r.url) if hasattr(r, 'url') else "https://www.netflix.com/tv8"
+            logger.info(f"Activation POST status: {r.status_code}, final URL: {final_url}")
 
-            logger.info(f"Activation POST status: {response.status_code}")
-            logger.info(f"Activation POST final URL: {response.url}")
+            # ══════════════════════════════════════════════
+            #  Step 3: Strict success/failure detection
+            #
+            #  DETECTION ORDER IS CRITICAL — do NOT rearrange:
+            #    1. HTTP error codes (500/403)
+            #    2. URL redirect success (most reliable, can't be faked)
+            #    3. Clean HTML (strip JS/CSS that contain false-positive
+            #       route names like "tvLoginSuccess" in every page load)
+            #    4. ERROR detection FIRST (must run before success checks
+            #       to prevent localized error pages from falling through
+            #       to ambiguous → retry → false success)
+            #    5. reactContext flow-mode (ONLY inside the actual JSON
+            #       block, never the full raw HTML)
+            #    6. Text-based success patterns with verification
+            #    7. Session expired
+            #    8. Ambiguous fallback (retryable)
+            # ══════════════════════════════════════════════
 
-            current_url = str(response.url).lower()
-
-            # Clean text early so HTTP error handling can still distinguish a
-            # real inline TV-code rejection from Netflix returning a broken
-            # confirmation page after accepting the rendezvous code.
-            import html as html_mod
-            clean_text = response.text
-            clean_text = re.sub(r'<script[^>]*>.*?</script>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
-            clean_text = re.sub(r'<style[^>]*>.*?</style>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
-            clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
-            clean_text = html_mod.unescape(clean_text)
-            clean_text = re.sub(r'\s+', ' ', clean_text).strip().lower()
-
-            form_still_showing = (
-                "pin-number-input" in response.text or
-                "witcher-code-form" in response.text or
-                "enter the code" in clean_text
-            )
-
-            explicit_code_error = False
-            if form_still_showing:
-                for pat in TV_CODE_ERROR_PATTERNS:
-                    if re.search(pat, clean_text):
-                        explicit_code_error = True
-                        break
-
-            # ── Handle HTTP errors ──
-            if response.status_code == 500:
-                # Netflix often returns a 500 after it has already accepted a
-                # valid TV rendezvous code. The TV completes activation, but the
-                # web confirmation page fails, which previously became a false
-                # "invalid_code" in OKFLIX and stopped the retry/update flow.
-                # Only call it invalid if Netflix re-rendered the PIN form with
-                # an explicit code error. Otherwise treat it as accepted so the
-                # receipt and activation counters stay in sync with the TV.
-                if explicit_code_error:
-                    return {"success": False, "error_type": "invalid_code",
-                            "message": "❌ Incorrect or expired TV code."}
-                details = await self.get_account_details()
-                return {
-                    "success": True,
-                    "message": "✅ TV activation accepted. Netflix confirmation page returned 500, but the device flow completed.",
-                    "details": details,
-                    "country": details.get("country", "Unknown"),
-                    "plan": details.get("plan", "Unknown"),
-                    "email": details.get("email", "Unknown"),
-                    "video_quality": details.get("video_quality", "Unknown"),
-                    "netflix_status_code": 500,
-                }
-
-            if response.status_code == 403:
-                # BUG FIX: Previously returned error_type="blocked" for 403, which
-                # netflix_adapter.py mapped to cookie_dead=True. On Railway/VPS, the
-                # authURL CSRF token in the /tv8 payload expires if the container is
-                # slow (cold-start latency between fetching /tv8 and POSTing the code).
-                # Netflix also returns 403 on rate-limit. Both are transient — the
-                # cookie/account is healthy. Changed to "auth_expired" so netflix_adapter.py
-                # skips this cookie without deleting it and retries with another.
+            # 3a: Handle HTTP error codes
+            if r.status_code == 500:
+                return {"success": False, "error_type": "expired_code",
+                        "message": "❌ Netflix returned error 500. Code may be expired."}
+            if r.status_code == 403:
                 return {"success": False, "error_type": "auth_expired",
-                        "message": "❌ authURL expired or rate-limited (403). Retrying with another cookie."}
+                        "message": "❌ authURL expired or rate-limited (403). Retrying."}
 
-            # ── Success detection (URL + text + form-disappearance) ──
-            is_success = False
-
-            # Signal 1 — Netflix redirected off /tv8 to any known post-activation
-            # destination. Strongest signal, checked first.
-            URL_SUCCESS_MARKERS = (
-                "/tv/out/success", "/tv8/success", "/tv/activate/success",
-                "/tv-activated", "/browse", "/chooseprofile", "/youraccount",
-                "/account", "/profilesgate",
-            )
-            if any(m in current_url for m in URL_SUCCESS_MARKERS):
-                is_success = True
-
-            # Signal 2 — Localized success copy in the page body.
-            if not is_success:
-                for pat in TV_CODE_SUCCESS_PATTERNS:
-                    if re.search(pat, clean_text):
-                        is_success = True
-                        break
-
-            still_on_tv8 = ("/tv8" in current_url and "/tv8/success" not in current_url)
-
-            # Signal 3 — Response 200, PIN form gone, and we've moved off /tv8.
-            # Covers generic confirmation pages whose copy we don't match.
-            if not is_success and response.status_code == 200 and not form_still_showing and not still_on_tv8:
-                is_success = True
-
-            if is_success:
+            # 3b: URL-based success (MOST RELIABLE — Netflix only redirects
+            #     to /tv/out/success on a real, confirmed activation)
+            final_url_lower = final_url.lower()
+            if "/tv/out/success" in final_url_lower:
+                logger.info(f"TV activation SUCCESS: URL redirect → {final_url}")
                 details = await self.get_account_details()
                 return {
                     "success": True,
@@ -758,36 +697,136 @@ class NetflixSession:
                     "video_quality": details.get("video_quality", "Unknown"),
                 }
 
-            # ── Failure detection ──
-            # BUG FIX: previously the (very broad) TV_CODE_ERROR_PATTERNS ran
-            # against ANY page — including Netflix's own success page which
-            # contains generic copy like "try again"/"riprova" in help widgets.
-            # That produced false-negative "That code doesn't match" errors even
-            # though the TV had activated. Only classify as invalid_code when
-            # the code-entry form is STILL showing (Netflix re-rendered /tv8
-            # with an inline error).
-            if form_still_showing:
-                for pat in TV_CODE_ERROR_PATTERNS:
-                    if re.search(pat, clean_text):
-                        return {"success": False, "error_type": "invalid_code",
-                                "message": "❌ Incorrect or expired TV code."}
-                return {"success": False, "error_type": "not_accepted",
-                        "message": "❌ Code was not accepted. The activation form is still showing. Try a fresh code."}
+            # 3c: Clean HTML — strip all <script> and <style> blocks FIRST.
+            #     This is CRITICAL because Netflix's JS bundles contain route
+            #     names like "tvLoginSuccess", "loginComplete", "/tv/out/success"
+            #     on EVERY page load (they're moneyballPaths mapping entries).
+            #     If we search the raw HTML, we get false-positive success on
+            #     every single activation attempt — including wrong codes.
+            clean_text = r.text
+            clean_text = re.sub(r'<script[^>]*>.*?</script>', '', clean_text,
+                                flags=re.DOTALL | re.IGNORECASE)
+            clean_text = re.sub(r'<style[^>]*>.*?</style>', '', clean_text,
+                                flags=re.DOTALL | re.IGNORECASE)
+            clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
+            clean_text = html_mod.unescape(clean_text)
+            clean_text = re.sub(r'\s+', ' ', clean_text).strip()
 
-            # Check if redirected to login (session expired)
-            if "login" in current_url or "signin" in current_url:
+            logger.info(f"Activation clean text (first 300): {clean_text[:300]}")
+
+            # 3d: Error detection FIRST — must run BEFORE any success check.
+            #     Netflix returns localized error messages (Turkish, Spanish,
+            #     Arabic, etc.) based on the proxy IP or account locale.
+            #     If error detection runs after a broken success check, the
+            #     bot never reaches the error patterns and reports a false
+            #     success for every wrong code.
+            if self._is_tv_code_error(clean_text):
+                return {"success": False, "error_type": "invalid_code",
+                        "message": "❌ Incorrect or expired TV code."}
+
+            # 3e: reactContext flow-mode success — Netflix's React SPA may
+            #     transition the flow mode to a success state inside the
+            #     reactContext JSON without redirecting. But we MUST only
+            #     check inside the actual "mode" field value in the cleaned
+            #     text (scripts stripped), NOT the full raw HTML. The raw
+            #     HTML always contains "tvLoginSuccess" as a route/path
+            #     definition in the JS bundles regardless of outcome.
+            clean_text_lower = clean_text.lower()
+            react_mode_success = False
+            # These patterns only match the actual reactContext mode value,
+            # not JS route definitions (which were stripped above)
+            for marker in ['"mode":"tvloginsuccess"', '"mode": "tvloginsuccess"',
+                           '"mode":"logincomplete"', '"mode": "logincomplete"',
+                           'mode tvloginsuccess', 'mode logincomplete']:
+                if marker in clean_text_lower:
+                    react_mode_success = True
+                    break
+            if react_mode_success:
+                logger.info("TV activation SUCCESS: reactContext flow-mode transition")
+                details = await self.get_account_details()
+                return {
+                    "success": True,
+                    "message": "✅ TV activated successfully!",
+                    "details": details,
+                    "country": details.get("country", "Unknown"),
+                    "plan": details.get("plan", "Unknown"),
+                    "email": details.get("email", "Unknown"),
+                    "video_quality": details.get("video_quality", "Unknown"),
+                }
+
+            # 3f: Success text patterns (FreeTV.py's explicit success indicators)
+            if self._is_tv_code_success(final_url, clean_text):
+                # Text-based success detected — VERIFY by re-fetching /tv8
+                # to confirm the PIN form is actually gone.
+                logger.info("TV activation text-pattern success detected, verifying...")
+                verify_passed = True
+                try:
+                    import time as _time
+                    _time.sleep(1.5)
+                    verify_r = curl_session.get("https://www.netflix.com/tv8", **base_kwargs)
+                    # Strip JS from verify response too — same false-positive risk
+                    verify_clean = re.sub(r'<script[^>]*>.*?</script>', '', verify_r.text,
+                                          flags=re.DOTALL | re.IGNORECASE)
+                    verify_lower = verify_clean.lower()
+
+                    # If PIN form is STILL showing → false positive
+                    if ("pin-number-input" in verify_lower or
+                            "entertvloginrendezvouscode" in verify_lower or
+                            "witcher-code-form" in verify_lower):
+                        # Double-check: does the cleaned verify page also
+                        # show a success message in visible text?
+                        has_success_in_verify = any(
+                            m in verify_lower for m in
+                            ['your tv is ready', 'device activated',
+                             'tu tv est', 'sua tv est', 'votre t',
+                             'dein tv ist', 'activation complete']
+                        )
+                        if has_success_in_verify:
+                            logger.info("TV activation verify: PIN form + success text both present → trusting success")
+                        else:
+                            logger.warning("TV activation FALSE POSITIVE — PIN form still showing after delay")
+                            verify_passed = False
+                except Exception as e:
+                    logger.warning(f"Post-activation verify failed: {e}, trusting original success")
+
+                if verify_passed:
+                    logger.info("TV activation SUCCESS: verified via text pattern + /tv8 re-check")
+                    details = await self.get_account_details()
+                    return {
+                        "success": True,
+                        "message": "✅ TV activated successfully!",
+                        "details": details,
+                        "country": details.get("country", "Unknown"),
+                        "plan": details.get("plan", "Unknown"),
+                        "email": details.get("email", "Unknown"),
+                        "video_quality": details.get("video_quality", "Unknown"),
+                    }
+                else:
+                    return {"success": False, "error_type": "not_accepted",
+                            "message": "❌ Code was not accepted. Please try a fresh code."}
+
+            # 3g: Session expired (redirected to login)
+            if "login" in final_url_lower or "signin" in final_url_lower:
                 return {"success": False, "error_type": "session_expired",
                         "message": "❌ Session expired. Cookie is no longer valid."}
 
+            # 3h: Everything else → AMBIGUOUS (retryable, never assume success)
+            logger.warning(f"TV activation AMBIGUOUS — will retry. "
+                           f"URL={final_url}, status={r.status_code}, "
+                           f"text_preview={clean_text[:200]}")
             return {
                 "success": False,
-                "error_type": "unknown",
-                "message": f"⚠️ Unexpected response (status {response.status_code}). The code may be invalid or expired."
+                "error_type": "activation_ambiguous",
+                "message": f"⚠️ Unexpected response (status {r.status_code}). Retrying..."
             }
 
-        except httpx.TimeoutException:
-            return {"success": False, "error_type": "timeout", "message": "❌ Request timed out. Please try again."}
         except Exception as e:
             logger.error(f"Error activating TV: {e}")
-            return {"success": False, "error_type": "error", "message": f"❌ Error: {str(e)}"}
+            return {"success": False, "error_type": "error",
+                    "message": f"❌ Error: {str(e)}"}
+        finally:
+            try:
+                curl_session.close()
+            except Exception:
+                pass
 

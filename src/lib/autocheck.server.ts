@@ -214,8 +214,8 @@ export async function runCookiesAutocheck(force = false): Promise<CookieRunResul
       if (proxyId) {
         await supabaseAdmin.rpc("release_proxy", {
           _id: proxyId,
-          _success: true,
-          _err: undefined,
+          _success: !out.transient,
+          _err: out.transient ? (out.error ?? "Transient cookie check failure") : undefined,
         });
       }
       if (out.transient) {

@@ -107,7 +107,8 @@ async def check(
     cookie_payload = _cookie_payload(body.cookies, body.cookie_text)
     proxy = _proxy_url(body.proxy)
     try:
-        result = check_cookie_sync(cookie_payload, proxy)
+        import asyncio as _asyncio
+        result = await _asyncio.to_thread(check_cookie_sync, cookie_payload, proxy)
     except Exception as e:  # pragma: no cover
         log.exception("check_cookie failed")
         return {"status": "unknown", "is_valid": False, "transient": True, "error": str(e)}
@@ -147,9 +148,14 @@ async def activate(
         # fast cookie pre-check, proxy-aware activation, and bot status mapping.
         # Offload to a worker thread — activate_tv_code calls asyncio.run()
         # internally, which fails inside FastAPI's running event loop.
+        #
+        # IMPORTANT: activate_tv_code signature is:
+        #   (cookie_blob, tv_code, region=None, proxy_url=None)
+        # `proxy` MUST be passed as a keyword arg to `proxy_url`, NOT as the
+        # 3rd positional arg (which maps to the unused `region` param).
         import asyncio as _asyncio
         res = await _asyncio.to_thread(
-            activate_tv_code, cookie_payload, body.code, proxy
+            activate_tv_code, cookie_payload, body.code, None, proxy
         )
     except Exception as e:  # pragma: no cover
         log.exception("activate_tv failed")
@@ -168,7 +174,7 @@ async def activate(
         err_type = "free"
     elif err_type == "on_hold_account":
         err_type = "on_hold"
-    elif err_type == "check_failed":
+    elif err_type in ("check_failed", "activation_ambiguous"):
         err_type = "tv8_unavailable"
     elif err_type in ("not_accepted", "expired_code"):
         err_type = "invalid_code"

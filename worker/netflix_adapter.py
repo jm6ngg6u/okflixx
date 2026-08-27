@@ -282,7 +282,8 @@ def activate_tv_code(cookie_blob, tv_code: str, region: Optional[str] = None,
     # (common on slow containers). Also a transient/infrastructure issue, not a dead
     # cookie. Same treatment: skip, retry, do not delete.
     # "timeout" / "error" — network-level failures, not confirmed cookie state.
-    if err_type in ("tv8_unavailable", "auth_expired", "timeout", "error"):
+    if err_type in ("tv8_unavailable", "auth_expired", "timeout", "error",
+                     "activation_ambiguous"):
         return {"success": False, "error_type": "check_failed",
                 "error": msg, "cookie_dead": False, "cookie_transient": True}
     if err_type in ("session_expired", "blocked", "auth"):
