@@ -1,53 +1,45 @@
+# Fresh host for OKFLIX + GitHub repo + worker token
 
-# OKFLIX Launch Readiness Deep Audit — Execution Plan
+## What the uploaded archive is
 
-Scope: Deliver the full Phase 1–6 audit exactly as specified in the uploaded brief. No item skipped. Evidence-based (file:line, SQL, RPC invocation, Playwright). Order strictly Phase 1 → 6.
+`okflix-source-clean-3.zip` contains 205 files under `okflix-source/` — the same app that already lives in this project (`src/`, `public/`, `worker/`, `supabase/`, plus `package.json`, `vite.config.ts`, `railway.json`, `nixpacks.toml`). It has no `.git` folder and no `node_modules`, so it is safe to use as source material.
 
-## Phase 1 — Discovery (systems 1–37)
-For each of the 37 systems (Public 1–9, Admin 10–24, Server fns 25–32, DB 33–37) perform:
-- 1a static read (imports, side effects, module-scope `process.env`, timers, AbortControllers)
-- 1b data-flow trace of every await/RPC/realtime
-- 1c state matrix (loading/empty/partial/error/offline/rate-limited/unauth/maintenance/job-*/gate-*/reduced-motion/hidden-tab)
-- 1d secret hygiene grep across `src/lib/*.functions.ts`
-- 1e schema snapshot per table (columns, policies, grants, indexes)
-- 1f RPC hygiene (SECURITY DEFINER, `search_path=public`, EXECUTE grants)
-- 1g cron audit (`cron.job` + `cron.job_run_details`)
+Two files in it are newer than the copy in the project: `nixpacks.toml`, `railway.json` (Railway build config) and `worker/server.py`.
 
-Batched in parallel where independent: reads of files, SQL introspection queries, `supabase--linter`, grep sweeps.
+## Plan
 
-## Phase 2 — Defect Log
-Enumerate every finding as F### with severity P0/P1/P2 across categories:
-A. Correctness · B. Concurrency/Races · C. Error handling · D. Security (RLS/GRANT/service-role/captcha residue/AAL2/OAuth redirect/rate-limit gate rule) · E. Performance @ 2000 users + required indexes · F. Data integrity (uniqueness, FKs, stuck-lock reaper, override drift) · G. UX/a11y (dropdown opacity, reduced motion, focus trap, tap targets) · H. Observability (job_runs, admin_activity_log, structured logs, quiet hours) · I. Cloudflare Workers runtime · J. Regression matrix toggles.
+### 1. Sync the project to the archive (build mode)
+- Extract the zip to a temp folder and compare it file-by-file with the project.
+- Overwrite project files with the archive versions where they differ, and delete project files that no longer exist in the archive (excluding `node_modules`, lockfiles, `.git`, and Lovable-generated integration files).
+- Leave auto-generated backend integration files and `.env` untouched — they are tied to this project's backend and must not be replaced by the archive copies.
+- Run a build check afterwards and fix anything the sync breaks.
 
-No fixes yet. Each finding cites file:line / table.column / rpc name.
+### 2. Publish to `okflix.lovable.app`
+- Run a security scan, then publish with the slug `okflix`, which produces `https://okflix.lovable.app`.
+- The old preview URL keeps working; publishing simply repoints the live site to the current code. Fully removing an existing published site is done with the Unpublish button in Project settings — I cannot do that from chat.
 
-## Phase 3 — Fix Plan
-Every F### gets: severity, location, root cause, minimal-diff strategy, exact verification command, rollback. Ordered P0-security → P0-crash → P1 → P2 with dependency ordering (fix RLS before RPC that traverses it).
+### 3. GitHub repository
+Creating the repo has to be done by you, from the Lovable UI — the agent cannot create or connect a Git remote:
+- Project settings > GitHub > Connect to GitHub, then "Create repository".
+- That makes a fresh repo owned by your GitHub account and two-way syncs this project into it.
+Tell me once it exists if you want the repo contents adjusted (README, deploy docs, etc.).
 
-## Phase 4 — Implement
-One finding at a time. Minimal diff. Run the exact verification before advancing. Re-run `supabase--linter` after every migration. Revert before re-patching if a prior fix was wrong.
+### 4. Worker token — what to set
 
-## Phase 5 — End-to-End Verification Matrix
-Execute all 37 scenarios in the brief's table. Record pass/fail with evidence link (screenshot path / SQL result / server-function log line). Playwright drives interactive scenarios; SQL + `stack_modern--invoke-server-function` drives server-side ones.
+The website talks to the Python worker with a shared secret. Three values, two places:
 
-## Phase 6 — Final Report
-1. Executive summary + launch verdict (ship / ship-with-caveats / hold)
-2. Full defect log with status
-3. Diff summary (files, ±lines, migrations)
-4. Verification evidence table
-5. Residual risks + monitoring alerts (job failures, worker_error rate >5%, realtime disconnect, stuck locks >10)
-6. Production launch checklist (all 17 items ticked)
+| Where | Variable | Value |
+|---|---|---|
+| Railway (worker service) | `WORKER_TOKEN` | a long random string you generate |
+| Website (Lovable secrets) | `NETFLIX_WORKER_TOKEN` | the exact same string |
+| Website (Lovable secrets) | `NETFLIX_WORKER_URL` | your Railway public URL, no trailing slash |
 
-## Rules of engagement (enforced throughout)
-- Read before edit. Never guess.
-- No edits to auto-generated files (`src/integrations/supabase/*` except non-generated, `.env`, `supabase/config.toml`, `routeTree.gen.ts`, `_authenticated/route.tsx`).
-- Preserve design tokens: uppercase headers, opaque dropdowns, Work Sans + Sora, `.text-shine`/`.text-live`/`.glow-border`/`.why-card`/`.faq-card`, red-gradient hover.
-- No emojis in code. No stray `console.log`. Structured logs only.
-- Never mark fixed without the exact listed verification. Revert before re-patching.
-- Surface conflicts with prior memories (no captcha, no admin maintenance bypass, uppercase kickers) before proceeding.
+Generate the token with `openssl rand -hex 32` (64 hex chars). The worker rejects any request whose `X-Worker-Token` header does not match `WORKER_TOKEN`, and it refuses to serve at all if the variable is empty.
 
-## Deliverable cadence
-Begin at Phase 1 / System 1 (`src/routes/index.tsx`) and proceed sequentially through all 37. Progress reported in-line as each phase completes; no Phase 6 summary until Phases 1–5 are done.
+When you send the Railway URL, I will store both secrets and run the built-in worker health check from Admin > Settings to confirm the website reaches it.
 
-## Estimated size
-Large. Expect dozens of file reads, ~30–60 SQL introspection queries, one or more migrations for missing indexes / stuck-lock reaper / cron prefix rename if `emberlord-*` still active, targeted Playwright runs for scenarios 12, 17–23, 27–29, 32, 36.
+## Technical notes
+
+- Railway deploy config in the archive: Nixpacks with `bun install --frozen-lockfile`, `bun run build`, start `bun run start`, healthcheck `/` with a 300s timeout.
+- The website itself is hosted on Lovable; only the Python worker (`worker/server.py`, FastAPI) belongs on Railway.
+- Backend data (cookies, proxies, settings, admin accounts) lives in the project backend and is not affected by re-hosting the code.
